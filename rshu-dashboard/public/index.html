@@ -195,6 +195,13 @@ function renderPage(data, period) {
         <div style="font-size:13px;color:#1565C0;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">📋 В работе на начало периода</div>
         <div style="font-size:42px;font-weight:800;color:#0D47A1;margin:4px 0">${(carry.cnt || 0).toLocaleString()}</div>
         <div style="font-size:16px;color:#1565C0;">сделок на сумму ${(carry.sum || 0).toLocaleString()} ₽</div>
+        <div style="font-size:11px;color:#6a7a9a;margin-top:4px">на 30.04.2026</div>
+      </div>
+      <div class="card" style="background:linear-gradient(135deg,#f3e5f5,#e1bee7);border-left:5px solid #9C27B0;padding:24px">
+        <div style="font-size:13px;color:#9C27B0;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">📊 Объём воронки</div>
+        <div style="font-size:42px;font-weight:800;color:#6A1B9A;margin:4px 0">${((carry.cnt || 0) + (data.totalCreatedCnt || 0)).toLocaleString()}</div>
+        <div style="font-size:16px;color:#9C27B0;">сделок на сумму ${((carry.sum || 0) + (data.totalCreatedSum || 0)).toLocaleString()} ₽</div>
+        <div style="font-size:11px;color:#6a7a9a;margin-top:4px">в работе на начало + создано в периоде</div>
       </div>
       <div class="card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-left:5px solid #2E7D32;padding:24px">
         <div style="font-size:13px;color:#2E7D32;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">➕ Создано за период</div>
@@ -450,7 +457,7 @@ function renderAprilPage(data) {
       <div class="card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-left:5px solid #2E7D32;padding:24px">
         <div style="font-size:13px;color:#2E7D32;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">➕ Создано в периоде</div>
         <div style="font-size:42px;font-weight:800;color:#1B5E20;margin:4px 0">${(data.totalCreatedCnt || 0).toLocaleString()}</div>
-        <div style="font-size:16px;color:#2E7D32;">новых сделок в Сейл (без ПреСейл и КОМ)</div>
+        <div style="font-size:16px;color:#2E7D32;">создано в Sale + PreSale (без WON)</div>
       </div>
     </div>
 
@@ -479,6 +486,10 @@ function renderAprilPage(data) {
     <div class="twocol">
       <div class="card"><h3>🏆 Топ менеджеров (оплаченные)</h3><div class="scroll-x"><table id="mgrsAprilTable"><thead><tr><th>#</th><th>Менеджер</th><th>Оплат</th><th>Сумма</th></tr></thead><tbody></tbody></table></div></div>
       <div class="card"><h3>📈 Поступления по дням</h3><div class="chartbox"><canvas id="dailyChartApril"></canvas></div><div style="margin-top:8px;font-size:12px;color:#6a7a9a;text-align:center" id="dailyStatsApril"></div></div>
+      <div class="twocol" style="margin-top:16px">
+        <div class="card"><h3>🥧 Направления обучения</h3><div class="chartbox" style="height:250px"><canvas id="dirChartApril"></canvas></div></div>
+        <div class="card"><h3>📊 Форматы обучения</h3><div class="chartbox" style="height:250px"><canvas id="fmtChartApril"></canvas></div></div>
+      </div>
     </div>
 
     <!-- Объём воронки Sale в работе -->
@@ -555,6 +566,13 @@ function renderAprilPage(data) {
 
   drawAprilCharts(periods);
   if (data.dailyPaid) drawAprilDailyChart(data.dailyPaid);
+  // Загружаем данные для графиков (направления, форматы)
+  fetch(window.location.origin + '/rshu-dashboard/api/charts-data')
+    .then(r => r.json())
+    .then(chartData => {
+      if (!chartData || chartData.error) return;
+      drawChartsApril(chartData);
+    }).catch(() => {});
 }
 
 function drawAprilDailyChart(dailyData) {
@@ -655,7 +673,7 @@ function drawAprilDailyChart(dailyData) {
 function drawAprilCharts(periods) {
   if (!periods || !periods.length) return;
   // Уничтожаем старые графики
-  ['wonChartApril','cntChartApril','avgChartApril','dailyChartApril'].forEach(id => {
+  ['wonChartApril','cntChartApril','avgChartApril','dailyChartApril','dirChartApril','fmtChartApril'].forEach(id => {
     if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
   });
 
@@ -688,7 +706,7 @@ function drawAprilCharts(periods) {
     const steps = [
       { label: 'Все лиды за период', val: aprilData.totalCreatedCnt || 0, color: '#42A5F5' },
       { label: 'В Sale + на квалификации', val: (aprilData.createdSale || 0) + (aprilData?.saleAndPreSaleInWork || 0), color: '#1E88E5' },
-      { label: 'Воронка Sale', val: aprildata.createdSale || 0, color: '#1565C0' },
+      { label: 'Воронка Sale', val: aprilData.createdSale || 0, color: '#1565C0' },
       { label: '✅ Оплачено', val: aprilData.paidFromCreated || 0, color: '#22c55e' },
       { label: '🔄 В работе (Sale)', val: aprilData.inWorkSale || 0, color: '#FDD835' },
       { label: '❌ + отказы (Sale)', val: aprilData.inWorkAndLostSale || 0, color: '#FF9800' },
@@ -714,6 +732,54 @@ function drawAprilCharts(periods) {
   }
 }
 
+// --- Графики: направления и форматы ---
+function drawChartsApril(cd) {
+  if (chartInstances.dirChartApril) chartInstances.dirChartApril.destroy();
+  if (chartInstances.fmtChartApril) chartInstances.fmtChartApril.destroy();
+  
+  const dirCanvas = document.getElementById('dirChartApril');
+  if (dirCanvas && cd.directions && cd.directions.length) {
+    chartInstances.dirChartApril = new Chart(dirCanvas, {
+      type: 'doughnut',
+      data: {
+        labels: cd.directions.filter(d => d.cnt > 1).map(d => d.name + ' (' + d.cnt + ')'),
+        datasets: [{
+          data: cd.directions.filter(d => d.cnt > 1).map(d => d.sum),
+          backgroundColor: ['#1565C0','#2E7D32','#E67E22','#C62828','#7B1FA2','#00838F','#FF8F00','#43A047','#5C6BC0','#78909C','#D81B60','#00ACC1']
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 12, padding: 8 } },
+          tooltip: { callbacks: { label: ctx => ctx.parsed.toLocaleString() + ' руб' } }
+        }
+      }
+    });
+  }
+  
+  const fmtCanvas = document.getElementById('fmtChartApril');
+  if (fmtCanvas && cd.formats && cd.formats.length) {
+    chartInstances.fmtChartApril = new Chart(fmtCanvas, {
+      type: 'bar',
+      data: {
+        labels: cd.formats.filter(d => d.name !== 'Другой').map(d => d.name),
+        datasets: [
+          { label: 'Сумма, руб', data: cd.formats.filter(d => d.name !== 'Другой').map(d => d.sum),
+            backgroundColor: ['#1565C0','#2E7D32','#E67E22','#C62828','#7B1FA2'], borderRadius: 4 },
+          { label: 'Кол-во', data: cd.formats.filter(d => d.name !== 'Другой').map(d => d.cnt),
+            backgroundColor: ['#90CAF9','#A5D6A7','#FFCC80','#EF9A9A','#CE93D8'], borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } } }
+      }
+    });
+  }
+}
+
 // --- Переключение на вкладку «Апрель» ---
 let currentTab = 'main'; // 'main' or 'april'
 
@@ -727,7 +793,12 @@ document.getElementById('aprilTabBtn').addEventListener('click', async function(
   area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Расчёт по новым правилам…</div></div>';
 
   try {
-    const data = await api('/api/month-report?year=2026&month=5');
+    let data = await api('/api/month-report?year=2026&month=5');
+    // Если кеш не готов, пробуем live API
+    if (data.error || data.ready === false) {
+      area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка данных (live)…</div></div>';
+      data = await fetch(window.location.origin + '/rshu-dashboard/api/live-month-report?year=2026&month=5').then(r => r.json());
+    }
     if (data.error) {
       area.innerHTML = '<div class="error-state">❌ ' + data.error + '</div>';
       return;

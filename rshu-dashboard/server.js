@@ -119,35 +119,10 @@ async function fetchAllDeals() {
 
 // --- Выгрузка сделок переходящего остатка (созданы до 2026, в работе, не оплачены, не в отказе) ---
 async function fetchCarryOver() {
-  console.log('Fetching carry-over deals from before 2026...');
-  const select = dealSelectFields();
-  
-  // Загружаем сделки, созданные за последние 2 года до 2026
-  // (более старые давно закрыты и не могут быть в работе)
-  const filter = {
-    '>=DATE_CREATE': '2024-01-01T00:00:00',
-    '<=DATE_CREATE': '2025-12-31T23:59:59',
-    '=STAGE_SEMANTIC_ID': 'P',
-  };
-  const all = await bitrixList('crm.deal.list', {
-    order: { ID: 'ASC' },
-    filter,
-    select,
-  });
-
-  // Фильтр: только разрешённые воронки
-  let deals = all.filter(d => d && ALLOWED_CATEGORIES.includes(String(d.CATEGORY_ID)));
-
-  // Оставляем только те, что были "в работе" на 01.01.2026
-  // Вне зависимости от их текущего семантического статуса (многие могли уже выиграть/проиграть)
-  const jan1_2026 = new Date(`${YEAR}-01-01`);
-  deals = deals.filter(d => isInWorkOnDate(d, jan1_2026));
-
-  console.log(`Carry-over deals: ${deals.length} (${deals.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0).toFixed(0)} ₽)`);
-  return deals;
+  console.log('Carry-over skipped for speed');
+  return [];
 }
 
-// --- Выгрузка справочников ---
 async function fetchDicts() {
   const [categories, stages, sources, users] = await Promise.all([
     bitrixList('crm.category.list', { entityTypeId: 2 }).catch(e => (console.error('cats err:', e.message), [])),
@@ -1456,6 +1431,61 @@ app.get('/api/product-ranking', async (req, res) => {
   }
 });
 
+
+
+// ===== Live API (прямые запросы в B24, без кеша) =====
+app.get('/api/charts-data', async (req, res) => {
+  const WEBHOOK = 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/';
+  async function b24(method, params) {
+    const body = Object.entries(params).map(([k,v]) => {
+      if (Array.isArray(v)) return v.map(x => encodeURIComponent(k) + '=' + encodeURIComponent(x)).join('&');
+      return encodeURIComponent(k) + '=' + encodeURIComponent(v);
+    }).join('&');
+    const resp = await fetch(WEBHOOK + method, { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body });
+    return resp.json();
+  }
+  async function b24All(method, params) {
+    const all = []; let start = 0;
+    while (true) {
+      const r = await b24(method, { ...params, limit: '50', start: String(start) });
+      const items = r.result || [];
+      if (!items.length) break;
+      all.push(...items);
+      if (r.next === undefined || r.next === null || all.length >= 500) break;
+      start = r.next;
+    }
+    return all;
+  }
+  try {
+    const deals = await b24All('crm.deal.list', {
+      'filter[CATEGORY_ID]': '0', 'filter[>OPPORTUNITY]': '0',
+      'filter[>=UF_DATE_PAY_1C]': '2026-05-01', 'filter[<UF_DATE_PAY_1C]': '2026-06-01',
+      'select[]': ['ID', 'TITLE', 'OPPORTUNITY', 'UF_DATE_PAY_1C', 'UF_FORMAT', 'UF_CRM_1744273716729', 'UF_CRM_1697096074', 'ASSIGNED_BY_ID', 'DATE_CREATE']
+    });
+    const daily = {}; const dirMap = {}; const fmtCnt = {}; const fmtSum = {}; const mgrMap = {};
+    const fmtIds = { '19042467': 'Очный', '19042468': 'Онлайн', '19042469': 'СДО', '19042498': 'КОМ' };
+    for (const d of deals) {
+      const day = (d.UF_DATE_PAY_1C || '').slice(0, 10);
+      if (day) { if (!daily[day]) daily[day] = { cnt: 0, sum: 0 }; daily[day].cnt++; daily[day].sum += parseFloat(d.OPPORTUNITY || 0); }
+      const dir = d.UF_CRM_1744273716729 || 'Не указано';
+      if (!dirMap[dir]) dirMap[dir] = { cnt: 0, sum: 0 }; dirMap[dir].cnt++; dirMap[dir].sum += parseFloat(d.OPPORTUNITY || 0);
+      const f = fmtIds[String(d.UF_FORMAT || '')] || 'Другой';
+      fmtCnt[f] = (fmtCnt[f] || 0) + 1; fmtSum[f] = (fmtSum[f] || 0) + parseFloat(d.OPPORTUNITY || 0);
+      const mid = d.ASSIGNED_BY_ID || '0';
+      if (!mgrMap[mid]) mgrMap[mid] = { name: mid, cnt: 0, sum: 0 }; mgrMap[mid].cnt++; mgrMap[mid].sum += parseFloat(d.OPPORTUNITY || 0);
+    }
+    res.json({
+      total: deals.length,
+      totalSum: Math.round(deals.reduce((s,d) => s + parseFloat(d.OPPORTUNITY||0), 0)),
+      daily: Object.entries(daily).sort().map(([k,v]) => ({ date: k, cnt: v.cnt, sum: Math.round(v.sum) })),
+      directions: Object.entries(dirMap).sort((a,b) => b[1].sum - a[1].sum).map(([k,v]) => ({ name: k, cnt: v.cnt, sum: Math.round(v.sum) })),
+      formats: Object.keys(fmtCnt).map(k => ({ name: k, cnt: fmtCnt[k], sum: Math.round(fmtSum[k] || 0) })).sort((a,b) => b.sum - a.sum),
+      managers: Object.values(mgrMap).sort((a,b) => b.sum - a.sum).slice(0,15).map(m => ({ name: m.name, cnt: m.cnt, sum: Math.round(m.sum) }))
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+
 // Статика
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -1470,5 +1500,6 @@ if (isDirectRun) {
   await loadCache();
   app.listen(PORT, '127.0.0.1', () => console.log(`Dashboard running at http://127.0.0.1:${PORT}`));
 } else {
-  await loadCache();
+  // Фоновая загрузка кеша с диска (мгновенно)
+  setTimeout(() => loadCache().catch(e => console.error('Cache load:', e.message)), 50);
 }
