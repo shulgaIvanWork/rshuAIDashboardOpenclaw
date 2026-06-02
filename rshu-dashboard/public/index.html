@@ -410,35 +410,57 @@ function renderAprilPage(data) {
 
   area.innerHTML = `
     <div class="kpis" id="kpiApril">
-      <div class="kpi" style="border-top-color:#1565C0"><div class="label">Поступления (апрель)</div><div class="val">${(data.totalPaidSum||0).toLocaleString()} ₽</div><div class="sub">${data.totalPaidCnt||0} оплат</div></div>
-      <div class="kpi"><div class="label">Средний чек</div><div class="val">${Math.round(data.avgCheck||0).toLocaleString()} ₽</div></div>
-      <div class="kpi"><div class="label">Конверсия</div><div class="val">${(data.conversion||0).toFixed(1)}%</div></div>
-      <div class="kpi"><div class="label">Создано в апреле</div><div class="val">${(data.totalCreatedSum||0).toLocaleString()} ₽</div><div class="sub">${data.totalCreatedCnt||0} новых</div></div>
+      <div class="kpi" style="border-top-color:#1565C0"><div class="label">Поступления в периоде</div><div class="val">${(data.totalPaidSum||0).toLocaleString()} ₽</div><div class="sub">${data.totalPaidCnt||0} оплат</div></div>
+      <div class="kpi"><div class="label">Средний чек</div><div class="val">${Math.round(data.avgCheck||0).toLocaleString()} ₽</div><div class="sub">${data.avgCheckDelta > 0 ? '↑' : data.avgCheckDelta < 0 ? '↓' : ''} ${Math.abs(data.avgCheckDelta || 0).toFixed(1)}% к прошлому месяцу</div></div>
+      <div class="kpi"><div class="label">Конверсия (факт)</div><div class="val">${(data.conversionFact||0).toFixed(1)}%</div><div class="sub">по закрытым сделкам</div></div>
+      <div class="kpi"><div class="label">Конверсия (потенциал)</div><div class="val">${(data.conversionPotential||0).toFixed(1)}%</div><div class="sub">если все в работе закроются успешно</div></div>
+      <div class="kpi" style="border-top-color:#9C27B0"><div class="label">📊 Конверсия (взвешенная)</div><div class="val">${(data.conversionWeighted||0).toFixed(1)}%</div><div class="sub">с учётом весов стадий</div></div>
+      <div class="kpi" style="border-top-color:#00838F"><div class="label">🔄 Цикл сделки</div><div class="val">${data.dealCycleDays||0} дн.</div><div class="sub">среднее от создания до оплаты</div></div>
+      <div class="kpi" style="border-top-color:#9C27B0"><div class="label">📄 Выставлено счетов</div><div class="val">${(data.invoiceSum||0).toLocaleString()} ₽</div><div class="sub">${data.invoiceCnt||0} счетов · оплачено ${data.invoicePaid||0} / ${(data.invoicePaidSum||0).toLocaleString()} ₽ · конв. ${data.invoiceCnt ? ((data.invoicePaid||0)/data.invoiceCnt*100).toFixed(1) : 0}%</div></div>
+      <div class="kpi" style="border-top-color:#2E7D32"><div class="label">③ Все лиды за период</div><div class="val">${(data.totalCreatedSum||0).toLocaleString()} ₽</div><div class="sub">${data.totalCreatedCnt||0} сделок</div></div>
+      <div class="kpi" style="border-top-color:#E67E22"><div class="label">② В Sale + на квалификации</div><div class="val">${(data.saleAndPreSaleInWorkSum||0).toLocaleString()} ₽</div><div class="sub">${data.saleAndPreSaleInWork||0} сделок</div></div>
+      <div class="kpi" style="border-top-color:#22c55e"><div class="label">④ Оплачено</div><div class="val">${(data.paidFromCreatedSum||0).toLocaleString()} ₽</div><div class="sub">${data.paidFromCreated||0} из ${data.totalPaidCnt||0} оплат месяца (${data.totalPaidCnt ? ((data.paidFromCreated/data.totalPaidCnt)*100).toFixed(1) : 0}%)</div></div>
+      <div class="kpi" style="border-top-color:#1565C0"><div class="label">① Воронка Sale</div><div class="val">${(data.createdSaleSum||0).toLocaleString()} ₽</div><div class="sub">${data.createdSale||0} сделок</div></div>
       <div class="kpi"><div class="label">Лучшая неделя</div><div class="val">${bestLabel || '—'}</div><div class="sub">${(bestSum||0).toLocaleString()} ₽</div></div>
       <div class="kpi"><div class="label">Последняя неделя</div><div class="val">${(last.paidSum||0).toLocaleString()} ₽</div><div class="sub">${last.paidCnt||0} оплат <span class="delta ${delta>=0?'pos':'neg'}">${delta>=0?'↑':'↓'} ${Math.abs(delta).toFixed(1)}%</span></div></div>
     </div>
 
+    <div class="card" style="margin-bottom:20px">
+      <h3>📊 Воронка лидов (май 2026)</h3>
+      <div id="funnelContainer" style="margin:12px auto;max-width:650px"></div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:12px;justify-content:center">
+        <div>🔵 Все лиды: ${(data.totalCreatedCnt||0).toLocaleString()}</div>
+        <div>🔵 В Sale+квал.: ${(data.saleAndPreSaleInWork||0).toLocaleString()}</div>
+        <div>🔵 Воронка Sale: ${(data.createdSale||0).toLocaleString()}</div>
+        <div>🟢 Оплачено: ${(data.paidFromCreated||0).toLocaleString()}</div>
+        <div>🟡 В работе: ${(data.inWorkSale||0).toLocaleString()}</div>
+        <div>🟠 +отказы: ${(data.inWorkAndLostSale||0).toLocaleString()}</div>
+        <div>🔴 Отказы PreSale: ${(data.lostPreSale||0).toLocaleString()}</div>
+        <div>⚪ Неоплаченные: ${(data.totalCreatedCnt - data.paidFromCreated||0).toLocaleString()}</div>
+        <div>🔁 Все лиды: ${(data.totalCreatedCnt||0).toLocaleString()}</div>
+      </div>
+    </div>
     <div class="widget-inwork" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
       <div class="card" style="background:linear-gradient(135deg,#e3f2fd,#bbdefb);border-left:5px solid #1565C0;padding:24px">
-        <div style="font-size:13px;color:#1565C0;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">📋 В работе на начало апреля</div>
+        <div style="font-size:13px;color:#1565C0;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">📋 В работе на начало периода</div>
         <div style="font-size:42px;font-weight:800;color:#0D47A1;margin:4px 0">${(carry.cnt || 0).toLocaleString()}</div>
         <div style="font-size:16px;color:#1565C0;">сделок на сумму ${(carry.sum || 0).toLocaleString()} ₽</div>
         <div style="font-size:11px;color:#6a7a9a;margin-top:4px">на 31.03.2026, новые правила</div>
       </div>
       <div class="card" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-left:5px solid #2E7D32;padding:24px">
-        <div style="font-size:13px;color:#2E7D32;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">➕ Создано за апрель</div>
+        <div style="font-size:13px;color:#2E7D32;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">➕ Создано в периоде</div>
         <div style="font-size:42px;font-weight:800;color:#1B5E20;margin:4px 0">${(data.totalCreatedCnt || 0).toLocaleString()}</div>
         <div style="font-size:16px;color:#2E7D32;">новых сделок в Сейл (без ПреСейл и КОМ)</div>
       </div>
     </div>
 
-    <div class="card"><h2>Поступления по неделям апреля</h2><div class="chartbox"><canvas id="wonChartApril"></canvas></div></div>
+    <div class="card"><h2>Поступления по неделям</h2><div class="chartbox"><canvas id="wonChartApril"></canvas></div></div>
     <div class="twocol">
       <div class="card"><h2>Количество сделок</h2><div class="chartbox"><canvas id="cntChartApril"></canvas></div></div>
       <div class="card"><h2>Средний чек</h2><div class="chartbox"><canvas id="avgChartApril"></canvas></div></div>
     </div>
     <div class="card">
-      <h2>Детализация по неделям апреля</h2>
+      <h2>Детализация по неделям</h2>
       <div class="scroll-x"><table id="detailAprilTable">
         <thead><tr>
           <th>Неделя</th>
@@ -455,8 +477,8 @@ function renderAprilPage(data) {
       </table></div>
     </div>
     <div class="twocol">
-      <div class="card"><h3>🏆 Топ менеджеров (апрель, оплаченные)</h3><div class="scroll-x"><table id="mgrsAprilTable"><thead><tr><th>#</th><th>Менеджер</th><th>Оплат</th><th>Сумма</th></tr></thead><tbody></tbody></table></div></div>
-      <div class="card"><h3>📈 Поступления по дням (апрель)</h3><div class="chartbox"><canvas id="dailyChartApril"></canvas></div><div style="margin-top:8px;font-size:12px;color:#6a7a9a;text-align:center" id="dailyStatsApril"></div></div>
+      <div class="card"><h3>🏆 Топ менеджеров (оплаченные)</h3><div class="scroll-x"><table id="mgrsAprilTable"><thead><tr><th>#</th><th>Менеджер</th><th>Оплат</th><th>Сумма</th></tr></thead><tbody></tbody></table></div></div>
+      <div class="card"><h3>📈 Поступления по дням</h3><div class="chartbox"><canvas id="dailyChartApril"></canvas></div><div style="margin-top:8px;font-size:12px;color:#6a7a9a;text-align:center" id="dailyStatsApril"></div></div>
     </div>
 
     <!-- Объём воронки Sale в работе -->
@@ -506,7 +528,7 @@ function renderAprilPage(data) {
     }).join('');
   }
 
-  // Топ менеджеров (оплаченные за апрель)
+  // Топ менеджеров (оплаченные за месяц)
   const mgrBody = document.querySelector('#mgrsAprilTable tbody');
   if (mgrBody && mgrs.length) {
     mgrBody.innerHTML = mgrs.slice(0, 20).map((m, i) => `<tr><td>${i+1}</td><td>${m.name}</td><td>${m.cnt}</td><td>${(m.sum||0).toLocaleString()} ₽</td></tr>`).join('');
@@ -572,7 +594,7 @@ function drawAprilDailyChart(dailyData) {
   const totalSum = paidSum.reduce((s, v) => s + v, 0);
   const totalCnt = paidCnt.reduce((s, v) => s + v, 0);
   document.getElementById('dailyStatsApril').textContent =
-    `Всего за апрель: ${totalSum.toLocaleString()} ₽ · ${totalCnt} оплат`;
+    `Всего за период: ${totalSum.toLocaleString()} ₽ · ${totalCnt} оплат`;
 
   chartInstances.dailyChartApril = new Chart(canvas, {
     type: 'bar',
@@ -659,6 +681,37 @@ function drawAprilCharts(periods) {
     type: 'line', data: { labels, datasets: [{ label: 'Средний чек, ₽', data: avgData, borderColor: '#E67E22', backgroundColor: 'rgba(200,164,92,0.1)', fill: true, tension: 0.3, pointRadius: 3 }] },
     options: { ...common, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
+
+  // HTML-воронка (песочные часы)
+  const funnelDiv = document.getElementById('funnelContainer');
+  if (funnelDiv && aprilData) {
+    const steps = [
+      { label: 'Все лиды за период', val: aprilData.totalCreatedCnt || 0, color: '#42A5F5' },
+      { label: 'В Sale + на квалификации', val: (aprilData.createdSale || 0) + (aprilData?.saleAndPreSaleInWork || 0), color: '#1E88E5' },
+      { label: 'Воронка Sale', val: aprildata.createdSale || 0, color: '#1565C0' },
+      { label: '✅ Оплачено', val: aprilData.paidFromCreated || 0, color: '#22c55e' },
+      { label: '🔄 В работе (Sale)', val: aprilData.inWorkSale || 0, color: '#FDD835' },
+      { label: '❌ + отказы (Sale)', val: aprilData.inWorkAndLostSale || 0, color: '#FF9800' },
+      { label: '📄 Отказы (PreSale)', val: aprilData.lostPreSale || 0, color: '#ef5350' },
+      { label: '📦 Все неоплаченные', val: (aprilData.totalCreatedCnt || 0) - (aprilData.paidFromCreated || 0), color: '#819ca9' },
+      { label: '🔁 Все лиды (замыкание)', val: aprilData.totalCreatedCnt || 0, color: '#42A5F5' }
+    ];
+    const maxVal = steps[0].val || 1;
+    let html = '';
+    for (const s of steps) {
+      const pct = (s.val / maxVal) * 100;
+      const left = (100 - pct) / 2;
+      html += '<div style="display:flex;align-items:center;margin:4px 0;gap:10px">' +
+        '<div style="width:140px;text-align:right;font-size:12px;color:#555;flex-shrink:0">' + s.label + '</div>' +
+        '<div style="flex:1;height:28px;position:relative">' +
+          '<div style="position:absolute;left:' + left + '%;width:' + pct + '%;height:100%;background:' + s.color + ';border-radius:4px;display:flex;align-items:center;justify-content:center;min-width:40px">' +
+            '<span style="color:#fff;font-size:12px;font-weight:600;text-shadow:0 1px 2px rgba(0,0,0,0.3)">' + s.val.toLocaleString() + '</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+    funnelDiv.innerHTML = html;
+  }
 }
 
 // --- Переключение на вкладку «Апрель» ---

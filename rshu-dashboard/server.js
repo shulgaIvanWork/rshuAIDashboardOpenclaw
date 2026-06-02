@@ -69,6 +69,7 @@ function dealSelectFields() {
     'ASSIGNED_BY_ID','SOURCE_ID','PROBABILITY',
     'UF_DATE_PAY_1C',
     'UF_CRM_1474975772',  // Согл. дата оплаты
+    'UF_CRM_1753272713011', // Дата Счет отправлен
     UF_REFUSAL_DATE,
   ];
 }
@@ -272,8 +273,10 @@ function isPaidNew(d) {
   if (!d) return false;
   if (isCopy(d)) return false;
   if (isTechPaid(d)) return false;
-  // Только Сейл (воронка 0)
-  if (String(d.CATEGORY_ID) !== '0') return false;
+  // Sale + Pre Sale (кроме WON-копий)
+  const cat = String(d.CATEGORY_ID);
+  if (cat !== '0' && cat !== '8') return false;
+  if (cat === '8' && d.STAGE_SEMANTIC_ID === 'S') return false;
   if (!d.UF_DATE_PAY_1C) return false;
   if (parseFloat(d.OPPORTUNITY || 0) <= 0) return false;
   if (!(d.CLOSED === 'Y' && d.STAGE_SEMANTIC_ID === 'S')) return false;
@@ -344,7 +347,10 @@ function calcMonthNew(year, month, allDealsArray, carryOverDealsArray) {
   // 2. Созданные за месяц (только Сейл)
   const createdInMonth = validDeals.filter(d => {
     if (!d.DATE_CREATE) return false;
-    if (String(d.CATEGORY_ID) !== '0') return false;
+    const cat = String(d.CATEGORY_ID);
+    if (cat !== '0' && cat !== '8') return false;
+    // Pre Sale: исключаем WON (копии)
+    if (cat === '8' && d.STAGE_SEMANTIC_ID === 'S') return false;
     const cd = new Date(d.DATE_CREATE.slice(0, 10));
     return cd >= monthStart && cd <= monthEnd;
   });
@@ -449,11 +455,120 @@ function calcMonthNew(year, month, allDealsArray, carryOverDealsArray) {
     dailyPaid,
     totalCreatedCnt: createdInMonth.length,
     totalCreatedSum,
+    // Разбивка по воронкам
+    createdSale: createdInMonth.filter(d => String(d.CATEGORY_ID) === '0').length,
+    createdSaleSum: createdInMonth.filter(d => String(d.CATEGORY_ID) === '0').reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
+    // Sale P (в работе) + PreSale P (на квалификации)
+    createdInWork: createdInMonth.filter(d => d.STAGE_SEMANTIC_ID === 'P').length,
+    createdInWorkSum: createdInMonth.filter(d => d.STAGE_SEMANTIC_ID === 'P').reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
+    // Sale все + PreSale P (в работе)
+    saleAndPreSaleInWork: createdInMonth.filter(d => String(d.CATEGORY_ID) === '0' || (String(d.CATEGORY_ID) === '8' && d.STAGE_SEMANTIC_ID === 'P')).length,
+    saleAndPreSaleInWorkSum: createdInMonth.filter(d => String(d.CATEGORY_ID) === '0' || (String(d.CATEGORY_ID) === '8' && d.STAGE_SEMANTIC_ID === 'P')).reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
+    // Нижняя часть песочных часов (расширение)
+    // 5) В работе в Sale
+    inWorkSale: createdInMonth.filter(d => String(d.CATEGORY_ID) === '0' && d.STAGE_SEMANTIC_ID === 'P').length,
+    inWorkSaleSum: createdInMonth.filter(d => String(d.CATEGORY_ID) === '0' && d.STAGE_SEMANTIC_ID === 'P').reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
+    // 6) В работе + отказы в Sale
+    inWorkAndLostSale: createdInMonth.filter(d => String(d.CATEGORY_ID) === '0' && (d.STAGE_SEMANTIC_ID === 'P' || d.STAGE_SEMANTIC_ID === 'F')).length,
+    inWorkAndLostSaleSum: createdInMonth.filter(d => String(d.CATEGORY_ID) === '0' && (d.STAGE_SEMANTIC_ID === 'P' || d.STAGE_SEMANTIC_ID === 'F')).reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
+    // 7) Отказы PreSale
+    lostPreSale: createdInMonth.filter(d => String(d.CATEGORY_ID) === '8' && d.STAGE_SEMANTIC_ID === 'F').length,
+    lostPreSaleSum: createdInMonth.filter(d => String(d.CATEGORY_ID) === '8' && d.STAGE_SEMANTIC_ID === 'F').reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
     totalPaidCnt: paidInMonth.length,
     totalPaidSum,
+    // Оплачено из созданных в этом же периоде
+    paidFromCreated: createdInMonth.filter(d => {
+      if (!d.UF_DATE_PAY_1C) return false;
+      const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+      return pd >= monthStart && pd <= monthEnd;
+    }).length,
+    paidFromCreatedSum: createdInMonth.filter(d => {
+      if (!d.UF_DATE_PAY_1C) return false;
+      const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+      return pd >= monthStart && pd <= monthEnd;
+    }).reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
     totalLostCnt: lostInMonth.length,
     totalLostSum: lostInMonth.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
+    // Выставлены счета в периоде (дата счёта в периоде)
+    invoiceCnt: (() => {
+      return validDeals.filter(d => {
+        const sd = d.UF_CRM_1753272713011;
+        return sd && sd.length >= 10 && new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd;
+      });
+    })().length,
+    invoiceSum: (() => {
+      return validDeals.filter(d => {
+        const sd = d.UF_CRM_1753272713011;
+        return sd && sd.length >= 10 && new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd;
+      }).reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+    })(),
+    invoicePaid: (() => {
+      return validDeals.filter(d => {
+        const sd = d.UF_CRM_1753272713011;
+        if (!sd || sd.length < 10) return false;
+        if (!(new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd)) return false;
+        return isPaidNew(d);
+      }).length;
+    })(),
+    invoicePaidSum: (() => {
+      return validDeals.filter(d => {
+        const sd = d.UF_CRM_1753272713011;
+        if (!sd || sd.length < 10) return false;
+        if (!(new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd)) return false;
+        return isPaidNew(d);
+      }).reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+    })(),
     avgCheck,
+    conversionFact: paidInMonth.length && (paidInMonth.length + lostInMonth.length) ? paidInMonth.length / (paidInMonth.length + lostInMonth.length) * 100 : 0,
+    // Цикл сделки (среднее дней от создания до оплаты)
+    dealCycleDays: (() => {
+      const paid = paidInMonth.filter(d => d.DATE_CREATE && d.UF_DATE_PAY_1C);
+      if (!paid.length) return 0;
+      const days = paid.map(d => {
+        const created = new Date(d.DATE_CREATE.slice(0, 10));
+        const paidDate = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return (paidDate - created) / 86400000;
+      });
+      return Math.round(days.reduce((s, v) => s + v, 0) / days.length);
+    })(),
+    // Потенциальная конверсия с весами по стадиям
+    conversionWeighted: (() => {
+      const stageWeights = { 'PROPOSAL': 0.488, '2': 0.576, '6': 0.80 };
+      const inWork = createdInMonth.filter(d => d.STAGE_SEMANTIC_ID === 'P');
+      let weightedForecast = 0;
+      for (const d of inWork) {
+        const stage = d.STAGE_ID || '';
+        const sum = parseFloat(d.OPPORTUNITY || 0);
+        let weight = stageWeights[stage] || 0;
+        if (!weight) {
+          if (stage.endsWith(':PROPOSAL') || stage.includes('PROPOSAL')) weight = 0.488;
+          else if (stage.endsWith(':6') || stage === '6') weight = 0.80;
+          else if (stage === '2' || stage.endsWith(':2')) weight = 0.576;
+          else weight = 0.3;
+        }
+        weightedForecast += sum * weight;
+      }
+      const totalPaidSum = paidInMonth.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+      const totalLostSum = lostInMonth.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+      const denom = totalPaidSum + totalLostSum + weightedForecast;
+      return denom > 0 ? ((totalPaidSum + weightedForecast) / denom) * 100 : 0;
+    })(),
+
+    conversionPotential: (paidInMonth.length + lostInMonth.length + createdInMonth.filter(d => d.STAGE_SEMANTIC_ID === "P").length) ? (paidInMonth.length + createdInMonth.filter(d => d.STAGE_SEMANTIC_ID === "P").length) / (paidInMonth.length + lostInMonth.length + createdInMonth.filter(d => d.STAGE_SEMANTIC_ID === "P").length) * 100 : 0,
+    avgCheckDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevP = validDeals.filter(d => {
+        if (!isPaidNew(d) || !d.UF_DATE_PAY_1C) return false;
+        const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return pd >= ps && pd <= pe;
+      });
+      const prevSum = prevP.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+      const prevAvg = prevP.length ? prevSum / prevP.length : 0;
+      return prevAvg > 0 ? ((avgCheck - prevAvg) / prevAvg * 100) : 0;
+    })(),
     conversion,
     topManagers,
     dealsCount: validDeals.length,
