@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Клевер — чат</title>
+  <link rel="stylesheet" href="/style.css?v=3">
+  <script src="/marked.min.js?v=1"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-logo">🍀 Клевер</span>
+        <span class="sidebar-user"><%= user.name %></span>
+      </div>
+      <div class="sidebar-actions">
+        <button class="btn btn-sm btn-outline" onclick="newDialog()">+ Новый диалог</button>
+      </div>
+      <div class="dialog-list" id="dialogList">
+        <% dialogs.forEach(function(d) { %>
+          <div class="dialog-item <%= d.id === currentDialog ? 'active' : '' %>" 
+               onclick="switchDialog('<%= d.id %>')">
+            <div class="dialog-item-name"><%= d.title %></div>
+            <div class="dialog-item-preview"><%= d.lastMessage %></div>
+            <button class="dialog-delete" onclick="event.stopPropagation(); deleteDialog('<%= d.id %>')" title="Удалить">✕</button>
+          </div>
+        <% }) %>
+        <% if (dialogs.length === 0) { %>
+          <div class="dialog-empty">Нет диалогов</div>
+        <% } %>
+      </div>
+      <div class="sidebar-footer">
+        <a href="/dashboards" class="sidebar-link">📊 Дашборды</a>
+        <a href="/logout" class="sidebar-link logout-link">🚪 Выйти</a>
+      </div>
+    </aside>
+
+    <!-- Main chat area -->
+    <main class="chat-area">
+      <% if (currentDialog) { %>
+        <div class="chat-header">
+          <h2><%= currentDialogTitle %></h2>
+        </div>
+        <div class="messages" id="messages">
+          <% messages.forEach(function(m) { %>
+            <div class="message <%= m.role === 'user' ? 'message-user' : 'message-assistant' %>">
+              <div class="message-content"><%= m.content %></div>
+              <div class="message-time"><%= m.time %></div>
+            </div>
+          <% }) %>
+          <% if (messages.length === 0) { %>
+            <div class="messages-empty">
+              <p>Напишите, что нужно сделать</p>
+            </div>
+          <% } %>
+        </div>
+        <div class="chat-input">
+          <textarea id="messageInput" placeholder="Напишите сообщение..." rows="1" 
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea>
+          <button class="btn btn-primary" onclick="sendMessage()" id="sendBtn">Отправить</button>
+        </div>
+      <% } else { %>
+        <div class="chat-empty">
+          <div class="chat-empty-icon">🍀</div>
+          <h2>Выберите или создайте диалог</h2>
+          <p>Слева — список ваших диалогов</p>
+        </div>
+      <% } %>
+    </main>
+  </div>
+
+  <script>
+    const currentDialog = '<%= currentDialog || "" %>';
+
+    // При загрузке страницы — скролл вниз к последнему сообщению и рендер markdown
+    window.addEventListener('DOMContentLoaded', function() {
+      var msgs = document.getElementById('messages');
+      if (msgs) {
+        msgs.querySelectorAll('.message-assistant .message-content').forEach(function(el) {
+          el.innerHTML = marked.parse(el.textContent);
+        });
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    });
+    const userId = '<%= user.id %>';
+
+    function newDialog() {
+      const title = prompt('Название диалога:', 'Новый диалог');
+      if (!title) return;
+      fetch('/api/dialogs', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ title })
+      }).then(r => r.json()).then(d => {
+        if (d.id) window.location.href = '/chat?dialog=' + d.id;
+      });
+    }
+
+    function switchDialog(id) {
+      window.location.href = '/chat?dialog=' + id;
+    }
+
+    function deleteDialog(id) {
+      if (!confirm('Удалить диалог?')) return;
+      fetch('/api/dialogs/' + id, { method: 'DELETE' })
+        .then(() => { window.location.href = '/chat'; });
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const btn = document.getElementById('sendBtn');
+      const msg = input.value.trim();
+      if (!msg || !currentDialog) return;
+
+      input.value = '';
+      input.style.height = 'auto';
+      btn.disabled = true;
+      btn.textContent = '✉️';
+
+      const msgs = document.getElementById('messages');
+      const empty = msgs.querySelector('.messages-empty');
+      if (empty) empty.remove();
+      
+      const userMsg = document.createElement('div');
+      userMsg.className = 'message message-user';
+      userMsg.innerHTML = '<div class="message-content">' + escapeHtml(msg) + '</div><div class="message-time">сейчас</div>';
+      msgs.appendChild(userMsg);
+      msgs.scrollTop = msgs.scrollHeight;
+
+      const thinking = document.createElement('div');
+      thinking.className = 'message message-assistant message-thinking';
+      thinking.innerHTML = '<div class="message-content">🍀 <span id="thinkingText">думаю</span><span class="dots"></span></div>';
+      msgs.appendChild(thinking);
+      msgs.scrollTop = msgs.scrollHeight;
+
+      let seconds = 0;
+      const timer = setInterval(function() {
+        seconds++;
+        var el = document.getElementById('thinkingText');
+        if (el) el.textContent = 'думаю ' + seconds + 'с';
+      }, 1000);
+
+      fetch('/api/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ dialogId: currentDialog, message: msg })
+      }).then(function(r) {
+        return r.json();
+      }).then(function(data) {
+        clearInterval(timer);
+        thinking.remove();
+        const reply = document.createElement('div');
+        reply.className = 'message message-assistant';
+        reply.innerHTML = '<div class="message-content">' + marked.parse(data.reply) + '</div><div class="message-time">только что</div>';
+        msgs.appendChild(reply);
+        msgs.scrollTop = msgs.scrollHeight;
+      }).catch(function(err) {
+        clearInterval(timer);
+        thinking.remove();
+        const errMsg = document.createElement('div');
+        errMsg.className = 'message message-assistant';
+        errMsg.innerHTML = '<div class="message-content" style="color:#e74c3c">⚠️ Ошибка: ' + escapeHtml(err.message) + '</div>';
+        msgs.appendChild(errMsg);
+      }).finally(function() {
+        btn.disabled = false;
+        btn.textContent = 'Отправить';
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Auto-resize textarea
+    const textarea = document.getElementById('messageInput');
+    if (textarea) {
+      textarea.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+      });
+    }
+  </script>
+</body>
+</html>

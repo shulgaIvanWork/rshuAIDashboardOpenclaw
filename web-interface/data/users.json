@@ -1,0 +1,30 @@
+[
+  {
+    "id": "ivan",
+    "name": "Иван",
+    "password": "$2a$10$3FUHg3mE6DWOI.5EZGurouPHE/7uu1UjwcONVvMW1.l1SAEZ1Afca",
+    "role": "admin",
+    "avatar": "👨‍💻"
+  },
+  {
+    "id": "olga",
+    "name": "Ольга",
+    "password": "$2a$10$O.OL4.joIMDRF4WAPgxVsOzTvClC//fSvZMUQh546biq6sYDbOP0O",
+    "role": "admin",
+    "avatar": "👩‍💻"
+  },
+  {
+    "id": "anastasia",
+    "name": "Анастасия",
+    "password": "$2a$10$DW3swCoFXRaxa1F47ku6FujIDp4svshtJb23M6yM4avTz5biL1A2.",
+    "role": "admin",
+    "avatar": "👩‍💻"
+  },
+  {
+    "id": "Uprav",
+    "name": "Сотрудник",
+    "password": "$2a$10$7bEIIQgFHFKaIxYR9zw3E.V5C.yMw.9N7bYNjykZ2usp4HHgAclBG",
+    "role": "guest",
+    "avatar": "👤"
+  }
+]

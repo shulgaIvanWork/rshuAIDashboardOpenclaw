@@ -1,0 +1,22 @@
+{
+  "drop-dashboard": {
+    "label": "ДРОП — Дашборд продаж 2026",
+    "status": "ready",
+    "icon": "📈"
+  },
+  "rshu-dashboard": {
+    "label": "РШУ — Дашборд продаж (Bitrix24)",
+    "status": "ready",
+    "icon": "📊"
+  },
+  "kom-dashboard": {
+    "label": "КОМ — Дашборд корп. обучения 2026",
+    "status": "draft",
+    "icon": "🎓"
+  },
+  "test-dashboard": {
+    "label": "🧪 Тестовый дашборд",
+    "status": "draft",
+    "icon": "🧪"
+  }
+}

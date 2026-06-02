@@ -1,0 +1,37 @@
+# Environment
+.env
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+/tmp/
+
+# Cached data (API responses, generated)
+cache/
+data/cache.json
+*/data/cache.json
+
+# Generated reports
+output/
+*/output/
+
+# Python
+__pycache__/
+*.pyc
+
+# Web-interface sessions & dialogs (runtime data)
+web-interface/data/sessions/*
+web-interface/data/dialogs/*
+
+# IDE
+.vscode/
+.idea/
+
+# PM2
+pm2-logrotate/
