@@ -35,3 +35,5 @@ web-interface/data/dialogs/*
 
 # PM2
 pm2-logrotate/
+# Sensitive config
+web-interface/data/users.json

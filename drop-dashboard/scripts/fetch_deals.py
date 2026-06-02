@@ -24,7 +24,7 @@ SELECT = [
     "BEGINDATE",
 ]
 PAGE       = 50
-BATCH_CMDS = 50
+BATCH_CMDS = 10  # reduced from 50 for reliability
 
 
 def http_post(url, data, timeout=config.TIMEOUT):
