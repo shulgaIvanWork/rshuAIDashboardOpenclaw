@@ -74,8 +74,9 @@ window.BASE_PATH = _m ? '/' + _m[1] : '';
       <button data-period="week" class="active">Неделя</button>
       <button data-period="month">Месяц</button>
     </div>
-    <button id="aprilTabBtn" class="tab-btn">📋 Апрель (новые правила)</button>
-    <button id="forecastTabBtn" class="tab-btn alt">🔮 Прогноз (май)</button>
+    <button id="aprilTabBtn" class="tab-btn">📋 Май (итоги)</button>
+    <button id="forecastTabBtn" class="tab-btn alt">🔮 Июнь (прогноз)</button>
+    <button id="productsTabBtn" class="tab-btn">⭐ Рейтинг продуктов</button>
     <button id="refreshBtn">🔄 Обновить данные</button>
     <button id="exportBtn" disabled>📎 Экспорт в Excel</button>
   </div>
@@ -673,14 +674,14 @@ document.getElementById('aprilTabBtn').addEventListener('click', async function(
   area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Расчёт по новым правилам…</div></div>';
 
   try {
-    const data = await api('/api/month-report?year=2026&month=4');
+    const data = await api('/api/month-report?year=2026&month=5');
     if (data.error) {
       area.innerHTML = '<div class="error-state">❌ ' + data.error + '</div>';
       return;
     }
     aprilData = data;
     document.getElementById('sourceInfo').textContent =
-      '📋 Апрель 2026 · новые правила · переходящий остаток: ' + (data.carryOver?.cnt || 0) + ' шт. / ' + ((data.carryOver?.sum || 0).toLocaleString()) + ' ₽';
+      '📋 Май 2026 · итоги · переходящий остаток: ' + (data.carryOver?.cnt || 0) + ' шт. / ' + ((data.carryOver?.sum || 0).toLocaleString()) + ' ₽';
     renderAprilPage(data);
   } catch (e) {
     area.innerHTML = '<div class="error-state">❌ Ошибка: ' + e.message + '</div>';
@@ -705,7 +706,7 @@ document.getElementById('forecastTabBtn').addEventListener('click', async functi
       return;
     }
     document.getElementById('sourceInfo').textContent =
-      '🔮 Май 2026 · факт: ' + data.fact.cnt + ' оплат / ' + (data.fact.sum || 0).toLocaleString() + ' ₽ · прогноз воронки: ' + (data.pipeline.may || 0).toLocaleString() + ' ₽ · новые лиды: ' + (data.newLeads.sum || 0).toLocaleString() + ' ₽ · итого: ' + (data.total || 0).toLocaleString() + ' ₽ · в июнь: ' + (data.juneForecast || 0).toLocaleString() + ' ₽';
+      '🔮 Июнь 2026 · факт мая: ' + data.fact.cnt + ' оплат / ' + (data.fact.sum || 0).toLocaleString() + ' ₽ · прогноз воронки: ' + (data.pipeline.may || 0).toLocaleString() + ' ₽ · всего: ' + (data.total || 0).toLocaleString() + ' ₽ · прогноз на июнь: ' + (data.juneForecast || 0).toLocaleString() + ' ₽';
     renderForecastPage(data);
   } catch (e) {
     area.innerHTML = '<div class="error-state">❌ Ошибка: ' + e.message + '</div>';
@@ -754,7 +755,7 @@ function renderForecastPage(data) {
     </div>
 
     <div style="margin-top:12px;font-size:12px;color:#6a7a9a;text-align:center">
-      🧹 <strong>Прогноз на май:</strong> факт ${(data.fact.sum||0).toLocaleString()} ₽ + воронка ${(data.pipeline.may||0).toLocaleString()} ₽ + новые ${(data.newLeads.sum||0).toLocaleString()} ₽ = <strong>${(data.total||0).toLocaleString()} ₽</strong>
+      🧹 <strong>Прогноз на июнь:</strong> факт мая ${(data.fact.sum||0).toLocaleString()} ₽ + воронка ${(data.pipeline.may||0).toLocaleString()} ₽ = <strong>${(data.total||0).toLocaleString()} ₽</strong>
       · <strong>Прогноз на июнь</strong> (из текущей воронки): ${(data.juneForecast||0).toLocaleString()} ₽
     </div>
   `;
@@ -811,6 +812,66 @@ document.getElementById('periodGroup').addEventListener('click', function(e) {
   currentPeriod = period;
   loadAll(period);
 });
+
+// ===== ВКЛАДКА «Рейтинг продуктов» =====
+document.getElementById('productsTabBtn').addEventListener('click', async function() {
+  if (currentTab === 'products') return;
+  currentTab = 'products';
+  document.getElementById('aprilTabBtn').classList.remove('active');
+  document.getElementById('forecastTabBtn').classList.remove('active');
+  this.classList.toggle('active', true);
+  
+  const area = document.getElementById('contentArea');
+  area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка рейтинга продуктов…</div></div>';
+  
+  try {
+    const data = await fetch('/rshu-dashboard/api/product-ranking').then(r => r.json());
+    if (data.error) {
+      area.innerHTML = '<div class="error-state">❌ ' + data.error + '</div>';
+      return;
+    }
+    document.getElementById('sourceInfo').textContent = '⭐ Рейтинг продуктов · май 2026 · всего оплат: ' + data.total_all + ' · основной: ' + data.main.count + ' / ' + data.main.revenue.toLocaleString() + ' ₽ · ILP: ' + data.ilp.count + ' · Корп: ' + data.corp.count;
+    renderProductsPage(data);
+  } catch (e) {
+    area.innerHTML = '<div class="error-state">❌ Ошибка: ' + e.message + '</div>';
+  }
+});
+
+function renderProductsPage(data) {
+  const area = document.getElementById('contentArea');
+  
+  function fmt(n) { return (n || 0).toLocaleString('ru-RU'); }
+  function fRow(items, showFmt) {
+    return items.map((item, i) => {
+      const fmts = showFmt ? Object.entries(item.formats||{}).sort((a,b) => b[1]-a[1]).map(([f,c]) => f+':'+c).join(', ') : '';
+      return '<tr><td>'+(i+1)+'</td><td>'+item.name+'</td><td>'+item.cnt+'</td><td>'+fmt(item.rev)+' ₽</td><td>'+(item.cnt>0?fmt(Math.round(item.rev/item.cnt)):'0')+' ₽</td>'+(showFmt?'<td>'+fmts+'</td>':'')+'</tr>';
+    }).join('');
+  }
+  
+  area.innerHTML = 
+    '<div class="grid-4" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
+      '<div class="card"><h3>💰 Всего оплат</h3><div style="font-size:24px;font-weight:700;color:#1565C0">'+fmt(data.total_all)+'</div></div>' +
+      '<div class="card"><h3>⭐ Основной</h3><div style="font-size:24px;font-weight:700;color:#2E7D32">'+data.main.count+'</div><div style="font-size:13px;color:#666">'+fmt(data.main.revenue)+' ₽</div></div>' +
+      '<div class="card"><h3>📌 ILP</h3><div style="font-size:24px;font-weight:700;color:#7B1FA2">'+data.ilp.count+'</div><div style="font-size:13px;color:#666">'+fmt(data.ilp.revenue)+' ₽</div></div>' +
+      '<div class="card"><h3>📌 Корп.обучение</h3><div style="font-size:24px;font-weight:700;color:#E65100">'+data.corp.count+'</div><div style="font-size:13px;color:#666">'+fmt(data.corp.revenue)+' ₽</div></div>' +
+    '</div>' +
+    '<div class="card" style="margin-bottom:16px"><h3>🏆 ТОП-20 по сумме</h3><div class="scroll-x"><table><thead><tr><th>#</th><th>Продукт</th><th>Кол</th><th>Выручка</th><th>Ср.чек</th><th>Форматы</th></tr></thead><tbody>' +
+    fRow(data.main.byRev, true) +
+    '<tr style="font-weight:700;border-top:2px solid #333"><td></td><td>ИТОГО</td><td>'+data.main.count+'</td><td>'+fmt(data.main.revenue)+' ₽</td><td>'+fmt(Math.round(data.main.revenue/data.main.count))+' ₽</td><td></td></tr>' +
+    '</tbody></table></div></div>' +
+    '<div class="card" style="margin-bottom:16px"><h3>🏆 ТОП-20 по количеству</h3><div class="scroll-x"><table><thead><tr><th>#</th><th>Продукт</th><th>Кол</th><th>Выручка</th><th>Ср.чек</th><th>Форматы</th></tr></thead><tbody>' +
+    fRow(data.main.byCnt, true) +
+    '<tr style="font-weight:700;border-top:2px solid #333"><td></td><td>ИТОГО</td><td>'+data.main.count+'</td><td>'+fmt(data.main.revenue)+' ₽</td><td>'+fmt(Math.round(data.main.revenue/data.main.count))+' ₽</td><td></td></tr>' +
+    '</tbody></table></div></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+      '<div class="card"><h3>📌 ILP</h3><div class="scroll-x"><table><thead><tr><th>#</th><th>Продукт</th><th>Кол</th><th>Выручка</th></tr></thead><tbody>'+
+      (data.ilp.items.length ? data.ilp.items.map((item,i) => '<tr><td>'+(i+1)+'</td><td>'+item.name+'</td><td>'+item.cnt+'</td><td>'+fmt(item.rev)+' ₽</td></tr>').join('') : '<tr><td colspan="4">—</td></tr>')+
+      '<tr style="font-weight:700"><td></td><td>ИТОГО</td><td>'+data.ilp.count+'</td><td>'+fmt(data.ilp.revenue)+' ₽</td></tr></tbody></table></div></div>' +
+      '<div class="card"><h3>📌 Корп. обучение</h3><div class="scroll-x"><table><thead><tr><th>#</th><th>Продукт</th><th>Кол</th><th>Выручка</th></tr></thead><tbody>'+
+      (data.corp.items.length ? data.corp.items.map((item,i) => '<tr><td>'+(i+1)+'</td><td>'+item.name+'</td><td>'+item.cnt+'</td><td>'+fmt(item.rev)+' ₽</td></tr>').join('') : '<tr><td colspan="4">—</td></tr>')+
+      '<tr style="font-weight:700"><td></td><td>ИТОГО</td><td>'+data.corp.count+'</td><td>'+fmt(data.corp.revenue)+' ₽</td></tr></tbody></table></div></div>' +
+    '</div>';
+}
 
 // --- Старт ---
 loadAll('week');

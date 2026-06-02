@@ -2,11 +2,14 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+const _require = createRequire(import.meta.url);
+const xlsx = _require('xlsx');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3001;
 const DATA_DIR = path.join(__dirname, 'data');
-const BITRIX_BASE = process.env.BITRIX_BASE || 'https://24.uprav.ru/rest/479/a98jbqufylu1si1e/';
+const BITRIX_BASE = process.env.BITRIX_BASE || 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/';
 const YEAR = 2026; // Основной дашборд — только 2026
 // Для source-report используется yearFrom/yearTo
 
@@ -1242,6 +1245,100 @@ app.get('/api/forecast', (req, res) => {
     daysPassed,
     juneForecast: Math.round(forecastJun),
   });
+});
+
+// ===== API: Рейтинг продуктов (из Excel-файла Ольги — эталон) =====
+app.get('/api/product-ranking', async (req, res) => {
+  try {
+    const xlsxPath = '/root/.openclaw/media/inbound/выгрузка_май_20266_оплаты_для_ИИ---f37f06ca-a14d-45cb-a070-afc94a1770df.xlsx';
+    
+    // Dynamic import of xlsx
+    const wb = xlsx.readFile(xlsxPath);
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = xlsx.utils.sheet_to_json(ws, { header: 1 });
+    
+    if (data.length < 2) {
+      return res.json({ error: 'Excel пуст' });
+    }
+    
+    // Map columns: 0=ID, 1=Title, 5=Sum, 17=Format, 18=Direction, 24=KOM
+    const rows = data.slice(1); // skip header
+    
+    function cleanTitle(t) {
+      if (!t) return 'Unknown';
+      let t2 = String(t);
+      t2 = t2.replace(/НЕ удалять пока! /gi, '');
+      t2 = t2.replace(/\d{2}\.\d{2}\.\d{4}/g, '');
+      t2 = t2.replace(/\d{4}-\d{2}-\d{2}/g, '');
+      t2 = t2.replace(/с \d{2}\.\d{2}\.\d{4}/gi, '');
+      t2 = t2.replace(/по \d{2}\.\d{2}\.\d{4}/gi, '');
+      t2 = t2.replace(/в г\.\s*\S+[\S]*/g, '');
+      t2 = t2.replace(/\(Москва\)/g, '');
+      t2 = t2.replace(/\(Санкт-Петербург\)/g, '');
+      t2 = t2.replace(/\(СДО\)/g, '');
+      t2 = t2.replace(/\(онлайн\)/gi, '');
+      t2 = t2.replace(/Договор\s*№\s*\d+(\s+от\s+\d{2}\.\d{2}\.\d{4})?/g, '');
+      t2 = t2.replace(/от\s+/g, '');
+      t2 = t2.replace(/\d{2}\.\d{2}-/g, '');
+      t2 = t2.replace(/-\s*\d{2}\.\d{2}$/g, '');
+      t2 = t2.replace(/^\d{2}\.\d{2}\s*/g, '');
+      t2 = t2.replace(/\s+\d{2}$/g, '');
+      t2 = t2.replace(/\s+\d{2}\s/g, ' ');
+      t2 = t2.replace(/\s+/g, ' ').trim();
+      return t2.length > 3 ? t2 : String(t).trim();
+    }
+    
+    const all = [];
+    for (const row of rows) {
+      if (!row[0]) continue;
+      all.push({
+        id: String(row[0]),
+        title: String(row[1] || ''),
+        summa: parseFloat(row[5]) || 0,
+        format: String(row[17] || '').trim(),
+        naprav: String(row[18] || '').trim(),
+        kom: String(row[24] || '').trim()
+      });
+    }
+    
+    // Разделяем
+    const main = [], ilp = [], corp = [];
+    for (const d of all) {
+      if (d.kom === 'Да' || d.naprav === 'Корпоративное обучение') {
+        corp.push(d);
+      } else if (d.title.toUpperCase().startsWith('ILP') || d.title.includes(' ILP ')) {
+        ilp.push(d);
+      } else {
+        main.push(d);
+      }
+    }
+    
+    function group(arr) {
+      const map = {};
+      for (const d of arr) {
+        const name = cleanTitle(d.title);
+        if (!map[name]) map[name] = { cnt: 0, rev: 0, formats: {} };
+        map[name].cnt++;
+        map[name].rev += d.summa;
+        const f = d.format || '—';
+        map[name].formats[f] = (map[name].formats[f] || 0) + 1;
+      }
+      return Object.entries(map).map(([k,v]) => ({ name: k, cnt: v.cnt, rev: Math.round(v.rev), formats: v.formats }));
+    }
+    
+    const mainRanking = group(main);
+    const byRev = [...mainRanking].sort((a,b) => b.rev - a.rev || b.cnt - a.cnt).slice(0,20);
+    const byCnt = [...mainRanking].sort((a,b) => b.cnt - a.cnt || b.rev - a.rev).slice(0,20);
+    
+    res.json({
+      total_all: all.length,
+      main: { count: main.length, revenue: Math.round(main.reduce((s,d) => s + d.summa, 0)), byRev, byCnt },
+      ilp: { count: ilp.length, revenue: Math.round(ilp.reduce((s,d) => s + d.summa, 0)), items: group(ilp) },
+      corp: { count: corp.length, revenue: Math.round(corp.reduce((s,d) => s + d.summa, 0)), items: group(corp) }
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Статика
