@@ -16,11 +16,29 @@
 Никаких отдельных портов и PM2 процессов для дашбордов не нужно.
 Новый дашборд = новая папка с server.js + mount в web-interface/server.js.
 
-## Источники данных (3 основных + 1 дополнительный)
+## Источники данных (2 основных)
 
 1. **Bitrix24 REST API** — вебхук `https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/`
-2. **Roistat API** — ключ и проект в TOOLS.md
-3. **Яндекс Метрика API** — токен и ClientID в TOOLS.md
+2. **Яндекс Метрика API** — дубликат в TOOLS.md
+
+### 2. Яндекс Метрика API — учётные данные
+
+**ClientID:** `78b1e8c8046f4b08837f3d007ac983b4`
+**Client secret:** `055582f270bc4443984e42e6020d68f0`
+**Токен OAuth:** `y0__wgBELrbs5oCGKr3QiDt4u3iF6ydZv9PW4NDN8I-iaAaFC-A6UfL`
+**Redirect URI:** `https://oauth.yandex.ru/verification_code`
+
+**Эндпоинты:**
+- Отчёты: `/stat/v1/data/`
+- Управление: CRUD счётчиков, целей через API управления
+
+**Лимиты:** 30 запр/с с IP, 5000 запр/сутки, 200 запр/5мин для отчётов
+
+**Документация:**
+- Общее: https://yandex.ru/dev/metrika/ru/
+- Квоты: https://yandex.ru/dev/metrika/ru/intro/quotas
+
+**Статус:** не подключён, данные не выгружаются
 
 ### 1b. CRM Export API (Bitrix24, для ИИ-агентов)
 - **Эндпоинт:** `https://24.uprav.ru/web_services/crm/export.php`
