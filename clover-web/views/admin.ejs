@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>РШУ дашборды — админка</title>
-  <link rel="stylesheet" href="/style.css?v=3">
+  <link rel="stylesheet" href="/style.css?v=4">
   <style>
     .admin-page { padding: 24px; max-width: 1200px; margin: 0 auto; }
     .admin-page h1 { font-size: 24px; margin-bottom: 20px; }
@@ -46,20 +46,20 @@
 </head>
 <body>
   <div class="app-layout">
-    <aside class="sidebar">
-      <div class="sidebar-header">
-        <span class="sidebar-logo">📊 РШУ дашборды</span>
-        <span class="sidebar-user"><%= user.name %></span>
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="topbar-logo">🍀 Клевер</span>
+        <span class="topbar-separator">|</span>
+        <span class="topbar-user"><%= user.name %></span>
       </div>
-      <div class="sidebar-spacer"></div>
-      <div class="sidebar-footer">
-        <a href="/dashboards" class="sidebar-link">📊 Дашборды</a>
-        <a href="/admin" class="sidebar-link" style="color:#C8A45C; font-weight:600;">👥 Пользователи</a>
-        <a href="/logout" class="sidebar-link logout-link">🚪 Выйти</a>
-      </div>
-    </aside>
+      <nav class="topbar-nav">
+        <a href="/dashboards" class="topbar-link">📊 Дашборды</a>
+        <a href="/admin" class="topbar-link active">👥 Пользователи</a>
+        <a href="/logout" class="topbar-link logout-link">🚪 Выйти</a>
+      </nav>
+    </header>
 
-    <main style="flex:1; overflow-y:auto; background:#f4f6fb;">
+    <main class="main-content">
       <div class="admin-page">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
           <h1>👥 Управление пользователями</h1>

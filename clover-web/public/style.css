@@ -1,5 +1,5 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #1f2a44; height: 100vh; overflow: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #1f2a44; }
 
 /* Login */
 .login-page { display: flex; align-items: center; justify-content: center; height: 100vh; background: #1a2332; }
@@ -27,32 +27,27 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .alert-error { background: #fdecea; color: #c0392b; border: 1px solid #f5c6cb; }
 
 /* Layout */
-.app-layout { display: flex; height: 100vh; }
+.app-layout { display: flex; flex-direction: column; height: 100vh; }
 
-/* Sidebar */
-.sidebar { width: 280px; min-width: 280px; background: #1a2332; color: #fff; display: flex; flex-direction: column; }
-.sidebar-header { padding: 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.1); }
-.sidebar-logo { font-size: 16px; font-weight: 700; }
-.sidebar-user { font-size: 12px; color: #aaa; }
-.sidebar-actions { padding: 12px 16px; }
-.dialog-list { flex: 1; overflow-y: auto; }
-.dialog-item { padding: 12px 16px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,.05); position: relative; transition: background .15s; }
-.dialog-item:hover { background: rgba(255,255,255,.08); }
-.dialog-item.active { background: rgba(200,164,92,.15); border-left: 3px solid #C8A45C; }
-.dialog-item-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-.dialog-item-preview { font-size: 12px; color: #8899aa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
-.dialog-delete { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #667; cursor: pointer; font-size: 14px; opacity: 0; transition: opacity .2s; padding: 4px; }
-.dialog-item:hover .dialog-delete { opacity: 1; }
-.dialog-delete:hover { color: #e74c3c; }
-.dialog-empty { padding: 24px 16px; text-align: center; color: #667; font-size: 13px; }
-.sidebar-spacer { flex: 1; }
-.sidebar-footer { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.1); display: flex; gap: 12px; }
-.sidebar-link { color: #aaa; text-decoration: none; font-size: 13px; }
-.sidebar-link:hover { color: #fff; }
-.logout-link { margin-left: auto; }
+/* Topbar */
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; background: #1a2332; color: #fff; flex-shrink: 0; }
+.topbar-left { display: flex; align-items: center; gap: 8px; }
+.topbar-logo { font-size: 16px; font-weight: 700; }
+.topbar-separator { color: rgba(255,255,255,.2); font-size: 16px; }
+.topbar-user { font-size: 13px; color: rgba(255,255,255,.7); }
+.topbar-guest { font-size: 0.7rem; opacity: 0.5; }
+.topbar-nav { display: flex; align-items: center; gap: 4px; }
+.topbar-link { color: rgba(255,255,255,.6); text-decoration: none; font-size: 13px; padding: 6px 14px; border-radius: 6px; transition: all .15s; }
+.topbar-link:hover { color: #fff; background: rgba(255,255,255,.1); }
+.topbar-link.active { color: #C8A45C; font-weight: 600; background: rgba(200,164,92,.12); }
+.topbar-link.logout-link { margin-left: 8px; }
+.topbar-link.logout-link:hover { background: rgba(231,76,60,.15); color: #e74c3c; }
 
-/* Chat area */
-.chat-area { flex: 1; display: flex; flex-direction: column; background: #fff; }
+/* Main content */
+.main-content { flex: 1; overflow-y: auto; background: #f4f6fb; }
+
+/* Chat area (legacy) */
+.chat-area { display: flex; flex-direction: column; flex: 1; background: #fff; }
 .chat-header { padding: 16px 24px; border-bottom: 1px solid #eee; }
 .chat-header h2 { font-size: 16px; font-weight: 600; }
 .messages { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px; }
@@ -93,15 +88,50 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .chat-empty h2 { font-size: 20px; color: #666; }
 .chat-empty p { font-size: 14px; }
 
-/* Dashboards */
-.dashboards-page { padding: 40px; max-width: 1000px; margin: 0 auto; }
-.dashboards-page h1 { margin-bottom: 24px; }
-.dashboard-card { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); display: flex; align-items: center; gap: 16px; }
-.dashboard-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); }
-.dashboard-icon { font-size: 32px; }
-.dashboard-info { flex: 1; }
-.dashboard-info h3 { font-size: 16px; margin-bottom: 4px; }
-.dashboard-info p { color: #888; font-size: 13px; margin: 0; }
+/* Dashboards page */
+.dashboards-page { padding: 40px; max-width: 800px; margin: 0 auto; }
+.dashboards-page h1 { margin-bottom: 24px; font-size: 22px; }
+
+.dashboard-card-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dashboard-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  transition: all .15s;
+}
+.dashboard-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  transform: translateY(-1px);
+}
+
+.dashboard-icon { font-size: 24px; line-height: 1; }
+.dashboard-title { font-size: 15px; font-weight: 600; flex: 1; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-draft { background: #fff3cd; color: #8b6914; }
+.badge-ready { background: #d4edda; color: #155724; }
+
+.empty-msg { color: #888; text-align: center; padding: 40px; }
 
 /* Animations */
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
