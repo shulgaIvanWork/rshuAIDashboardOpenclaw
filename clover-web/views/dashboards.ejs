@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>📊 Дашборды — uprav.tech</title>
-  <link rel="stylesheet" href="/style.css?v=4">
+  <link rel="stylesheet" href="/style.css?v=5">
 </head>
 <body>
   <div class="app-layout">
     <header class="topbar">
       <div class="topbar-left">
-        <span class="topbar-logo">🍀 Клевер</span>
+        <span class="topbar-logo">📊 РШУ</span>
         <span class="topbar-separator">|</span>
         <span class="topbar-user"><%= user.name %><% if (user.role === 'guest') { %> <span class="topbar-guest">(гость)</span><% } %></span>
       </div>
@@ -25,85 +25,16 @@
       <div class="dashboards-page">
         <h1>📊 Дашборды</h1>
         <% dashboards.forEach(function(d) { %>
-          <div class="dashboard-card-wrapper">
-            <a href="<%= d.url %>" target="_blank" class="dashboard-card">
-              <span class="dashboard-icon"><%= d.icon %></span>
-              <span class="dashboard-title"><%= d.description %></span>
-              <% if (d.status === 'draft') { %><span class="badge badge-draft">черновик</span><% } %>
-              <% if (d.status === 'ready') { %><span class="badge badge-ready">опубликован</span><% } %>
-            </a>
-            <% if (user.role === 'admin') { %>
-              <div class="dashboard-toggle">
-                <label class="toggle-switch" title="Переключить статус">
-                  <input type="checkbox" class="toggle-input" data-dashboard="<%= d.name %>" <%= d.status === 'ready' ? 'checked' : '' %> />
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            <% } %>
-          </div>
+          <a href="<%= d.url %>" target="_blank" class="dashboard-card">
+            <span class="dashboard-icon"><%= d.icon %></span>
+            <span class="dashboard-title"><%= d.description %></span>
+          </a>
         <% }) %>
         <% if (dashboards.length === 0) { %>
-          <p class="empty-msg">Пока нет дашбордов</p>
+          <p class="empty-msg">Нет доступных дашбордов</p>
         <% } %>
       </div>
     </main>
   </div>
-
-<% if (user.role === 'admin') { %>
-<style>
-.dashboard-card-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.dashboard-toggle {
-  min-width: 36px;
-}
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 36px;
-  height: 20px;
-}
-.toggle-input { opacity: 0; width: 0; height: 0; }
-.toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background: #ccc;
-  border-radius: 20px;
-  transition: 0.3s;
-}
-.toggle-slider:before {
-  content: "";
-  position: absolute;
-  height: 14px; width: 14px;
-  left: 3px; bottom: 3px;
-  background: white;
-  border-radius: 50%;
-  transition: 0.3s;
-}
-.toggle-input:checked + .toggle-slider { background: #4CAF50; }
-.toggle-input:checked + .toggle-slider:before { transform: translateX(16px); }
-</style>
-<script>
-document.querySelectorAll('.toggle-input').forEach(function(el) {
-  el.addEventListener('change', function() {
-    const name = this.dataset.dashboard;
-    const status = this.checked ? 'ready' : 'draft';
-    fetch('/api/dashboards/' + encodeURIComponent(name) + '/status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (!data.ok) { this.checked = !this.checked; alert('Ошибка: ' + (data.error || 'неизвестная')); }
-    }.bind(this))
-    .catch(function() { this.checked = !this.checked; alert('Ошибка соединения'); }.bind(this));
-  });
-});
-</script>
-<% } %>
 </body>
 </html>

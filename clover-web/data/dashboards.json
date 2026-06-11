@@ -1,27 +1,22 @@
 {
   "drop-dashboard": {
     "label": "ДРОП — Отчёт по продажам",
-    "status": "draft",
     "icon": "📈"
   },
   "rshu-dashboard": {
     "label": "Отчёт по продажам за последний месяц",
-    "status": "draft",
     "icon": "📊"
   },
   "kom-dashboard": {
     "label": "КОМ — Корпоративное обучение",
-    "status": "draft",
     "icon": "🎓"
   },
   "test-dashboard": {
     "label": "🧪 Тестовый дашборд (прогноз)",
-    "status": "draft",
     "icon": "🧪"
   },
   "drop-dashboard-new": {
     "label": "ДРОП — Отчёт по продажам (копия)",
-    "status": "draft",
     "icon": "📈"
   }
 }

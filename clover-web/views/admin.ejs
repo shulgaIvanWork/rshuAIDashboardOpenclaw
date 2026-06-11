@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>РШУ дашборды — админка</title>
-  <link rel="stylesheet" href="/style.css?v=4">
+  <link rel="stylesheet" href="/style.css?v=5">
   <style>
     .admin-page { padding: 24px; max-width: 1200px; margin: 0 auto; }
     .admin-page h1 { font-size: 24px; margin-bottom: 20px; }
@@ -48,7 +48,7 @@
   <div class="app-layout">
     <header class="topbar">
       <div class="topbar-left">
-        <span class="topbar-logo">🍀 Клевер</span>
+        <span class="topbar-logo">📊 РШУ</span>
         <span class="topbar-separator">|</span>
         <span class="topbar-user"><%= user.name %></span>
       </div>
@@ -90,7 +90,7 @@
                     <span class="badge badge-dash"><%= d %></span>
                   <% }); %>
                 <% } else { %>
-                  <span style="color:#888;font-size:12px;">все опубликованные</span>
+                  <span style="color:#888;font-size:12px;">все</span>
                 <% } %>
               </td>
               <td>
@@ -134,11 +134,11 @@
           <% dashboards.forEach(function(d) { %>
             <label>
               <input type="checkbox" class="dash-chk" value="<%= d.name %>">
-              <%= d.label %> <% if (d.status === 'draft') { %><span style="color:#aaa;font-size:10px;">(черновик)</span><% } %>
+              <%= d.label %>
             </label>
           <% }); %>
         </div>
-        <div style="font-size:11px;color:#888;margin-top:4px;">оставьте пустым — будут видны все опубликованные</div>
+        <div style="font-size:11px;color:#888;margin-top:4px;">оставьте пустым — будут видны все дашборды</div>
       </div>
 
       <div id="passwordDisplay" class="password-display" style="display:none;">
@@ -157,7 +157,7 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const allDashboards = <%- JSON.stringify(dashboards.map(d => ({ name: d.name, label: d.label, status: d.status }))) %>;
+    const allDashboards = <%- JSON.stringify(dashboards.map(d => ({ name: d.name, label: d.label }))) %>;
     
     function openCreate() {
       document.getElementById('modalTitle').textContent = '➕ Создать пользователя';

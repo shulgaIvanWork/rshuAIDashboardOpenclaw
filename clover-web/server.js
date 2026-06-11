@@ -116,22 +116,7 @@ app.get('/api/dashboards', requireAuth, (req, res) => {
   res.json(getAvailableDashboards(req.user));
 });
 
-// Toggle dashboard status (admin only)
-app.post('/api/dashboards/:name/status', requireAdmin, (req, res) => {
-  const { name } = req.params;
-  const { status } = req.body;
-  if (!status || !['ready', 'draft'].includes(status)) {
-    return res.status(400).json({ error: 'Status must be "ready" or "draft"' });
-  }
-  const meta = readDashboardsMeta();
-  if (!meta[name]) {
-    return res.status(404).json({ error: 'Dashboard not found' });
-  }
-  meta[name].status = status;
-  writeDashboardsMeta(meta);
-  console.log(`🔁 Dashboard "${name}" status → ${status}`);
-  res.json({ ok: true, name, status });
-});
+
 
 // --------------- Admin panel ---------------
 app.get('/admin', requireAdmin, (req, res) => {
@@ -270,15 +255,6 @@ function getAllDashboardsMeta() {
   return readDashboardsMeta();
 }
 
-function getAllKnownDashboards() {
-  const meta = readDashboardsMeta();
-  return Object.keys(meta).map(name => ({
-    name,
-    label: meta[name].label || name,
-    status: meta[name].status || 'draft'
-  }));
-}
-
 function getDashboardStatus(name) {
   const meta = readDashboardsMeta();
   return meta[name] || null;
@@ -304,15 +280,9 @@ function getAvailableDashboards(user) {
 
       const meta = getDashboardStatus(entry.name);
 
-      // Админы видят всё
-      if (!isAdmin) {
-        // Если у гостя есть персональный список — показываем только то, что в списке И опубликовано
-        if (allowedDashboards.length > 0) {
-          if (!allowedDashboards.includes(entry.name)) continue;
-        } else {
-          // Если списка нет — старый принцип: все опубликованные
-          if (!meta || meta.status !== 'ready') continue;
-        }
+      // Админы видят всё, гости — только из своего списка
+      if (!isAdmin && allowedDashboards.length > 0) {
+        if (!allowedDashboards.includes(entry.name)) continue;
       }
 
       if (knownProjects[entry.name]) {
@@ -321,8 +291,7 @@ function getAvailableDashboards(user) {
           name: entry.name,
           description: meta ? meta.label : entry.name,
           icon: meta ? meta.icon : '📁',
-          url: kp.url,
-          status: meta ? meta.status : 'draft'
+          url: kp.url
         });
         continue;
       }
@@ -343,8 +312,7 @@ function getAvailableDashboards(user) {
           name: entry.name,
           description: desc,
           icon: htmlFiles.length > 0 ? '📊' : '📁',
-          url: '/dashboard-files/' + entry.name + '/',
-          status: meta ? meta.status : 'draft'
+          url: '/dashboard-files/' + entry.name + '/'
         });
       }
     }
