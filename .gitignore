@@ -1,0 +1,19 @@
+# OpenClaw internal
+.openclaw/
+
+# PM2
+pm2-logrotate/
+
+# Logs
+*.log
+logs/
+
+# Cache & temp
+*.tmp
+backup/
+cron/
+inbox/
+outbox/
+
+# Node
+node_modules/
