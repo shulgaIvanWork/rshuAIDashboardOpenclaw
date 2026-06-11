@@ -99,6 +99,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   margin-bottom: 10px;
 }
 
+.dashboard-card-wrapper:last-child {
+  margin-bottom: 0;
+}
+
 .dashboard-card {
   display: flex;
   align-items: center;
@@ -111,6 +115,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   color: inherit;
   box-shadow: 0 1px 3px rgba(0,0,0,.06);
   transition: all .15s;
+  margin-bottom: 10px;
 }
 .dashboard-card:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,.1);

@@ -122,7 +122,7 @@ app.get('/api/dashboards', requireAuth, (req, res) => {
 app.get('/admin', requireAdmin, (req, res) => {
   const users = loadUsers();
   const dashboardsMeta = getAllDashboardsMeta();
-  const allDashboards = getAllKnownDashboards();
+  const allDashboards = Object.entries(getAllDashboardsMeta()).map(([name, m]) => ({ name, label: m.label || name }));
   res.render('admin.ejs', {
     user: { id: req.user.id, name: req.user.name },
     users: users.map(u => ({ id: u.id, name: u.name, role: u.role, dashboards: u.dashboards, avatar: u.avatar })),
