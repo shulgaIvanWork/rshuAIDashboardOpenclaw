@@ -12,7 +12,7 @@
     "icon": "🎓"
   },
   "test-dashboard": {
-    "label": "🧪 Тестовый дашборд (прогноз)",
+    "label": "Тестовый дашборд (прогноз)",
     "icon": "🧪"
   },
   "rshu-management-dashboard": {
@@ -20,7 +20,7 @@
     "icon": "📈"
   },
   "participants-dashboard": {
-    "label": "👥 Участники",
+    "label": "Участники",
     "icon": "👥"
   }
 }
