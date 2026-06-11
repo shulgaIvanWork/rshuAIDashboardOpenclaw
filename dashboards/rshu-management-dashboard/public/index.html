@@ -6,6 +6,19 @@
   <title>Управленческий дашборд РШУ 2026</title>
   <script>
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function loadArtifacts(){
+  fetch('/rshu-management-dashboard/api/artifacts').then(function(r){return r.json();}).then(function(data){
+    var el=document.getElementById('newArtifacts');
+    if(!el)return;
+    if(!data||!data.anomalies||!data.anomalies.length){el.innerHTML='<div style="padding:8px;color:#888;font-size:12px">Аномалий не обнаружено</div>';return;}
+    var h='<div style="font-size:12px;background:#fff8e1;border-radius:8px;padding:12px;margin:8px 0">';
+    h+='<b>⚠ Аномалии ('+data.anomalies.length+'):</b><ul>';
+    data.anomalies.forEach(function(a){h+='<li>'+escapeHtml(a.message||a)+'</li>';});
+    h+='</ul></div>';
+    el.innerHTML=h;
+  }).catch(function(){});
+}
+
 
 // Автоопределение пути — работает и самостоятельным сайтом, и как sub-app
 var _p = window.location.pathname;
