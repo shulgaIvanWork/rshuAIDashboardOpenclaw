@@ -82,14 +82,25 @@ def main():
                 'trainingDays': 0,
             })
     
-    # Monthly KOM from agg (group weeks into months)
+    # Monthly KOM from agg (group weeks by actual month from label_dates)
+    def week_to_month(label_dates):
+        """Определяем месяц по дате начала недели из label_dates"""
+        try:
+            # Format: '12.01—18.01' or '26.01—01.02'
+            start_str = label_dates.split('—')[0].strip()
+            day, month = start_str.split('.')
+            return int(month)
+        except:
+            return None
+    
     month_map = {}
     for w in weeks:
         kom_rev = w.get('kom_postupleniya', 0)
         kom_cnt = w.get('kom_won_cnt', 0)
         if kom_rev > 0 or kom_cnt > 0:
-            mon_str = w.get('label_dates', '')[-7:-2] if len(w.get('label_dates','')) > 7 else ''
-            month_num = w.get('week', 0) // 4  # approximate
+            month_num = week_to_month(w.get('label_dates', ''))
+            if month_num is None:
+                continue
             month_map[month_num] = month_map.get(month_num, {'revenue': 0, 'deals': 0})
             month_map[month_num]['revenue'] += kom_rev
             month_map[month_num]['deals'] += kom_cnt
@@ -100,7 +111,7 @@ def main():
     monthly = []
     for m_num in sorted(month_map.keys()):
         m = month_map[m_num]
-        mn = month_names[m_num + 1] if 0 <= m_num < 11 else str(m_num)
+        mn = month_names[m_num] if 1 <= m_num <= 12 else str(m_num)
         monthly.append({
             'monthName': mn,
             'revenue': round(m['revenue']),

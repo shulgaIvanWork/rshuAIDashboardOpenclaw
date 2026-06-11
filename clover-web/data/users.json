@@ -1,0 +1,30 @@
+[
+    {
+        "id": "ivan",
+        "name": "Иван Шульга",
+        "password": "$2a$10$BqDyq25yLxwnwytQbUdMXe0U6Gc722vNnecRvcp4s4PdEdjPKLuYi",
+        "role": "admin",
+        "avatar": "👨‍💻"
+    },
+    {
+        "id": "anastasia",
+        "name": "Анастасия Боровская",
+        "password": "$2a$10$4mAi8S3tMqCl8oX7pq89Bu1NOKHdyD/PHltgaBEKDIzd60dqRaUEy",
+        "role": "admin",
+        "avatar": "👩‍💻"
+    },
+    {
+        "id": "Uprav",
+        "name": "Сотрудник",
+        "password": "$2a$10$ItVmFkpFsiMgZqvBQxEuVeSp142l6IfeoaZtt1ThtWM0Q6CVRzCEq",
+        "role": "guest",
+        "avatar": "👤"
+    },
+    {
+        "id": "olga",
+        "name": "Ольга Гайдукова",
+        "password": "$2a$10$Ip/Pnuf9wIOO20J9TyPR5e.5DpkgIGOVzf.JzFvAN8zuESy10wc12",
+        "role": "admin",
+        "avatar": "👩💻"
+    }
+]

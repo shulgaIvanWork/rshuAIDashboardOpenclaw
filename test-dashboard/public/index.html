@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📊 Итоги мая 2026 — Сквозная аналитика</title>
+  <title>📊 Тестовый дашборд — Май 2026</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -12,17 +12,22 @@
     .header h1 { font-size: 22px; font-weight: 600; }
     .header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
     .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-    .tabs { display: flex; gap: 4px; background: #e0e4e8; padding: 4px; border-radius: 10px; margin-bottom: 20px; overflow-x: auto; }
-    .tab { padding: 10px 20px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: #555; white-space: nowrap; }
+    .tabs { display: flex; gap: 4px; background: #e0e4e8; padding: 4px; border-radius: 10px; margin-bottom: 20px; }
+    .tab { padding: 10px 20px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: #555; transition: all 0.2s; }
     .tab:hover { background: rgba(255,255,255,0.5); }
     .tab.active { background: white; color: #333; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
     .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .card h3 { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
     .card .value { font-size: 28px; font-weight: 700; }
     .card .sub { font-size: 12px; color: #888; margin-top: 4px; }
+    .card .green { color: #22c55e; }
+    .card .red { color: #ef4444; }
+    .card .blue { color: #3b82f6; }
+    .card .orange { color: #f59e0b; }
+    .card .purple { color: #8b5cf6; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .full { grid-column: 1 / -1; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -30,239 +35,994 @@
     td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
     tr:hover td { background: #f9fafb; }
     .chart-container { position: relative; height: 300px; }
-    .green { color: #22c55e; }
-    .red { color: #ef4444; }
-    .blue { color: #3b82f6; }
-    .orange { color: #f59e0b; }
-    .purple { color: #8b5cf6; }
+    .loading-state { padding: 60px; text-align: center; color: #677; }
+    .loading-state .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #C8A45C; border-radius: 50%; animation: spin .8s linear infinite; margin-bottom: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-state { padding: 40px; text-align: center; color: #C62828; font-size: 16px; }
     .loading { padding: 40px; text-align: center; color: #888; }
-    .note { font-size: 12px; color: #999; margin-top: 8px; font-style: italic; }
+    .loading::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
+    @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-green { background: #dcfce7; color: #16a34a; }
+    .badge-red { background: #fee2e2; color: #dc2626; }
+    .badge-blue { background: #dbeafe; color: #2563eb; }
+    .badge-gray { background: #f3f4f6; color: #6b7280; }
+    .progress-bar { height: 6px; background: #e5e7eb; border-radius: 3px; margin: 8px 0; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+    .tooltip { position: relative; cursor: help; border-bottom: 1px dashed #ccc; }
     @media (max-width: 768px) { .row { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>📊 Итоги мая 2026 — Сквозная аналитика</h1>
-    <p>Яндекс Метрика → Roistat (visit_id) → Bitrix24 (делки Sale)</p>
+    <p>Яндекс Метрика + Roistat + Bitrix24</p>
   </div>
   <div class="container">
     <div class="tabs" id="tabs">
-      <button class="tab active" data-tab="funnel">① Воронка (Roistat→B24)</button>
+      <button class="tab active" data-tab="forecast">💡 Прогноз (разработка)</button>
+      <button class="tab" data-tab="funnel">① Воронка продаж</button>
       <button class="tab" data-tab="calls">② Коллтрекинг</button>
-      <button class="tab" data-tab="channels">③ Каналы трафика</button>
+      <button class="tab" data-tab="channels">③ Рекламные каналы</button>
       <button class="tab" data-tab="conversion">④ Конверсия</button>
-      <button class="tab" data-tab="products">⑤ Рейтинг продуктов</button>
+      <button class="tab" data-tab="motivation">⑤ Мотивация ДРОП</button>
+      <button class="tab" data-tab="products">⑥ Рейтинг продуктов</button>
     </div>
-    <div class="tab-content active" id="tab-funnel"><div class="loading">Загрузка воронки...</div></div>
-    <div class="tab-content" id="tab-calls"><div class="loading">Загрузка коллтрекинга...</div></div>
-    <div class="tab-content" id="tab-channels"><div class="loading">Загрузка каналов...</div></div>
-    <div class="tab-content" id="tab-conversion"><div class="loading">Загрузка конверсии...</div></div>
-    <div class="tab-content" id="tab-products"><div class="loading">Загрузка рейтинга продуктов...</div></div>
-  </div>
-  <script>
-  const BASE = '/test-dashboard/api';
-  let dataCache = {};
 
-  async function fetchAll() {
-    const eps = ['metrika-visits','metrika-sources','roistat-orders','roistat-calls','bitrix-deals','roistat-funnel','product-ranking'];
-    const results = await Promise.allSettled(eps.map(e => fetch(BASE+'/'+e).then(r=>r.json())));
-    eps.forEach((e,i) => dataCache[e] = results[i].status === 'fulfilled' ? results[i].value : null);
-    renderAll();
-  }
+    <!-- ============ TAB 0: Прогноз (разработка) ============ -->
+    <div class="tab-content active" id="tab-forecast">
+      <div id="forecast-content"><div class="loading-state"><div class="spinner"></div><div>Загрузка прогноза...</div></div></div>
+    </div>
 
-  function renderAll() { renderFunnel(); renderCalls(); renderChannels(); renderConversion(); renderProducts(); }
-  function fmt(n) { return (n || 0).toLocaleString('ru-RU'); }
-  function setContent(id, h) { const el = document.getElementById(id); if (el) el.innerHTML = h; }
-
-  // =========== TAB 1: Воронка ===========
-  function renderFunnel() {
-    const funnel = dataCache['roistat-funnel'];
-    const metrika = dataCache['metrika-visits'];
-    const roistatOrders = dataCache['roistat-orders'];
-    if (!funnel || funnel.error) return setContent('tab-funnel','<div class="card"><div class="value red">⚠️ Roistat funnel: нет данных. Запусти match_roistat_b24.py</div></div>');
-
-    const visitsTotal = metrika?.totals?.[0] || 0;
-    const bySource = funnel.by_source || {};
-    const totals = funnel.totals || {};
-    const totalMatched = totals.total || 0;
-    const totalWon = totals.won || 0;
-    const totalRevenue = totals.revenue || 0;
-    const totalLose = Object.values(bySource).reduce((s,x) => s + (x.lose||0), 0);
-    const totalInWork = Object.values(bySource).reduce((s,x) => s + (x.in_progress||0), 0);
-    const avgCheck = totalWon > 0 ? Math.round(totalRevenue/totalWon) : 0;
-    const ordersTotal = roistatOrders?.total || funnel.total_orders_api || 0;
-
-    setContent('tab-funnel', `
-      <div class="cards">
-        <div class="card"><h3>🌐 Визиты (Метрика)</h3><div class="value blue">${fmt(visitsTotal)}</div></div>
-        <div class="card"><h3>📦 Заказы в Roistat</h3><div class="value purple">${fmt(ordersTotal)}</div></div>
-        <div class="card"><h3>✅ WON (через Roistat)</h3><div class="value green">${fmt(totalWon)}</div><div class="sub">из ${fmt(totalMatched)} раскрытых</div></div>
-        <div class="card"><h3>💰 Выручка (выборка)</h3><div class="value green">${fmt(totalRevenue)} ₽</div><div class="sub">ср.чек ${fmt(avgCheck)} ₽</div></div>
-        <div class="card"><h3>❌ LOSE</h3><div class="value red">${fmt(totalLose)}</div></div>
-        <div class="card"><h3>🔄 В работе</h3><div class="value orange">${fmt(totalInWork)}</div></div>
+    <!-- ============ TAB 1: Воронка ============ -->
+    <div class="tab-content" id="tab-funnel">
+      <div class="cards" id="funnel-cards"></div>
+      <div class="row">
+        <div class="card full">
+          <h3>Воронка продаж (Sale, май 2026)</h3>
+          <div class="chart-container"><canvas id="funnelChart"></canvas></div>
+        </div>
       </div>
-      <div class="row"><div class="card full"><h3>Воронка по источникам (через Roistat visit_id)</h3>
-        <div class="chart-container"><canvas id="funnelChart"></canvas></div></div></div>
-      <div class="card"><h3>Детализация по источникам</h3>
-        <table>
-          <tr><th>Источник (Roistat source_type)</th><th>Всего сделок</th><th>WON</th><th>LOSE</th><th>В работе</th><th>Выручка</th><th>Конв.→WON</th></tr>
-          ${Object.entries(bySource).sort((a,b) => b[1].total - a[1].total).map(([src,s]) =>
-            `<tr><td>${src}</td><td>${fmt(s.total)}</td><td>${fmt(s.won)}</td><td>${fmt(s.lose)}</td><td>${fmt(s.in_progress)}</td><td>${fmt(Math.round(s.revenue))} ₽</td><td>${s.total > 0 ? ((s.won/s.total)*100).toFixed(1) : 0}%</td></tr>`
-          ).join('')}
-        </table>
-        <p class="note">⚡ Выборка: ${fmt(funnel.b24_matched)} сделок (B24) из ${fmt(funnel.with_visit_in_sample)} заказов Roistat с visit_id. Всего Roistat: ${fmt(ordersTotal)} заказов.</p>
-        <p class="note">⚠️ Ручные (аккаунтинг/email) отсечены — у них нет visit_id.</p>
+      <div class="card">
+        <h3>Детали воронки по источникам</h3>
+        <div id="funnel-table"><div class="loading">Загрузка</div></div>
       </div>
-    `);
+    </div>
 
-    setTimeout(() => {
-      const ctx = document.getElementById('funnelChart');
-      if (!ctx) return;
-      new Chart(ctx, {
-        type: 'bar', data: {
-          labels: Object.keys(bySource),
-          datasets: [
-            { label: 'Всего сделок', data: Object.values(bySource).map(s => s.total), backgroundColor: '#8b5cf6', borderRadius: 2 },
-            { label: 'WON', data: Object.values(bySource).map(s => s.won), backgroundColor: '#22c55e', borderRadius: 2 }
-          ]
-        }, options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: 'top' } },
-          scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } }
-        }
-      });
-    }, 100);
-  }
-
-  // =========== TAB 2: Коллтрекинг ===========
-  function renderCalls() {
-    const cr = dataCache['roistat-calls']?.summary;
-    if (!cr) return setContent('tab-calls','<div class="card"><div class="value red">⚠️ Нет данных</div></div>');
-    setContent('tab-calls', `
-      <div class="cards">
-        <div class="card"><h3>📞 Всего звонков</h3><div class="value blue">${fmt(cr.total)}</div></div>
-        <div class="card"><h3>✅ Дозвоны</h3><div class="value green">${fmt(cr.answered)}</div><div class="sub">${cr.total > 0 ? ((cr.answered/cr.total)*100).toFixed(1) : 0}%</div></div>
-        <div class="card"><h3>👤 Уникальных</h3><div class="value purple">${fmt(cr.unique_callers)}</div></div>
-        <div class="card"><h3>⏱ Средн. длит.</h3><div class="value orange">${Math.round(cr.avg_duration)} сек</div></div>
+    <!-- ============ TAB 2: Коллтрекинг ============ -->
+    <div class="tab-content" id="tab-calls">
+      <div class="cards" id="calls-cards"></div>
+      <div class="row">
+        <div class="card full">
+          <h3>Звонки и визиты по дням (май 2026)</h3>
+          <div class="chart-container"><canvas id="callsChart"></canvas></div>
+        </div>
       </div>
-      <div class="row"><div class="card full"><h3>Звонки и визиты по дням</h3><div class="chart-container"><canvas id="callsChart"></canvas></div></div></div>
-    `);
-    const byDay = dataCache['roistat-calls']?.by_day || [];
-    const visitsRows = dataCache['metrika-visits']?.rows || [];
-    const labels = byDay.map(d => d.date.slice(5));
-    const callData = byDay.map(d => d.count);
-    const visitData = labels.map((_,i) => { const full = '2026-'+byDay[i].date.slice(5); const m = visitsRows.find(v => v.date === full); return m?.visits || 0; });
-    setTimeout(() => {
-      const ctx = document.getElementById('callsChart');
-      if (!ctx) return;
-      new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'Звонки', data: callData, backgroundColor: '#3b82f6', borderRadius: 2 }, { label: 'Визиты', data: visitData, backgroundColor: '#22c55e', borderRadius: 2, yAxisID: 'y1' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Звонки' } }, y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Визиты' } } } } });
-    }, 100);
-  }
+      <div class="card">
+        <h3>Звонки по дням</h3>
+        <div id="calls-table"><div class="loading">Загрузка</div></div>
+      </div>
+    </div>
 
-  // =========== TAB 3: Каналы ===========
-  function renderChannels() {
-    const srcs = dataCache['metrika-sources']?.data || [];
-    const totalVisits = dataCache['metrika-visits']?.totals?.[0] || 0;
-    if (!srcs.length) return setContent('tab-channels','<div class="card"><div class="value red">⚠️ Нет данных</div></div>');
-    setContent('tab-channels', `
-      <div class="cards">
-        <div class="card"><h3>Всего источников</h3><div class="value blue">${srcs.length}</div></div>
-        <div class="card"><h3>📢 Реклама</h3><div class="value purple">${fmt(srcs.find(s=>s.id==='ad')?.visits||0)}</div></div>
-        <div class="card"><h3>🔍 Поиск</h3><div class="value green">${fmt(srcs.find(s=>s.id==='organic')?.visits||0)}</div></div>
-        <div class="card"><h3>🏠 Прямые</h3><div class="value orange">${fmt(srcs.find(s=>s.id==='direct')?.visits||0)}</div></div>
+    <!-- ============ TAB 3: Каналы ============ -->
+    <div class="tab-content" id="tab-channels">
+      <div class="cards" id="channels-cards"></div>
+      <div class="card">
+        <h3>Рекламные каналы: трафик → заявки</h3>
+        <div class="chart-container"><canvas id="channelsChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Таблица каналов</h3>
+        <div id="channels-table"><div class="loading">Загрузка</div></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB 4: Конверсия ============ -->
+    <div class="tab-content" id="tab-conversion">
+      <div class="cards" id="conversion-cards"></div>
+      <div class="row">
+        <div class="card full">
+          <h3>Конверсия по дням: визиты → сделки WON</h3>
+          <div class="chart-container"><canvas id="conversionChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Конверсия по неделям</h3>
+        <div id="conversion-table"><div class="loading">Загрузка</div></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB 5: Мотивация ДРОП ============ -->
+    <div class="tab-content" id="tab-motivation">
+      <div class="cards" id="motivation-cards"></div>
+      <div class="row">
+        <div class="card full">
+          <h3>План vs Факт по месяцам</h3>
+          <div class="chart-container"><canvas id="motivationMonthlyChart"></canvas></div>
+        </div>
       </div>
       <div class="row">
-        <div class="card"><h3>Доля источников</h3><div class="chart-container"><canvas id="channelsChart"></canvas></div></div>
-        <div class="card"><h3>Таблица</h3><table><tr><th>Источник</th><th>Визиты</th><th>%</th></tr>${srcs.map(s => `<tr><td>${s.name||s.id}</td><td>${fmt(s.visits||0)}</td><td>${((s.visits||0)/totalVisits*100).toFixed(1)}%</td></tr>`).join('')}</table></div>
+        <div class="card full">
+          <h3>Итоговое вознаграждение по сотрудникам (накоплено)</h3>
+          <div class="chart-container"><canvas id="motivationEmployeeChart"></canvas></div>
+        </div>
       </div>
-    `);
-    setTimeout(() => {
-      const ctx = document.getElementById('channelsChart');
-      if (!ctx) return;
-      new Chart(ctx, { type: 'doughnut', data: { labels: srcs.map(s=>s.name||s.id), datasets: [{ data: srcs.map(s=>s.visits||0), backgroundColor: ['#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#14b8a6','#f97316'] }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } } });
-    }, 100);
-  }
-
-  // =========== TAB 4: Конверсия ===========
-  function renderConversion() {
-    const funnel = dataCache['roistat-funnel'];
-    const metrikaVisits = dataCache['metrika-visits']?.totals?.[0] || 1;
-    const visits = dataCache['metrika-visits']?.rows || [];
-    const totals = funnel?.totals || {};
-    const totalWon = totals.won || 0;
-    const totalMatched = totals.total || 1;
-    const revenue = totals.revenue || 0;
-    const avgCheck = totalWon > 0 ? Math.round(revenue/totalWon) : 0;
-    const convVisitToOrder = ((totalMatched / metrikaVisits) * 100).toFixed(2);
-    const convOrderToWon = ((totalWon / totalMatched) * 100).toFixed(1);
-
-    setContent('tab-conversion', `
-      <div class="cards">
-        <div class="card"><h3>📈 Визит → заказ (Roistat)</h3><div class="value green">${convVisitToOrder}%</div></div>
-        <div class="card"><h3>🔄 Заказ → WON</h3><div class="value blue">${convOrderToWon}%</div></div>
-        <div class="card"><h3>👁 Визитов на 1 WON</h3><div class="value purple">${Math.round(metrikaVisits/totalWon)}</div></div>
-        <div class="card"><h3>💰 Средний чек WON</h3><div class="value orange">${fmt(avgCheck)} ₽</div></div>
+      <div class="card">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="all">Все месяцы</button>
+          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="0">Янв</button>
+          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="1">Фев</button>
+          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="2">Мар</button>
+          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="3">Апр</button>
+          <button class="tab active" style="padding:6px 14px;font-size:12px" data-motiv-month="4">Май</button>
+        </div>
+        <h3>Детализация по сотрудникам</h3>
+        <div id="motivation-table"><div class="loading">Загрузка</div></div>
       </div>
-      <div class="row"><div class="card full"><h3>Конверсия понедельно</h3><div class="chart-container"><canvas id="conversionChart"></canvas></div></div></div>
-    `);
-    const weeks = [{label:'1-4 мая', days:[1,2,3,4]},{label:'5-11 мая', days:[5,6,7,8,9,10,11]},{label:'12-18 мая', days:[12,13,14,15,16,17,18]},{label:'19-25 мая', days:[19,20,21,22,23,24,25]},{label:'26-31 мая', days:[26,27,28,29,30,31]}];
-    const weeklyVisits = weeks.map(w => visits.filter(v => w.days.includes(parseInt(v.date.slice(-2)))).reduce((s,v)=>s+(v.visits||0), 0));
-    const weeklyWon = weeklyVisits.map(wv => Math.round((wv / metrikaVisits) * totalWon));
-    setTimeout(() => {
-      const ctx = document.getElementById('conversionChart');
-      if (!ctx) return;
-      new Chart(ctx, { type: 'line', data: { labels: weeks.map(w=>w.label), datasets: [{ label: 'Визиты', data: weeklyVisits, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, yAxisID: 'y' }, { label: 'WON (оценка)', data: weeklyWon, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, yAxisID: 'y1' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Визиты' } }, y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'WON' } } } } });
-    }, 100);
-  }
 
-  // =========== TAB 5: Рейтинг продуктов ===========
-  function renderProducts() {
-    const pr = dataCache['product-ranking'];
-    if (!pr || pr.error) return setContent('tab-products','<div class="card"><div class="value red">⚠️ Нет данных</div></div>');
-    
-    function pRow(arr, showFmt) {
-      return arr.map((item, i) => {
-        const fmts = showFmt ? Object.entries(item.formats||{}).sort((a,b) => b[1]-a[1]).map(([f,c]) => f+':'+c).join(', ') : '';
-        return '<tr><td>'+(i+1)+'</td><td>'+item.name+'</td><td>'+item.cnt+'</td><td>'+fmt(item.rev)+' ₽</td><td>'+(item.cnt>0?fmt(Math.round(item.rev/item.cnt)):0)+' ₽</td>'+(showFmt?'<td>'+fmts+'</td>':'')+'</tr>';
-      }).join('');
+      <!-- ===== Анализ по источникам ===== -->
+      <div class="card" style="margin-top:16px">
+        <h3>📊 Анализ поступлений: Входящий vs Исходящий трафик</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:12px">Исходящие: аккаунтинг, репитсейл, реанимация, холодная база, апсейл</p>
+        <div class="chart-container" style="height:250px"><canvas id="sourceChart"></canvas></div>
+        <div id="source-table" style="margin-top:12px"><div class="loading">Загрузка...</div></div>
+      </div>
+
+      <!-- ===== Анализ по форматам ===== -->
+      <div class="card" style="margin-top:16px">
+        <h3>📊 Анализ поступлений: КОМ vs Остальные форматы</h3>
+        <div class="chart-container" style="height:250px"><canvas id="formatChart"></canvas></div>
+        <div id="format-table" style="margin-top:12px"><div class="loading">Загрузка...</div></div>
+      </div>
+    </div>
+  </div>
+
+    <!-- ============ TAB 6: Рейтинг продуктов ============ -->
+    <div class="tab-content" id="tab-products">
+      <div class="cards" id="products-cards"></div>
+      <div class="row">
+        <div class="card full">
+          <h3>Рейтинг продуктов (по кол-ву)</h3>
+          <div id="products-table"><div class="loading">Загрузка</div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="card full">
+          <h3>Рейтинг продуктов (по выручке)</h3>
+          <div id="products-table-rev"><div class="loading">Загрузка</div></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="card">
+          <h3>ILP программы</h3>
+          <div id="products-ilp"><div class="loading">Загрузка</div></div>
+        </div>
+        <div class="card">
+          <h3>Корпоративное обучение</h3>
+          <div id="products-corp"><div class="loading">Загрузка</div></div>
+        </div>
+      </div>
+    </div>
+  <script>
+  // ============ DATA FETCHING ============
+  const BASE = '/test-dashboard/api';
+
+  // Безопасный fetch с проверкой редиректа на логин
+  async function safeFetch(url) {
+    const r = await fetch(url);
+    const text = await r.text();
+    if (r.redirected || text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      window.location.href = '/login';
+      throw new Error('redirect');
     }
-
-    setContent('tab-products', 
-      '<div class="cards">' +
-        '<div class="card"><h3>Всего оплат</h3><div class="value blue">'+fmt(pr.total_all)+'</div></div>' +
-        '<div class="card"><h3>Основной рейтинг</h3><div class="value green">'+fmt(pr.main.count)+'</div><div class="sub">'+fmt(pr.main.revenue)+' ₽</div></div>' +
-        '<div class="card"><h3>ILP программы</h3><div class="value purple">'+fmt(pr.ilp.count)+'</div><div class="sub">'+fmt(pr.ilp.revenue)+' ₽</div></div>' +
-        '<div class="card"><h3>Корп. обучение</h3><div class="value orange">'+fmt(pr.corp.count)+'</div><div class="sub">'+fmt(pr.corp.revenue)+' ₽</div></div>' +
-      '</div>' +
-      '<div class="card"><h3>🏆 ТОП-20 по сумме (без ILP и Корп.обучения)</h3>' +
-        '<table><tr><th>#</th><th>Продукт</th><th>Кол</th><th>Выручка</th><th>Ср.чек</th><th>Форматы</th></tr>' +
-        (pr.main.itemsByRev.length ? pRow(pr.main.itemsByRev, true) : '<tr><td colspan="6">—</td></tr>') +
-        '<tr style="font-weight:700"><td></td><td>ИТОГО</td><td>'+pr.main.count+'</td><td>'+fmt(pr.main.revenue)+' ₽</td><td>'+fmt(Math.round(pr.main.revenue/pr.main.count))+' ₽</td><td></td></tr>' +
-        '</table></div>' +
-      '<div class="card"><h3>🏆 ТОП-20 по количеству (без ILP и Корп.обучения)</h3>' +
-        '<table><tr><th>#</th><th>Продукт</th><th>Кол</th><th>Выручка</th><th>Ср.чек</th><th>Форматы</th></tr>' +
-        (pr.main.itemsByCnt.length ? pRow(pr.main.itemsByCnt, true) : '<tr><td colspan="6">—</td></tr>') +
-        '<tr style="font-weight:700"><td></td><td>ИТОГО</td><td>'+pr.main.count+'</td><td>'+fmt(pr.main.revenue)+' ₽</td><td>'+fmt(Math.round(pr.main.revenue/pr.main.count))+' ₽</td><td></td></tr>' +
-        '</table></div>' +
-      '<div class="row">' +
-        '<div class="card"><h3>📌 ILP</h3><table><tr><th>#</th><th>Продукт</th><th>Кол</th><th>Выручка</th></tr>'+(pr.ilp.items.length?pRow(pr.ilp.items,false):'<tr><td colspan="4">—</td></tr>')+'<tr style="font-weight:700"><td></td><td>ИТОГО</td><td>'+pr.ilp.count+'</td><td>'+fmt(pr.ilp.revenue)+' ₽</td></tr></table></div>' +
-        '<div class="card"><h3>📌 Корп. обучение</h3><table><tr><th>#</th><th>Продукт</th><th>Кол</th><th>Выручка</th></tr>'+(pr.corp.items.length?pRow(pr.corp.items,false):'<tr><td colspan="4">—</td></tr>')+'<tr style="font-weight:700"><td></td><td>ИТОГО</td><td>'+pr.corp.count+'</td><td>'+fmt(pr.corp.revenue)+' ₽</td></tr></table></div>' +
-      '</div>'
-    );
+    try {
+      return JSON.parse(text);
+    } catch(e) {
+      console.error('Invalid JSON from', url, text.substring(0, 200));
+      throw new Error('Invalid response from server');
+    }
   }
 
-  // Tabs
+  let metrikaData = null, roistatOrders = null, roistatCalls = null, bitrixDeals = null;
+
+  async function loadAll() {
+    // Мотивация и экспорт — загружаются независимо (быстрее)
+    safeFetch(BASE + '/motivations').then(d => {
+      motivationData = d;
+      renderMotivation();
+    }).catch(() => {});
+    safeFetch(BASE + '/export-analysis').then(d => {
+      exportAnalysisData = d;
+      renderExportAnalysis();
+    }).catch(() => {});
+
+    // Основные данные (могут быть медленными)
+    try {
+      const [visits, srcs, orders, calls, deals] = await Promise.all([
+        safeFetch(BASE + '/metrika-visits'),
+        safeFetch(BASE + '/metrika-sources'),
+        safeFetch(BASE + '/roistat-orders'),
+        safeFetch(BASE + '/roistat-calls'),
+        safeFetch(BASE + '/bitrix-deals'),
+      ]);
+      metrikaData = { visits, sources: srcs };
+      roistatOrders = orders;
+      roistatCalls = calls;
+      bitrixDeals = deals;
+      renderFunnel();
+      renderCalls();
+      renderChannels();
+      renderConversion();
+    } catch(e) {
+      document.querySelectorAll('.tab-content').forEach(el => {
+        el.innerHTML = `<div class="card"><div class="value red">⚠️ Ошибка: ${e.message}</div></div>`;
+      });
+    }
+  }
+
+  function renderAll() {
+    renderFunnel();
+    renderCalls();
+    renderChannels();
+    renderConversion();
+    renderMotivation();
+  }
+
+  // ============ RENDER ============
+  function renderAll() {
+    renderFunnel();
+    renderCalls();
+    renderChannels();
+    renderConversion();
+    renderMotivation();
+    renderExportAnalysis();
+  }
+
+  // --- 1. Воронка ---
+  function renderFunnel() {
+    const d = bitrixDeals?.sale;
+    if (!d) return;
+    const total = d.total_all || 0;
+    const won = d.won_positive || 0;
+    const lose = d.lose || 0;
+    const inWork = d.in_progress || 0;
+    const tech = d.won_zero || 0;
+    const revenue = d.revenue || 0;
+    const visitsTotal = metrikaData?.visits?.totals?.[0] || 0;
+
+    document.getElementById('funnel-cards').innerHTML = `
+      <div class="card"><h3>Визиты (Метрика)</h3><div class="value blue">${fmt(visitsTotal)}</div><div class="sub">за май 2026</div></div>
+      <div class="card"><h3>Сделки Sale</h3><div class="value purple">${fmt(total)}</div><div class="sub">всего в воронке</div></div>
+      <div class="card"><h3>WON (с суммой)</h3><div class="value green">${fmt(won)}</div><div class="sub">+ ${fmt(tech)} тех.нулевых</div></div>
+      <div class="card"><h3>Выручка</h3><div class="value green">${fmt(revenue)} ₽</div><div class="sub">по WON сделкам с суммой > 0</div></div>
+      <div class="card"><h3>Проиграно</h3><div class="value red">${fmt(lose)}</div></div>
+      <div class="card"><h3>В работе</h3><div class="value orange">${fmt(inWork)}</div></div>
+    `;
+
+    new Chart(document.getElementById('funnelChart'), {
+      type: 'bar',
+      data: {
+        labels: ['Трафик (визиты)', 'Сделки Sale', 'WON (сумма >0)', 'Проиграно', 'В работе'],
+        datasets: [{
+          label: 'Количество',
+          data: [visitsTotal, total, won, lose, inWork],
+          backgroundColor: ['#3b82f6', '#8b5cf6', '#22c55e', '#ef4444', '#f59e0b'],
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => fmt(v) } } }
+      }
+    });
+
+    // Таблица
+    const convVisitsToDeals = visitsTotal > 0 ? ((total / visitsTotal) * 100).toFixed(2) : 0;
+    const convToWon = total > 0 ? ((won / total) * 100).toFixed(1) : 0;
+    const convWonToRev = won > 0 ? (revenue / won).toFixed(0) : 0;
+    document.getElementById('funnel-table').innerHTML = `
+      <table>
+        <tr><th>Этап</th><th>Кол-во</th><th>Конверсия</th><th>Сумма / Средний чек</th></tr>
+        <tr><td>🌐 Трафик (визиты)</td><td>${fmt(visitsTotal)}</td><td>100%</td><td>—</td></tr>
+        <tr><td>📋 Сделки Sale</td><td>${fmt(total)}</td><td>${convVisitsToDeals}% от трафика</td><td>—</td></tr>
+        <tr><td>✅ WON (с суммой)</td><td>${fmt(won)}</td><td>${convToWon}% от сделок</td><td>${fmt(revenue)} ₽</td></tr>
+        <tr><td>💰 Средний чек</td><td>—</td><td>—</td><td><strong>${fmt(parseInt(convWonToRev))} ₽</strong></td></tr>
+      </table>
+    `;
+  }
+
+  // --- 2. Коллтрекинг ---
+  function renderCalls() {
+    const calls = roistatCalls?.summary;
+    if (!calls) return;
+    const visitsTotal = metrikaData?.visits?.totals?.[0] || 0;
+
+    document.getElementById('calls-cards').innerHTML = `
+      <div class="card"><h3>Всего звонков</h3><div class="value blue">${fmt(calls.total)}</div><div class="sub">за май 2026</div></div>
+      <div class="card"><h3>Дозвоны</h3><div class="value green">${fmt(calls.answered)}</div><div class="sub">${((calls.answered / calls.total) * 100).toFixed(1)}% дозвон</div></div>
+      <div class="card"><h3>Уникальных номеров</h3><div class="value purple">${fmt(calls.unique_callers)}</div></div>
+      <div class="card"><h3>Средняя длит.</h3><div class="value orange">${Math.round(calls.avg_duration || 0)} сек</div><div class="sub">по ответившим</div></div>
+    `;
+
+    // Chart calls + visits by day
+    const callsByDay = roistatCalls?.by_day || [];
+    const visits = metrikaData?.visits?.rows || [];
+    const labels = Array.from({length: 31}, (_, i) => `0${i+1}.05`.slice(-5));
+    const callData = labels.map((_,i) => {
+      const day = `2026-05-${String(i+1).padStart(2,'0')}`;
+      const match = callsByDay.find(c => c.date?.slice(0,10) === day);
+      return match?.count || 0;
+    });
+    const visitData = labels.map((_,i) => {
+      const day = `2026-05-${String(i+1).padStart(2,'0')}`;
+      const match = visits.find(v => v.date === day);
+      return match?.visits || 0;
+    });
+
+    new Chart(document.getElementById('callsChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Звонки', data: callData, backgroundColor: '#3b82f6', borderRadius: 2 },
+          { label: 'Визиты (Метрика)', data: visitData, backgroundColor: '#22c55e', borderRadius: 2, yAxisID: 'y1' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Звонки' } },
+          y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Визиты' } }
+        }
+      }
+    });
+
+    // Table
+    const callDates = roistatCalls?.by_day || [];
+    document.getElementById('calls-table').innerHTML = `
+      <table>
+        <tr><th>Дата</th><th>Звонков</th><th>Дозвонов</th><th>Длительность (средн.)</th><th>Визитов</th></tr>
+        ${callDates.slice(0, 31).map(c => {
+          const v = visits.find(v2 => v2.date === c.date?.slice(0,10));
+          return `<tr><td>${c.date?.slice(0,10) || '—'}</td><td>${fmt(c.count||0)}</td><td>${fmt(c.answered||0)}</td><td>${Math.round(c.avg_duration||0)}</td><td>${fmt(v?.visits || 0)}</td></tr>`;
+        }).join('')}
+      </table>
+    `;
+  }
+
+  // --- 3. Каналы ---
+  function renderChannels() {
+    const srcs = metrikaData?.sources?.data || [];
+    const deals = bitrixDeals?.sale;
+    
+    document.getElementById('channels-cards').innerHTML = `
+      <div class="card"><h3>Источников трафика</h3><div class="value blue">${srcs.length}</div></div>
+      <div class="card"><h3>Трафик из рекламы</h3><div class="value purple">${fmt(srcs.find(s => s.name?.includes('Ad') || s.id === 'ad')?.visits || 0)}</div><div class="sub">${((srcs.find(s => s.id === 'ad')?.visits || 0) / (metrikaData?.visits?.totals?.[0] || 1) * 100).toFixed(0)}% трафика</div></div>
+      <div class="card"><h3>Органика (поиск)</h3><div class="value green">${fmt(srcs.find(s => s.id === 'organic')?.visits || 0)}</div></div>
+      <div class="card"><h3>Прямые заходы</h3><div class="value orange">${fmt(srcs.find(s => s.id === 'direct')?.visits || 0)}</div></div>
+    `;
+
+    new Chart(document.getElementById('channelsChart'), {
+      type: 'doughnut',
+      data: {
+        labels: srcs.map(s => s.name || s.id),
+        datasets: [{
+          data: srcs.map(s => s.visits || 0),
+          backgroundColor: ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899'],
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } }
+      }
+    });
+
+    const totalOrderVisits = roistatOrders?.total || 0;
+    document.getElementById('channels-table').innerHTML = `
+      <table>
+        <tr><th>Источник (Метрика)</th><th>Визиты</th><th>% трафика</th><th>Заказов в Roistat</th></tr>
+        ${srcs.map(s => `
+          <tr>
+            <td>${s.name || s.id}</td>
+            <td>${fmt(s.visits || 0)}</td>
+            <td>${((s.visits || 0) / (metrikaData?.visits?.totals?.[0] || 1) * 100).toFixed(1)}%</td>
+            <td>—</td>
+          </tr>
+        `).join('')}
+        <tr style="font-weight:700;border-top:2px solid #333">
+          <td>ИТОГО</td>
+          <td>${fmt(metrikaData?.visits?.totals?.[0] || 0)}</td>
+          <td>100%</td>
+          <td>${fmt(totalOrderVisits)}</td>
+        </tr>
+      </table>
+    `;
+  }
+
+  // --- 4. Конверсия ---
+  function renderConversion() {
+    const visits = metrikaData?.visits?.rows || [];
+    const deals = bitrixDeals?.sale;
+    if (!visits.length || !deals) return;
+
+    // Conversion by day: visits → won deals
+    // We don't have daily won deal count from API summary directly, but we can estimate
+    const totalVisits = metrikaData?.visits?.totals?.[0] || 1;
+    const totalWon = deals.won_positive || 0;
+    const overallConv = ((totalWon / totalVisits) * 100).toFixed(2);
+    
+    document.getElementById('conversion-cards').innerHTML = `
+      <div class="card"><h3>Общая конверсия</h3><div class="value green">${overallConv}%</div><div class="sub">визит → сделка WON</div></div>
+      <div class="card"><h3>Визитов на 1 WON</h3><div class="value blue">${Math.round(totalVisits / totalWon)}</div></div>
+      <div class="card"><h3>Конверсия сделка→WON</h3><div class="value purple">${deals.total_all > 0 ? ((deals.won_positive / deals.total_all) * 100).toFixed(1) : 0}%</div><div class="sub">Sale → WON</div></div>
+      <div class="card"><h3>Средний чек WON</h3><div class="value orange">${deals.won_positive > 0 ? fmt(Math.round(deals.revenue / deals.won_positive)) : 0} ₽</div></div>
+    `;
+
+    // Weekly conversion
+    const labels = ['1-4 мая', '5-11 мая', '12-18 мая', '19-25 мая', '26-31 мая'];
+    const weekRanges = [
+      [1,4],[5,11],[12,18],[19,25],[26,31]
+    ];
+    const weekVisits = weekRanges.map(([s,e]) => {
+      return visits.filter(v => {
+        const day = parseInt(v.date?.split('-')[2]);
+        return day >= s && day <= e;
+      }).reduce((sum, v) => sum + (v.visits || 0), 0);
+    });
+
+    // Estimate daily won — total won distributed proportional to visits
+    const weeklyWon = weekVisits.map(wv => Math.round((wv / totalVisits) * totalWon));
+    const weeklyConv = weekVisits.map((wv, i) => wv > 0 ? ((weeklyWon[i] / wv) * 100).toFixed(2) : '0');
+
+    new Chart(document.getElementById('conversionChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Визиты', data: weekVisits, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, yAxisID: 'y' },
+          { label: 'WON (оценка)', data: weeklyWon, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, yAxisID: 'y1' },
+          { label: 'Конверсия %', data: weeklyConv, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: false, yAxisID: 'y2', borderDash: [5,5] }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Визиты' } },
+          y1: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'WON' } },
+          y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Конв. %' } }
+        }
+      }
+    });
+
+    document.getElementById('conversion-table').innerHTML = `
+      <table>
+        <tr><th>Неделя</th><th>Визиты</th><th>WON (оценка)</th><th>Конверсия</th></tr>
+        ${labels.map((l, i) => `
+          <tr><td>${l}</td><td>${fmt(weekVisits[i])}</td><td>${fmt(weeklyWon[i])}</td><td><strong>${weeklyConv[i]}%</strong></td></tr>
+        `).join('')}
+        <tr style="font-weight:700;border-top:2px solid #333">
+          <td>МАЙ 2026</td>
+          <td>${fmt(totalVisits)}</td>
+          <td>${fmt(totalWon)}</td>
+          <td><strong>${overallConv}%</strong></td>
+        </tr>
+      </table>
+    `;
+  }
+
+  // ============ 5. Мотивация ДРОП ============
+  let motivationData = null;
+  let motivationCharts = {};
+  let exportAnalysisData = null;
+  let exportCharts = {};
+
+  function renderMotivation() {
+    if (!motivationData) return;
+    const months = motivationData;
+    
+    // Summary cards
+    let totalFact = 0, totalPlan = 0, totalBonus = 0, totalReturns = 0;
+    months.forEach(m => {
+      totalFact += m.total?.fact || 0;
+      totalPlan += m.total?.plan || 0;
+      totalBonus += m.total?.itog || 0;
+      totalReturns += m.returns || 0;
+    });
+    const overallPct = totalPlan > 0 ? ((totalFact / totalPlan) * 100).toFixed(1) : 0;
+    
+    document.getElementById('motivation-cards').innerHTML = `
+      <div class="card"><h3>План (5 мес)</h3><div class="value blue">${fmt(Math.round(totalPlan))} ₽</div></div>
+      <div class="card"><h3>Факт (5 мес)</h3><div class="value ${totalFact >= totalPlan ? 'green' : 'red'}">${fmt(Math.round(totalFact))} ₽</div><div class="sub">Выполнение: ${overallPct}%</div></div>
+      <div class="card"><h3>Начислено мотивации</h3><div class="value purple">${fmt(Math.round(totalBonus))} ₽</div><div class="sub">${totalFact > 0 ? ((totalBonus / totalFact) * 100).toFixed(2) : 0}% от выручки</div></div>
+      <div class="card"><h3>Возвраты</h3><div class="value red">${fmt(Math.abs(totalReturns))} ₽</div><div class="sub">${totalFact > 0 ? ((Math.abs(totalReturns) / totalFact) * 100).toFixed(1) : 0}% от факта</div></div>
+    `;
+
+    // Monthly plan vs fact chart
+    const monthLabels = months.map(m => m.month.replace(' 2026', ''));
+    const planData = months.map(m => Math.round((m.total?.plan || 0) / 1000));
+    const factData = months.map(m => Math.round((m.total?.fact || 0) / 1000));
+    const pctData = months.map(m => +(m.total?.pct || 0).toFixed(1));
+
+    if (motivationCharts.monthly) motivationCharts.monthly.destroy();
+    motivationCharts.monthly = new Chart(document.getElementById('motivationMonthlyChart'), {
+      type: 'bar',
+      data: {
+        labels: monthLabels,
+        datasets: [
+          { label: 'План (тыс)', data: planData, backgroundColor: '#93c5fd', borderRadius: 4 },
+          { label: 'Факт (тыс)', data: factData, backgroundColor: '#22c55e', borderRadius: 4 },
+          { label: '% выполнения', data: pctData, type: 'line', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, yAxisID: 'y1', tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true, title: { display: true, text: 'Тыс. ₽' } },
+          y1: { beginAtZero: true, position: 'right', max: 200, grid: { drawOnChartArea: false }, title: { display: true, text: '%' } }
+        }
+      }
+    });
+
+    // Employee cumulative bonus chart
+    const empMap = {};
+    months.forEach(m => {
+      (m.employees || []).forEach(e => {
+        if (!empMap[e.name]) empMap[e.name] = 0;
+        empMap[e.name] += e.itog || 0;
+      });
+    });
+    const sortedEmps = Object.entries(empMap).filter(([_,v]) => v > 0).sort((a,b) => b[1] - a[1]);
+    const empColors = ['#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#14b8a6','#f97316','#a855f7'];
+
+    if (motivationCharts.employee) motivationCharts.employee.destroy();
+    motivationCharts.employee = new Chart(document.getElementById('motivationEmployeeChart'), {
+      type: 'bar',
+      data: {
+        labels: sortedEmps.map(e => e[0]),
+        datasets: [{
+          label: 'Мотивация, ₽',
+          data: sortedEmps.map(e => Math.round(e[1])),
+          backgroundColor: sortedEmps.map((_,i) => empColors[i % empColors.length]),
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { callback: v => fmt(v) } } }
+      }
+    });
+
+    renderMotivationTable(4); // default to May
+  }
+
+  function renderMotivationTable(monthIdx) {
+    if (!motivationData) return;
+    const data = monthIdx === 'all' ? motivationData : [motivationData[monthIdx]];
+    const isAll = monthIdx === 'all';
+
+    // Build employee rows
+    const empRows = {};
+    data.forEach(m => {
+      (m.employees || []).forEach(e => {
+        if (!empRows[e.name]) empRows[e.name] = { name: e.name, months: [], totalPlan: 0, totalFact: 0, totalReward: 0, totalItog: 0 };
+        empRows[e.name].months.push({ month: m.month, ...e });
+        empRows[e.name].totalPlan += e.plan;
+        empRows[e.name].totalFact += e.fact;
+        empRows[e.name].totalReward += e.reward;
+        empRows[e.name].totalItog += e.itog;
+      });
+    });
+
+    const sorted = Object.values(empRows).filter(r => r.totalFact > 0).sort((a,b) => b.totalFact - a.totalFact);
+
+    let html = `<table>
+      <tr><th>Сотрудник</th>`;
+    if (isAll) {
+      html += `<th>Месяцев</th><th>План</th><th>Факт</th><th>%</th><th>Мотивация</th>`;
+    } else {
+      html += `<th>План</th><th>Факт</th><th>ОМ/ОН</th><th>СДО</th><th>КОМ</th><th>%</th><th>Мотивация</th><th>% от выручки</th>`;
+    }
+    html += '</tr>';
+
+    const allPct = isAll ? '' : '<span class="badge badge-gray">—</span>';
+
+    sorted.forEach(r => {
+      if (isAll) {
+        const pct = r.totalPlan > 0 ? ((r.totalFact / r.totalPlan) * 100).toFixed(1) : 0;
+        html += `<tr>
+          <td><strong>${r.name}</strong></td>
+          <td>${r.months.length}</td>
+          <td>${fmt(Math.round(r.totalPlan))}</td>
+          <td>${fmt(Math.round(r.totalFact))}</td>
+          <td>${pct}%</td>
+          <td><strong>${fmt(Math.round(r.totalItog))} ₽</strong></td>
+        </tr>`;
+      } else {
+        const m = r.months[0];
+        if (!m) return;
+        const pct = m.pct > 0 ? m.pct.toFixed(1) + '%' : '<span class="badge badge-gray">—</span>';
+        const bonusPct = m.bonus_pct > 0 ? m.bonus_pct.toFixed(2) + '%' : '—';
+        html += `<tr>
+          <td><strong>${r.name}</strong></td>
+          <td>${fmt(Math.round(m.plan))}</td>
+          <td>${fmt(Math.round(m.fact))}</td>
+          <td>${fmt(Math.round(m.om_on))}</td>
+          <td>${fmt(Math.round(m.sdo))}</td>
+          <td>${fmt(Math.round(m.kom))}</td>
+          <td>${pct}</td>
+          <td><strong>${fmt(Math.round(m.itog))} ₽</strong></td>
+          <td>${bonusPct}</td>
+        </tr>`;
+      }
+    });
+
+    // Totals row
+    const totalPlanSum = Object.values(empRows).reduce((s,r) => s + r.totalPlan, 0);
+    const totalFactSum = Object.values(empRows).reduce((s,r) => s + r.totalFact, 0);
+    const totalItogSum = Object.values(empRows).reduce((s,r) => s + r.totalItog, 0);
+    const totPct = totalPlanSum > 0 ? ((totalFactSum / totalPlanSum) * 100).toFixed(1) : 0;
+
+    html += `<tr style="font-weight:700;border-top:2px solid #333">
+      <td>ИТОГО</td>`;
+    if (isAll) {
+      html += `<td>—</td><td>${fmt(Math.round(totalPlanSum))}</td><td>${fmt(Math.round(totalFactSum))}</td><td>${totPct}%</td><td>${fmt(Math.round(totalItogSum))} ₽</td>`;
+    } else {
+      html += `<td>${fmt(Math.round(totalPlanSum))}</td><td>${fmt(Math.round(totalFactSum))}</td><td>—</td><td>—</td><td>—</td><td>${totPct}%</td><td>${fmt(Math.round(totalItogSum))} ₽</td><td>—</td>`;
+    }
+    html += '</tr></table>';
+
+    document.getElementById('motivation-table').innerHTML = html;
+  }
+
+  function esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function(m) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+    });
+  }
+  function fmt(n) { return (n || 0).toLocaleString('ru-RU'); }
+
+  // ============ 6. Анализ экспорта: источники и форматы ============
+  function renderExportAnalysis() {
+    if (!exportAnalysisData || exportAnalysisData.error) return;
+    
+    // Use May 2026 data by default (most complete)
+    const monthKey = '2026-05';
+    const data = exportAnalysisData[monthKey];
+    if (!data) {
+      document.getElementById('source-table').innerHTML = '<div class="card"><span class="value red">Нет данных</span></div>';
+      return;
+    }
+    
+    const managers = data.managers || [];
+    
+    // ===== TABLE 1: Sources (incoming/outgoing) =====
+    let srcHtml = `<table>
+      <tr><th>Менеджер</th><th>Входящий трафик</th><th>Исходящий трафик</th><th>Всего</th><th>% входящего</th></tr>`;
+    
+    managers.forEach(m => {
+      const total = m.incoming + m.outgoing;
+      const pct = total > 0 ? ((m.incoming / total) * 100).toFixed(1) : 0;
+      srcHtml += `<tr>
+        <td><strong>${m.name}</strong></td>
+        <td>${fmt(m.incoming)} ₽</td>
+        <td>${fmt(m.outgoing)} ₽</td>
+        <td>${fmt(total)} ₽</td>
+        <td>${pct}%</td>
+      </tr>`;
+    });
+    
+    srcHtml += `<tr style="font-weight:700;border-top:2px solid #333">
+      <td>ИТОГО</td>
+      <td>${fmt(data.total_incoming)} ₽</td>
+      <td>${fmt(data.total_outgoing)} ₽</td>
+      <td>${fmt(data.total_all)} ₽</td>
+      <td>${data.total_all > 0 ? ((data.total_incoming / data.total_all) * 100).toFixed(1) : 0}%</td>
+    </tr></table>`;
+    
+    // Detail by source
+    srcHtml += '<div style="margin-top:12px"><h4 style="font-size:13px;color:#666;margin-bottom:8px">Детализация по источникам (топ-10):</h4><table><tr><th>Менеджер</th><th>Источник</th><th>Сумма</th><th>Тип</th></tr>';
+    managers.forEach(m => {
+      (m.sources || []).slice(0, 5).forEach(s => {
+        const isOut = s.name.toLowerCase().includes('аккаунтинг') || s.name.toLowerCase().includes('up') || s.name.toLowerCase().includes('repe')
+        srcHtml += `<tr><td>${m.name}</td><td>${s.name}</td><td>${fmt(s.amount)} ₽</td><td><span class="badge ${isOut ? 'badge-red' : 'badge-green'}">${isOut ? 'Исх' : 'Вх'}</span></td></tr>`;
+      });
+    });
+    srcHtml += '</table></div>';
+    
+    document.getElementById('source-table').innerHTML = srcHtml;
+    
+    // Chart
+    const labels = managers.map(m => m.name);
+    const inData = managers.map(m => m.incoming);
+    const outData = managers.map(m => m.outgoing);
+    
+    if (exportCharts.source) exportCharts.source.destroy();
+    exportCharts.source = new Chart(document.getElementById('sourceChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Входящий', data: inData, backgroundColor: '#22c55e', borderRadius: 4 },
+          { label: 'Исходящий', data: outData, backgroundColor: '#ef4444', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true, ticks: { callback: v => fmt(v) } }
+        }
+      }
+    });
+    
+    // ===== TABLE 2: Format (KOM/other) =====
+    let fmtHtml = `<table>
+      <tr><th>Менеджер</th><th>КОМ</th><th>Остальные форматы</th><th>Всего</th><th>% КОМ</th></tr>`;
+    
+    managers.forEach(m => {
+      const total = m.kom + m.other;
+      const pct = total > 0 ? ((m.kom / total) * 100).toFixed(1) : 0;
+      fmtHtml += `<tr>
+        <td><strong>${m.name}</strong></td>
+        <td>${fmt(m.kom)} ₽</td>
+        <td>${fmt(m.other)} ₽</td>
+        <td>${fmt(total)} ₽</td>
+        <td>${pct}%</td>
+      </tr>`;
+    });
+    
+    fmtHtml += `<tr style="font-weight:700;border-top:2px solid #333">
+      <td>ИТОГО</td>
+      <td>${fmt(data.total_kom)} ₽</td>
+      <td>${fmt(data.total_other)} ₽</td>
+      <td>${fmt(data.total_all)} ₽</td>
+      <td>${data.total_all > 0 ? ((data.total_kom / data.total_all) * 100).toFixed(1) : 0}%</td>
+    </tr></table>`;
+    
+    document.getElementById('format-table').innerHTML = fmtHtml;
+    
+    // Chart
+    if (exportCharts.format) exportCharts.format.destroy();
+    exportCharts.format = new Chart(document.getElementById('formatChart'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'КОМ', data: managers.map(m => m.kom), backgroundColor: '#8b5cf6', borderRadius: 4 },
+          { label: 'Остальные', data: managers.map(m => m.other), backgroundColor: '#3b82f6', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' } },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true, ticks: { callback: v => fmt(v) } }
+        }
+      }
+    });
+  }
+
+
+
+  // ============ 0. Прогноз (разработка) ============
+  function rb(b) {
+    if (b.sum !== undefined) {
+      // Check for nested values
+      var sum = typeof b.sum === 'object' ? b.sum.value : b.sum;
+      var cnt = typeof b.cnt === 'object' ? b.cnt.value : b.cnt;
+      return '<div style="background:#f8f9fc;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#888;margin-bottom:2px">'+esc(b.label)+'</div><div style="font-size:18px;font-weight:700;color:#1f2a44">'+fmt(sum)+' \u20bd'+(cnt!==undefined?' \u00b7 '+cnt+' \u0441\u0434.':'')+'</div></div>';
+    }
+    return '<div style="background:#f8f9fc;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#888;margin-bottom:2px">'+esc(b.label)+'</div><div style="font-size:18px;font-weight:700;color:#1f2a44">'+esc(String(b.value||""))+'</div></div>';
+  }
+
+  function renderScreenCard(s, color) {
+    var hc = '<div class="card" style="border-left:4px solid '+color+';break-inside:avoid;margin-bottom:0;page-break-inside:avoid">';
+    hc += '<div style="font-size:14px;font-weight:700;margin-bottom:8px">'+esc(s.title)+'</div>';
+    if (s.subtitle) hc += '<div style="font-size:11px;color:#888;margin-bottom:10px">'+esc(s.subtitle)+'</div>';
+    if (s.blocks) {
+      hc += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
+      for (var i=0;i<s.blocks.length;i++) hc += rb(s.blocks[i]);
+      hc += '</div>';
+    }
+    if (s.pipeline) {
+      hc += '<div style="margin-top:8px;font-size:11px;color:#888">';
+      for (var st in s.pipeline) { var d=s.pipeline[st]; if(d.cnt>0) hc += '<span style="background:#eef4ff;padding:2px 6px;border-radius:4px;margin:2px;display:inline-block"><b>'+st+'</b>: '+fmt(d.sum)+' \u20bd ('+d.cnt+')</span>'; }
+      hc += '</div>';
+    }
+    if (s.weekly) {
+      hc += '<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">';
+      for (var wk in s.weekly) hc += '<span style="background:#fff3e0;padding:2px 6px;border-radius:4px;font-size:11px"><b>'+wk+'</b>: '+s.weekly[wk]+'</span>';
+      hc += '</div>';
+    }
+    if (s.conv_weekly) {
+      hc += '<div style="margin-top:8px;font-size:10px;max-height:140px;overflow-y:auto"><table><thead><tr><th>W</th><th>M\u2192S</th><th>S\u2192P</th><th>M\u2192P</th></tr></thead><tbody>';
+      for (var i=0;i<s.conv_weekly.length;i++) {
+        var r = s.conv_weekly[i];
+        hc += '<tr><td><b>'+r.week+'</b></td><td>'+r.mql_sql+'%</td><td>'+r.sql_paid+'%</td><td>'+r.mql_paid+'%</td></tr>';
+      }
+      hc += '</tbody></table></div>';
+    }
+    if (s.fmt_checks) {
+      hc += '<div style="margin-top:8px;font-size:11px">';
+      for (var fk in s.fmt_checks) {
+        hc += '<div style="display:flex;justify-content:space-between;padding:2px 0"><span>'+esc(fk)+'</span><span><b>'+fmt(s.fmt_checks[fk].avg)+'</b> \u20bd</span></div>';
+      }
+      if (s.b2b_avg) hc += '<div style="border-top:1px solid #eee;margin-top:4px;padding-top:4px;display:flex;justify-content:space-between"><span>B2B / B2C</span><span><b>'+fmt(s.b2b_avg)+'</b> / '+fmt(s.b2c_avg)+' \u20bd</span></div>';
+      hc += '</div>';
+    }
+    if (s.monthly_avg) {
+      hc += '<div style="margin-top:8px;font-size:10px;max-height:120px;overflow-y:auto"><table style="width:100%"><thead><tr><th>\u041c\u0435\u0441</th><th>\u0421\u0434</th><th>\u0421\u0440.\u0447\u0435\u043a</th></tr></thead><tbody>';
+      for (var i=0;i<s.monthly_avg.length;i++) {
+        hc += '<tr><td>'+s.monthly_avg[i].month+'</td><td>'+s.monthly_avg[i].cnt+'</td><td><b>'+fmt(s.monthly_avg[i].avg)+'</b></td></tr>';
+      }
+      hc += '</tbody></table></div>';
+    }
+    if (s.weekly_sql) {
+      hc += '<div style="margin-top:8px;font-size:10px;display:flex;gap:4px;flex-wrap:wrap">';
+      for (var wk in s.weekly_sql) hc += '<span style="background:#e8f5e9;padding:1px 5px;border-radius:3px">'+wk+': SQL='+s.weekly_sql[wk]+'</span>';
+      hc += '</div>';
+    }
+    if (s.weekly_mql) {
+      hc += '<div style="margin-top:4px;font-size:10px;display:flex;gap:4px;flex-wrap:wrap">';
+      for (var wk in s.weekly_mql) hc += '<span style="background:#e3f2fd;padding:1px 5px;border-radius:3px">'+wk+': MQL='+s.weekly_mql[wk]+'</span>';
+      hc += '</div>';
+    }
+    if (s.recommendations) {
+      hc += '<ul style="margin:8px 0 0;padding-left:16px;font-size:11px;line-height:1.6">';
+      for (var i=0;i<s.recommendations.length;i++) hc += '<li>'+s.recommendations[i]+'</li>';
+      hc += '</ul>';
+    }
+    if (s.coefficient_explanation) hc += '<div style="margin-top:6px;padding:4px 8px;background:#fff8e1;border-radius:4px;font-size:10px;color:#666">\ud83d\udca1 '+esc(s.coefficient_explanation)+'</div>';
+    hc += '</div>';
+    return hc;
+  }
+
+  async function loadForecast() {
+    var area = document.getElementById('forecast-content');
+    area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u0430\u2026</div></div>';
+    try {
+      var r = await fetch('/drop-dashboard/api/forecast');
+      var text = await r.text();
+      if (text.startsWith('<!DOCTYPE') || r.redirected) { window.location.href = '/login'; return; }
+      var fc = JSON.parse(text);
+      if (!fc || !fc.screens) { area.innerHTML = '<div class="error-state">\u274c \u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438 \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u0430</div>'; return; }
+      var sc = fc.screens;
+      var clrs = ["#1976D2","#C8A45C","#43A047","#9C27B0","#FF9800","#C62828","#E91E63","#00BCD4","#607D8B","#1f2a44"];
+      var h = '<div class="kpis" style="margin-bottom:12px">';
+      h += '<div class="kpi" style="background:linear-gradient(135deg,#1f2a44,#2a3a5c);color:#fff"><div class="lbl" style="color:#aaa">\ud83c\udfaf \u041f\u0440\u043e\u0433\u043d\u043e\u0437 \u043d\u0430 \u043e\u0441\u0442\u0430\u0442\u043e\u043a '+fc.days_left+' \u0434\u043d.</div><div class="val" style="color:#fff">'+fmt(sc[5].total_forecast)+' \u20bd</div><div class="sub" style="color:#aaa">\u043c\u0430\u0439 \u00b7 \u0443\u0436\u0435 '+fmt(sc[5].may_posted)+' \u20bd</div></div>';
+      h += '<div class="kpi"><div class="lbl">\ud83d\udcc5 \u0414\u043e \u043a\u043e\u043d\u0446\u0430 \u043c\u0435\u0441\u044f\u0446\u0430</div><div class="val">'+fc.days_left+' \u0434\u043d.</div><div class="sub">\u0441\u0435\u0433\u043e\u0434\u043d\u044f '+fc.today+'</div></div>';
+      h += '<div class="kpi"><div class="lbl">\ud83d\udcc8 \u0421\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d</div><div class="val">'+fmt(sc[0].forecast_sum)+' \u20bd</div><div class="sub">\u043a\u043e\u044d\u0444. '+sc[0].blocks[1].value+'</div></div>';
+      h += '<div class="kpi"><div class="lbl">\ud83d\udd2e SQL \u043f\u0440\u043e\u0433\u043d\u043e\u0437</div><div class="val">'+fmt(sc[1].forecast_sum)+' \u20bd</div><div class="sub">\u043a\u043e\u043d\u0432. '+sc[1].blocks[1].value+'</div></div>';
+      h += '<div class="kpi"><div class="lbl">\ud83c\udd95 \u041d\u043e\u0432\u044b\u0435 \u043b\u0438\u0434\u044b</div><div class="val">'+fmt(sc[2].forecast_sum)+' \u20bd</div><div class="sub">'+sc[2].blocks[0].value+' \u043b\u0438\u0434/\u0434\u0435\u043d\u044c</div></div>';
+      h += '</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">';
+      for (var i=0;i<10;i++) {
+        var si = i < 6 ? i : (i === 6 ? 6 : (i === 7 ? 7 : (i === 8 ? 8 : 9)));
+        h += renderScreenCard(sc[si], clrs[i]);
+      }
+      h += '</div>';
+      var coeffLabels = {conv_sale_won_pct:"\u041a\u043e\u043d\u0432. Sale WON",stage6_won_coeff_pct:"\u042d\u0442\u0430\u043f 6\u2192WON",conv_sql_paid_4w_pct:"SQL\u2192Paid 4\u043d\u0435\u0434",close_5d_pct:"\u0417\u0430\u043a\u0440\u044b\u0442\u0438\u0435 \u22645\u0434\u043d",leads_day_may:"\u041b\u0438\u0434\u044b/\u0434\u0435\u043d\u044c",avg_check_ytd:"\u0421\u0440.\u0447\u0435\u043a YTD"};
+      h += '<div class="card" style="background:#f0f4ff;margin-top:12px"><h2>\ud83d\udcd0 \u041a\u043e\u044d\u0444\u0444\u0438\u0446\u0438\u0435\u043d\u0442\u044b \u043f\u0440\u043e\u0433\u043d\u043e\u0437\u0430</h2><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">';
+      for (var key in fc.coeff) {
+        var lb = coeffLabels[key] || key;
+        var v = fc.coeff[key];
+        var di = key.indexOf("pct")>=0 ? v+"%" : (key.indexOf("day")>=0 ? v : fmt(v));
+        h += '<div style="background:#fff;border-radius:6px;padding:8px 12px"><div style="font-size:11px;color:#888">'+lb+'</div><div style="font-size:16px;font-weight:700">'+di+'</div></div>';
+      }
+      h += '</div></div>';
+      area.innerHTML = h;
+    } catch(e) { area.innerHTML = '<div class="error-state">\u274c \u041e\u0448\u0438\u0431\u043a\u0430: '+esc(e.message)+'</div>'; }
+  }
+
+  // Загружаем прогноз при клике на таб
+  document.getElementById('tabs').addEventListener('click', function(ev) {
+    var tab = ev.target.closest('.tab');
+    if (tab && tab.dataset.tab === 'forecast') {
+      // Проверяем, есть ли уже загруженные данные
+      var contentEl = document.getElementById('forecast-content');
+      if (contentEl && contentEl.innerHTML.indexOf('loading') !== -1) {
+        loadForecast();
+      }
+    }
+  });
+
+  // ...и при загрузке страницы (так как это первый таб)
+  window.addEventListener('load', function() {
+    setTimeout(loadForecast, 500);
+  });
+
+  // ============ 7. Рейтинг продуктов ============
+  let productsData = null;
+
+  async function loadProducts() {
+    try {
+      productsData = await safeFetch(BASE + "/product-ranking");
+      renderProducts();
+    } catch(e) {
+      document.getElementById("products-table").innerHTML = '<div style="padding:20px;color:#ef4444">❌ Ошибка: ' + e.message + '</div>';
+    }
+  }
+
+  function renderProducts() {
+    if (!productsData || productsData.error) {
+      document.getElementById("products-table").innerHTML = '<div style="padding:20px;color:#888">⚠ ' + (productsData?.error || "Нет данных") + '</div>';
+      return;
+    }
+    // KPI cards
+    let cardHtml = '';
+    cardHtml += '<div class="card"><h3>Всего сделок</h3><div class="value blue">' + productsData.total_all + '</div></div>';
+    cardHtml += '<div class="card"><h3>Выручка (осн.)</h3><div class="value green">' + fmt(productsData.main.revenue) + ' ₽</div></div>';
+    cardHtml += '<div class="card"><h3>Товаров (осн.)</h3><div class="value">' + productsData.main.itemsByCnt.length + '</div></div>';
+    cardHtml += '<div class="card"><h3>ILP</h3><div class="value orange">' + productsData.ilp.count + '</div><div class="sub">' + fmt(productsData.ilp.revenue) + ' ₽</div></div>';
+    cardHtml += '<div class="card"><h3>Корп.обуч.</h3><div class="value purple">' + productsData.corp.count + '</div><div class="sub">' + fmt(productsData.corp.revenue) + ' ₽</div></div>';
+    document.getElementById('products-cards').innerHTML = cardHtml;
+
+    function esc(s) { return String(s).replace(/[&<>"]/g,function(m){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]}); }
+
+    let html = '<table><tr><th>#</th><th>Продукт</th><th>Кол-во</th><th>Выручка</th><th>Ср.чек</th></tr>';
+    productsData.main.itemsByCnt.forEach(function(p, i) {
+      html += '<tr><td>' + (i+1) + '</td><td><strong>' + esc(p.name) + '</strong></td><td>' + p.cnt + '</td><td>' + fmt(p.rev) + ' ₽</td><td>' + fmt(Math.round(p.rev / p.cnt)) + ' ₽</td></tr>';
+    });
+    html += '</table>';
+    document.getElementById('products-table').innerHTML = html;
+
+    let revHtml = '<table><tr><th>#</th><th>Продукт</th><th>Выручка</th><th>Кол-во</th><th>Ср.чек</th></tr>';
+    productsData.main.itemsByRev.forEach(function(p, i) {
+      revHtml += '<tr><td>' + (i+1) + '</td><td><strong>' + esc(p.name) + '</strong></td><td>' + fmt(p.rev) + ' ₽</td><td>' + p.cnt + '</td><td>' + fmt(Math.round(p.rev / p.cnt)) + ' ₽</td></tr>';
+    });
+    revHtml += '</table>';
+    document.getElementById('products-table-rev').innerHTML = revHtml;
+
+    let ilpHtml = '<table><tr><th>#</th><th>Продукт</th><th>Кол-во</th><th>Выручка</th></tr>';
+    productsData.ilp.items.forEach(function(p, i) {
+      ilpHtml += '<tr><td>' + (i+1) + '</td><td><strong>' + esc(p.name) + '</strong></td><td>' + p.cnt + '</td><td>' + fmt(p.rev) + ' ₽</td></tr>';
+    });
+    ilpHtml += '</table>';
+    document.getElementById('products-ilp').innerHTML = ilpHtml;
+
+    let corpHtml = '<table><tr><th>#</th><th>Продукт</th><th>Кол-во</th><th>Выручка</th></tr>';
+    productsData.corp.items.forEach(function(p, i) {
+      corpHtml += '<tr><td>' + (i+1) + '</td><td><strong>' + esc(p.name) + '</strong></td><td>' + p.cnt + '</td><td>' + fmt(p.rev) + ' ₽</td></tr>';
+    });
+    corpHtml += '</table>';
+    document.getElementById('products-corp').innerHTML = corpHtml;
+  }
+
+  // Load products when tab clicked (lazy)
+  document.getElementById('tabs').addEventListener('click', function(e) {
+    var tab = e.target.closest('.tab');
+    if (tab && tab.dataset.tab === 'products' && !productsData) {
+      loadProducts();
+    }
+  });
+
+  // ============ TABS ============
   document.getElementById('tabs').addEventListener('click', e => {
     const tab = e.target.closest('.tab');
     if (!tab) return;
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
-    setTimeout(() => { document.querySelectorAll('canvas').forEach(c => { const p = c.parentElement; const id = c.id; p.innerHTML = '<canvas id="'+id+'"></canvas>'; }); renderAll(); }, 50);
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
   });
 
-  fetchAll();
+  // ============ Мотивация: фильтр по месяцам ============
+  document.getElementById('tab-motivation').addEventListener('click', e => {
+    const btn = e.target.closest('[data-motiv-month]');
+    if (!btn) return;
+    document.querySelectorAll('#tab-motivation [data-motiv-month]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderMotivationTable(btn.dataset.motivMonth);
+  });
+
+  // ============ INIT ============
+  loadAll();
   </script>
 </body>
 </html>

@@ -164,12 +164,14 @@ function showTab(id){
 }
 
 async function loadData(){
-  const res=await fetch((window.BASE_PATH||'')+'/api/data');
+  // Используем live-данные из B24 (UF_FORMAT=19042498), не кеш
+  const res=await fetch((window.BASE_PATH||'')+'/api/live-data');
   const data=await res.json();
-  if(!data.ready)throw new Error(data.error||'No data');
+  if(!data.ready)throw new Error(data.error||data.error||'No data');
   dataCache=data;
   renderAll(data);
-  loadExtended();
+  // Extended-данные пока отключаем (кеш не синхронизирован с live)
+  // loadExtended();
   setTimeout(initTableSort,150);
 }
 
@@ -213,8 +215,8 @@ function initTableSort(){
 
 function renderAll(data){
   const k=data.kpi;
-  document.getElementById('updateTime').textContent='Обновлено: '+(data.updatedAt||'май 2026');
-  if(data.warningNote) document.getElementById('infoBox').innerHTML='<b>📌 '+data.warningNote.text+'</b>';
+  document.getElementById('updateTime').textContent='Обновлено: '+(data.updatedAt||'—').slice(0,16).replace('T',' ')+' · LIVE';
+  if(data.note) document.getElementById('infoBox').innerHTML='<b>📌 '+data.note+'</b>';
   document.getElementById('kpiGrid').innerHTML=
     '<div class="kpi-card accent"><div class="label">Поступления КОМ</div><div class="value">'+fmtCurr(k.totalRevenue)+'</div><div class="sub">Факт. поступлений</div></div>'+
     '<div class="kpi-card"><div class="label">Лиды КОМ ✋</div><div class="value">'+fmtNum(k.totalLeads)+'</div><div class="sub">Входящих обращений</div></div>'+

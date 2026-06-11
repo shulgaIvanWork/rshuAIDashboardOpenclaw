@@ -70,6 +70,9 @@ function dealSelectFields() {
     'UF_DATE_PAY_1C',
     'UF_CRM_1474975772',  // Согл. дата оплаты
     'UF_CRM_1753272713011', // Дата Счет отправлен
+    'UF_CRM_1697096074',    // Продукт (чистое название)
+    'UF_FORMAT',             // Формат обучения (19042467=очный, 19042468=онлайн, 19042469=СДО, 19042498=КОМ)
+    'UF_CRM_1744273716729', // Направление обучения
     UF_REFUSAL_DATE,
   ];
 }
@@ -422,6 +425,15 @@ function calcMonthNew(year, month, allDealsArray, carryOverDealsArray) {
   const topManagers = Array.from(mgrMap.values()).sort((a, b) => b.sum - a.sum);
 
   const monthNames = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const currentInvCnt = createdInMonth.filter(d => {
+    const sd = d.UF_CRM_1474975772;
+    return sd && sd.length >= 10 && new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd;
+  }).length;
+  const curPaidFromCreated = createdInMonth.filter(d => {
+    if (!d.UF_DATE_PAY_1C) return false;
+    const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+    return pd >= monthStart && pd <= monthEnd;
+  }).length;
   return {
     year, month,
     monthName: monthNames[month],
@@ -464,30 +476,30 @@ function calcMonthNew(year, month, allDealsArray, carryOverDealsArray) {
     }).reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
     totalLostCnt: lostInMonth.length,
     totalLostSum: lostInMonth.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0),
-    // Выставлены счета в периоде (дата счёта в периоде)
+    // Выставлены счета в периоде (только созданные в месяце + согл.дата оплаты в том же месяце)
     invoiceCnt: (() => {
-      return validDeals.filter(d => {
-        const sd = d.UF_CRM_1753272713011;
+      return createdInMonth.filter(d => {
+        const sd = d.UF_CRM_1474975772;
         return sd && sd.length >= 10 && new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd;
       });
     })().length,
     invoiceSum: (() => {
-      return validDeals.filter(d => {
-        const sd = d.UF_CRM_1753272713011;
+      return createdInMonth.filter(d => {
+        const sd = d.UF_CRM_1474975772;
         return sd && sd.length >= 10 && new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd;
       }).reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
     })(),
     invoicePaid: (() => {
-      return validDeals.filter(d => {
-        const sd = d.UF_CRM_1753272713011;
+      return createdInMonth.filter(d => {
+        const sd = d.UF_CRM_1474975772;
         if (!sd || sd.length < 10) return false;
         if (!(new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd)) return false;
         return isPaidNew(d);
       }).length;
     })(),
     invoicePaidSum: (() => {
-      return validDeals.filter(d => {
-        const sd = d.UF_CRM_1753272713011;
+      return createdInMonth.filter(d => {
+        const sd = d.UF_CRM_1474975772;
         if (!sd || sd.length < 10) return false;
         if (!(new Date(sd.slice(0, 10)) >= monthStart && new Date(sd.slice(0, 10)) <= monthEnd)) return false;
         return isPaidNew(d);
@@ -540,9 +552,194 @@ function calcMonthNew(year, month, allDealsArray, carryOverDealsArray) {
         const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
         return pd >= ps && pd <= pe;
       });
-      const prevSum = prevP.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
-      const prevAvg = prevP.length ? prevSum / prevP.length : 0;
+      const prevPsum = prevP.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+      const prevPcnt = prevP.length;
+      const prevAvg = prevPcnt ? prevPsum / prevPcnt : 0;
+      
+      // Созданные за предыдущий месяц
+      const prevC = validDeals.filter(d => {
+        if (!d.DATE_CREATE) return false;
+        const cat = String(d.CATEGORY_ID);
+        if (cat !== '0' && cat !== '8') return false;
+        if (cat === '8' && d.STAGE_SEMANTIC_ID === 'S') return false;
+        const cd = new Date(d.DATE_CREATE.slice(0, 10));
+        return cd >= ps && cd <= pe;
+      });
+      const prevCs = prevC.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+      const prevCc = prevC.length;
+      
+      // Проигранные за предыдущий месяц
+      const prevL = validDeals.filter(d => {
+        if (!d.CLOSEDATE) return false;
+        if (d.STAGE_SEMANTIC_ID !== 'F') return false;
+        const ld = new Date(d.CLOSEDATE.slice(0, 10));
+        return ld >= ps && ld <= pe;
+      });
+      const prevLc = prevL.length;
+      const prevConvFact = (prevPcnt + prevLc) ? (prevPcnt / (prevPcnt + prevLc)) * 100 : 0;
+      
+      // Цикл предыдущего месяца
+      const prevCycleArr = prevP.filter(d => d.DATE_CREATE);
+      const prevCycleDays = prevCycleArr.length ? Math.round(prevCycleArr.reduce((s, d) => {
+        const cr = new Date(d.DATE_CREATE.slice(0, 10));
+        const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return s + (pd - cr) / 86400000;
+      }, 0) / prevCycleArr.length) : 0;
+      
       return prevAvg > 0 ? ((avgCheck - prevAvg) / prevAvg * 100) : 0;
+    })(),
+    // Дельта поступлений к предыдущему месяцу
+    paidSumDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevP = validDeals.filter(d => {
+        if (!isPaidNew(d) || !d.UF_DATE_PAY_1C) return false;
+        const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return pd >= ps && pd <= pe;
+      });
+      const prevSum = prevP.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+      return prevSum > 0 ? ((totalPaidSum - prevSum) / prevSum * 100) : 0;
+    })(),
+    // Дельта оплат (шт) к предыдущему месяцу
+    paidCntDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevCnt = validDeals.filter(d => {
+        if (!isPaidNew(d) || !d.UF_DATE_PAY_1C) return false;
+        const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return pd >= ps && pd <= pe;
+      }).length;
+      return prevCnt > 0 ? ((paidInMonth.length - prevCnt) / prevCnt * 100) : 0;
+    })(),
+    // Дельта конверсии факт к предыдущему месяцу
+    convFactDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevP = validDeals.filter(d => {
+        if (!isPaidNew(d) || !d.UF_DATE_PAY_1C) return false;
+        const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return pd >= ps && pd <= pe;
+      }).length;
+      const prevL = validDeals.filter(d => {
+        if (!d.CLOSEDATE) return false;
+        if (d.STAGE_SEMANTIC_ID !== 'F') return false;
+        const ld = new Date(d.CLOSEDATE.slice(0, 10));
+        return ld >= ps && ld <= pe;
+      }).length;
+      const prevConv = (prevP + prevL) ? (prevP / (prevP + prevL)) * 100 : 0;
+      const currentConv = (paidInMonth.length + lostInMonth.length) ? (paidInMonth.length / (paidInMonth.length + lostInMonth.length)) * 100 : 0;
+      return prevConv > 0 ? ((currentConv - prevConv) / prevConv * 100) : 0;
+    })(),
+    // Дельта цикла сделки к предыдущему месяцу
+    dealCycleDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevP = validDeals.filter(d => {
+        if (!isPaidNew(d) || !d.UF_DATE_PAY_1C) return false;
+        const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return pd >= ps && pd <= pe;
+      });
+      const prevCycleArr = prevP.filter(d => d.DATE_CREATE);
+      const prevCycle = prevCycleArr.length ? Math.round(prevCycleArr.reduce((s, d) => {
+        const cr = new Date(d.DATE_CREATE.slice(0, 10));
+        const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return s + (pd - cr) / 86400000;
+      }, 0) / prevCycleArr.length) : 0;
+      const currentCycle = (() => {
+        const paid = paidInMonth.filter(d => d.DATE_CREATE && d.UF_DATE_PAY_1C);
+        if (!paid.length) return 0;
+        const days = paid.map(d => {
+          const cr = new Date(d.DATE_CREATE.slice(0, 10));
+          const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+          return (pd - cr) / 86400000;
+        });
+        return Math.round(days.reduce((s, v) => s + v, 0) / days.length);
+      })();
+      return prevCycle > 0 ? ((currentCycle - prevCycle) / prevCycle * 100) : 0;
+    })(),
+    // Дельта кол-ва созданных к предыдущему месяцу
+    createdCntDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevC = validDeals.filter(d => {
+        if (!d.DATE_CREATE) return false;
+        const cat = String(d.CATEGORY_ID);
+        if (cat !== '0' && cat !== '8') return false;
+        if (cat === '8' && d.STAGE_SEMANTIC_ID === 'S') return false;
+        const cd = new Date(d.DATE_CREATE.slice(0, 10));
+        return cd >= ps && cd <= pe;
+      });
+      const prevCnt = prevC.length;
+      return prevCnt > 0 ? ((createdInMonth.length - prevCnt) / prevCnt * 100) : 0;
+    })(),
+    // Дельта суммы созданных к предыдущему месяцу
+    createdSumDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevC = validDeals.filter(d => {
+        if (!d.DATE_CREATE) return false;
+        const cat = String(d.CATEGORY_ID);
+        if (cat !== '0' && cat !== '8') return false;
+        if (cat === '8' && d.STAGE_SEMANTIC_ID === 'S') return false;
+        const cd = new Date(d.DATE_CREATE.slice(0, 10));
+        return cd >= ps && cd <= pe;
+      });
+      const prevSum = prevC.reduce((s, d) => s + parseFloat(d.OPPORTUNITY || 0), 0);
+      return prevSum > 0 ? ((totalCreatedSum - prevSum) / prevSum * 100) : 0;
+    })(),
+    // Дельта выставленных счетов к предыдущему месяцу
+    invCntDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevC = validDeals.filter(d => {
+        if (!d.DATE_CREATE) return false;
+        const cat = String(d.CATEGORY_ID);
+        if (cat !== '0' && cat !== '8') return false;
+        if (cat === '8' && d.STAGE_SEMANTIC_ID === 'S') return false;
+        const cd = new Date(d.DATE_CREATE.slice(0, 10));
+        return cd >= ps && cd <= pe;
+      });
+      const prevInvCnt = prevC.filter(d => {
+        const sd = d.UF_CRM_1474975772;
+        if (!sd || sd.length < 10) return false;
+        return new Date(sd.slice(0, 10)) >= ps && new Date(sd.slice(0, 10)) <= pe;
+      }).length;
+      return prevInvCnt > 0 ? ((currentInvCnt - prevInvCnt) / prevInvCnt * 100) : 0;
+    })(),
+    // Дельта оплаченных из созданных в периоде
+    paidFromCreatedCntDelta: (() => {
+      const prev = (month === 1 ? 12 : month - 1);
+      const prevY = month === 1 ? year - 1 : year;
+      const ps = new Date(prevY, prev - 1, 1);
+      const pe = new Date(prevY, prev, 0);
+      const prevC = validDeals.filter(d => {
+        if (!d.DATE_CREATE) return false;
+        const cat = String(d.CATEGORY_ID);
+        if (cat !== '0' && cat !== '8') return false;
+        if (cat === '8' && d.STAGE_SEMANTIC_ID === 'S') return false;
+        const cd = new Date(d.DATE_CREATE.slice(0, 10));
+        return cd >= ps && cd <= pe;
+      });
+      const prevPaidCnt = prevC.filter(d => {
+        if (!d.UF_DATE_PAY_1C) return false;
+        const pd = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
+        return pd >= ps && pd <= pe;
+      }).length;
+      return prevPaidCnt > 0 ? ((curPaidFromCreated - prevPaidCnt) / prevPaidCnt * 100) : 0;
     })(),
     conversion,
     topManagers,
@@ -1431,7 +1628,136 @@ app.get('/api/product-ranking', async (req, res) => {
   }
 });
 
-
+// ===== API: Рейтинг продуктов с начала года (Live B24) =====
+app.get('/api/product-ranking-year', async (req, res) => {
+  const WEBHOOK = 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/';
+  const fmtNames = { '19042467': 'Очный', '19042468': 'Онлайн', '19042469': 'СДО', '19042498': 'КОМ' };
+  
+  async function b24(method, params) {
+    const body = Object.entries(params).map(([k,v]) => {
+      if (Array.isArray(v)) return v.map(x => encodeURIComponent(k) + '=' + encodeURIComponent(x)).join('&');
+      return encodeURIComponent(k) + '=' + encodeURIComponent(v);
+    }).join('&');
+    const resp = await fetch(WEBHOOK + method, { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body });
+    return resp.json();
+  }
+  
+  async function b24All(method, params) {
+    const all = []; let start = 0;
+    while (true) {
+      const r = await b24(method, { ...params, limit: '50', start: String(start) });
+      const items = r.result || [];
+      if (!items.length) break;
+      all.push(...items);
+      if (r.next === undefined || r.next === null) break;
+      start = r.next;
+    }
+    return all;
+  }
+  
+  try {
+    // Запрашиваем все оплаченные сделки Sale с начала 2026 года
+    const deals = await b24All('crm.deal.list', {
+      'filter[CATEGORY_ID]': '0',
+      'filter[>OPPORTUNITY]': '0',
+      'filter[>=UF_DATE_PAY_1C]': '2026-01-01',
+      'filter[<=UF_DATE_PAY_1C]': '2026-12-31',
+      'select[]': ['ID', 'TITLE', 'OPPORTUNITY', 'UF_DATE_PAY_1C', 'UF_FORMAT', 'UF_CRM_1744273716729', 'UF_CRM_1697096074', 'CATEGORY_ID', 'CLOSED', 'STAGE_SEMANTIC_ID', 'DATE_CREATE']
+    });
+    
+    // Фильтр: только WON + с суммой
+    const paid = deals.filter(d => {
+      return d && d.CLOSED === 'Y' && d.STAGE_SEMANTIC_ID === 'S' && parseFloat(d.OPPORTUNITY || 0) > 0;
+    });
+    
+    function cleanTitle(t) {
+      if (!t) return 'Unknown';
+      let t2 = String(t);
+      t2 = t2.replace(/НЕ удалять пока! /gi, '');
+      t2 = t2.replace(/\d{2}\.\d{2}\.\d{4}/g, '');
+      t2 = t2.replace(/\d{4}-\d{2}-\d{2}/g, '');
+      t2 = t2.replace(/с \d{2}\.\d{2}\.\d{4}/gi, '');
+      t2 = t2.replace(/по \d{2}\.\d{2}\.\d{4}/gi, '');
+      t2 = t2.replace(/в г\.\s*\S+[\S]*/g, '');
+      t2 = t2.replace(/\(Москва\)/g, '');
+      t2 = t2.replace(/\(Санкт-Петербург\)/g, '');
+      t2 = t2.replace(/\(СДО\)/g, '');
+      t2 = t2.replace(/\(онлайн\)/gi, '');
+      t2 = t2.replace(/Договор\s*№\s*\d+(\s+от\s+\d{2}\.\d{2}\.\d{4})?/g, '');
+      t2 = t2.replace(/от\s+/g, '');
+      t2 = t2.replace(/\d{2}\.\d{2}-/g, '');
+      t2 = t2.replace(/-\s*\d{2}\.\d{2}$/g, '');
+      t2 = t2.replace(/^\d{2}\.\d{2}\s*/g, '');
+      t2 = t2.replace(/\s+\d{2}$/g, '');
+      t2 = t2.replace(/\s+\d{2}\s/g, ' ');
+      t2 = t2.replace(/\s+/g, ' ').trim();
+      return t2.length > 3 ? t2 : String(t).trim();
+    }
+    
+    // Собираем с полями
+    const allItems = [];
+    for (const d of paid) {
+      const productClean = d.UF_CRM_1697096074 || '';
+      const productName = productClean || cleanTitle(d.TITLE || '');
+      const fmtId = String(d.UF_FORMAT || '');
+      const fmtName = fmtNames[fmtId] || 'Другой';
+      const naprav = String(d.UF_CRM_1744273716729 || '').trim();
+      const isKom = naprav === 'Корпоративное обучение' || fmtId === '19042498';
+      
+      allItems.push({
+        id: d.ID,
+        title: d.TITLE || '',
+        productName,
+        summa: parseFloat(d.OPPORTUNITY || 0),
+        format: fmtName,
+        naprav: naprav || '—',
+        kom: isKom,
+        payDate: (d.UF_DATE_PAY_1C || '').slice(0, 10),
+      });
+    }
+    
+    // Разделяем
+    const main = [], ilp = [], corp = [];
+    for (const d of allItems) {
+      if (d.kom) {
+        corp.push(d);
+      } else if (d.productName.toUpperCase().startsWith('ILP') || d.productName.includes(' ILP ')) {
+        ilp.push(d);
+      } else {
+        main.push(d);
+      }
+    }
+    
+    function group(arr) {
+      const map = {};
+      for (const d of arr) {
+        const name = d.productName;
+        if (!map[name]) map[name] = { cnt: 0, rev: 0, formats: {} };
+        map[name].cnt++;
+        map[name].rev += d.summa;
+        const f = d.format || '—';
+        map[name].formats[f] = (map[name].formats[f] || 0) + 1;
+      }
+      return Object.entries(map).map(([k,v]) => ({ name: k, cnt: v.cnt, rev: Math.round(v.rev), formats: v.formats }));
+    }
+    
+    const mainRanking = group(main);
+    const byRev = [...mainRanking].sort((a,b) => b.rev - a.rev || b.cnt - a.cnt).slice(0,20);
+    const byCnt = [...mainRanking].sort((a,b) => b.cnt - a.cnt || b.rev - a.rev).slice(0,20);
+    
+    res.json({
+      yearFrom: 2026,
+      yearTo: 2026,
+      total_all: allItems.length,
+      main: { count: main.length, revenue: Math.round(main.reduce((s,d) => s + d.summa, 0)), byRev, byCnt },
+      ilp: { count: ilp.length, revenue: Math.round(ilp.reduce((s,d) => s + d.summa, 0)), items: group(ilp) },
+      corp: { count: corp.length, revenue: Math.round(corp.reduce((s,d) => s + d.summa, 0)), items: group(corp) },
+      dateRange: paid.length ? { from: paid.reduce((a,d) => (!a||d.UF_DATE_PAY_1C<a) ? d.UF_DATE_PAY_1C.slice(0,10) : a, null), to: paid.reduce((a,d) => d.UF_DATE_PAY_1C>a ? d.UF_DATE_PAY_1C.slice(0,10) : a, '') } : null,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // ===== Live API (прямые запросы в B24, без кеша) =====
 app.get('/api/charts-data', async (req, res) => {

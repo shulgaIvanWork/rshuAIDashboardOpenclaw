@@ -356,6 +356,195 @@ app.get('/api/export', (req, res) => {
   res.send(bom + csvContent);
 });
 
+// ===== Live API: КОМ данные напрямую из B24 (с UF_FORMAT=19042498) =====
+app.get('/api/live-data', async (req, res) => {
+  const WEBHOOK = 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/';
+  const monthNames = ['', 'Январь','Февраль','Март','Апрель','Май','Июнь',
+                      'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+  async function b24All(method, params) {
+    const all = []; let start = 0;
+    while (true) {
+      const body = Object.entries({...params, limit: '50', start: String(start)}).map(([k,v]) => {
+        if (Array.isArray(v)) return v.map(x => encodeURIComponent(k) + '=' + encodeURIComponent(x)).join('&');
+        return encodeURIComponent(k) + '=' + encodeURIComponent(v);
+      }).join('&');
+      const resp = await fetch(WEBHOOK + method, {
+        method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body
+      });
+      const r = await resp.json();
+      const items = r.result || [];
+      if (!items.length) break;
+      all.push(...items);
+      if (r.next === undefined || r.next === null) break;
+      start = r.next;
+    }
+    return all;
+  }
+
+  try {
+    // 1. КОМ-формат (UF_FORMAT=19042498) + WON + оплачено в 2026
+    const fmtIds = { '19042467': 'Очный', '19042468': 'Онлайн', '19042469': 'СДО', '19042498': 'КОМ' };
+    
+    const deals = await b24All('crm.deal.list', {
+      'filter[UF_FORMAT]': '19042498',
+      'filter[>=CLOSEDATE]': '2026-01-01T00:00:00',
+      'filter[<=CLOSEDATE]': '2026-12-31T23:59:59',
+      'filter[>OPPORTUNITY]': '0',
+      'filter[STAGE_SEMANTIC_ID]': 'S',
+      'select[]': ['ID', 'TITLE', 'OPPORTUNITY', 'UF_DATE_PAY_1C', 'CLOSEDATE', 'CATEGORY_ID', 'UF_FORMAT', 'ASSIGNED_BY_ID']
+    });
+    
+    // 2. Также добавляем КОМ-копии (cat=19), WON, оплачено в 2026
+    const komCopies = await b24All('crm.deal.list', {
+      'filter[CATEGORY_ID]': '19',
+      'filter[>=CLOSEDATE]': '2026-01-01T00:00:00',
+      'filter[<=CLOSEDATE]': '2026-12-31T23:59:59',
+      'filter[>OPPORTUNITY]': '0',
+      'filter[STAGE_SEMANTIC_ID]': 'S',
+      'select[]': ['ID', 'TITLE', 'OPPORTUNITY', 'UF_DATE_PAY_1C', 'CLOSEDATE', 'CATEGORY_ID', 'UF_FORMAT', 'ASSIGNED_BY_ID']
+    });
+    
+    // Объединяем, избегая дубликатов
+    const allDeals = [...deals];
+    const seenIds = new Set(deals.map(d => d.ID));
+    for (const d of komCopies) {
+      if (!seenIds.has(d.ID)) {
+        allDeals.push(d);
+        seenIds.add(d.ID);
+      }
+    }
+    
+    // Исключаем копии для статистики (они дублируют реальные сделки)
+    const realDeals = allDeals.filter(d => {
+      const t = (d.TITLE || '').toLowerCase();
+      return !t.includes('копия для статистики');
+    });
+    
+    // Определяем месяц и неделю по UF_DATE_PAY_1C или CLOSEDATE
+    function getDate(d) {
+      const s = d.UF_DATE_PAY_1C || d.CLOSEDATE || '';
+      return s.slice(0, 10);
+    }
+    
+    function getMonth(d) {
+      const s = getDate(d);
+      if (!s) return 0;
+      return parseInt(s.slice(5, 7), 10);
+    }
+    
+    function isoWeek(dtStr) {
+      const d = new Date(dtStr);
+      d.setHours(0, 0, 0, 0);
+      const day = (d.getDay() + 6) % 7;
+      const thu = new Date(d);
+      thu.setDate(thu.getDate() - day + 3);
+      const firstThu = new Date(thu.getFullYear(), 0, 1);
+      if (firstThu.getDay() !== 4) firstThu.setDate(firstThu.getDate() + ((4 - firstThu.getDay()) + 7) % 7);
+      return 1 + Math.ceil((thu - firstThu) / 604800000);
+    }
+    
+    function weekLabel(dtStr) {
+      const d = new Date(dtStr);
+      const wk = isoWeek(dtStr);
+      const mon = new Date(d);
+      mon.setDate(mon.getDate() - ((d.getDay() + 6) % 7));
+      const sun = new Date(mon);
+      sun.setDate(sun.getDate() + 6);
+      const fmt = (dt) => String(dt.getDate()).padStart(2,'0') + '.' + String(dt.getMonth()+1).padStart(2,'0');
+      return { label: 'W' + String(wk).padStart(2,'0'), dates: `${fmt(mon)}—${fmt(sun)}` };
+    }
+    
+    // Monthly aggregation
+    const monthlyData = {};
+    // Weekly aggregation
+    const weeklyData = {};
+    
+    for (const d of realDeals) {
+      const dt = getDate(d);
+      if (!dt) continue;
+      const m = getMonth(d);
+      const opp = parseFloat(d.OPPORTUNITY || 0);
+      
+      if (!monthlyData[m]) monthlyData[m] = { revenue: 0, count: 0, deals: [] };
+      monthlyData[m].revenue += opp;
+      monthlyData[m].count++;
+      monthlyData[m].deals.push({ id: d.ID, title: d.TITLE, opp, date: dt });
+      
+      try {
+        const wl = weekLabel(dt);
+        const wkKey = `${2026}-W${isoWeek(dt).toString().padStart(2,'0')}`;
+        if (!weeklyData[wkKey]) {
+          weeklyData[wkKey] = { label: wl.label, dates: wl.dates, revenue: 0, count: 0, deals: [] };
+        }
+        weeklyData[wkKey].revenue += opp;
+        weeklyData[wkKey].count++;
+        weeklyData[wkKey].deals.push({ id: d.ID, title: d.TITLE, opp, date: dt });
+      } catch(e) { /* skip week calc errors */ }
+    }
+    
+    // Format output
+    const monthly = Object.entries(monthlyData).sort((a,b) => parseInt(a[0]) - parseInt(b[0])).map(([m, v]) => ({
+      monthName: monthNames[parseInt(m)] || m,
+      revenue: Math.round(v.revenue),
+      leads: v.count,
+      registrations: v.count,
+      paid: v.count,
+      avgCheck: Math.round(v.revenue / v.count),
+      conversion: 0, avgDuration: 0, trainingDays: 0, participants: 0
+    }));
+    
+    const weekly = Object.entries(weeklyData).sort((a,b) => a[0].localeCompare(b[0])).map(([k, v]) => ({
+      label: v.label,
+      dates: v.dates,
+      revenue: Math.round(v.revenue),
+      leads: v.count,
+      paid: v.count,
+      avgCheck: Math.round(v.revenue / v.count),
+      conversion: 0, avgDuration: 0, trainingDays: 0
+    }));
+    
+    // Top deals by revenue
+    const sortedDeals = [...realDeals].sort((a,b) => parseFloat(b.OPPORTUNITY||0) - parseFloat(a.OPPORTUNITY||0));
+    const topDeals = sortedDeals.slice(0, 50).map((d, i) => ({
+      rank: i + 1,
+      title: d.TITLE || '',
+      manager: d.ASSIGNED_BY_ID || '',
+      revenue: Math.round(parseFloat(d.OPPORTUNITY||0)),
+      clientType: 'new',
+      trainStart: '—',
+      trainEnd: '—',
+      teacherFee: null,
+      duration: 0,
+      payDate: (d.UF_DATE_PAY_1C || d.CLOSEDATE || '').slice(0, 10) || '—'
+    }));
+    
+    const totalRevenue = realDeals.reduce((s, d) => s + parseFloat(d.OPPORTUNITY||0), 0);
+    
+    res.json({
+      ready: true,
+      updatedAt: new Date().toISOString(),
+      note: 'Данные по КОМ из B24 (UF_FORMAT=19042498). Июнь без поступлений.' + (realDeals.length !== allDeals.length ? ` Исключено ${allDeals.length - realDeals.length} копий для статистики.` : ''),
+      kpi: {
+        totalRevenue: Math.round(totalRevenue),
+        totalLeads: realDeals.length,
+        totalRegistered: realDeals.length,
+        totalPaid: realDeals.length,
+        avgCheck: Math.round(totalRevenue / realDeals.length),
+        conversion: 0,
+        avgDuration: 0,
+        trainingDays: 0,
+        participants: 0
+      },
+      monthly,
+      weekly,
+      topDeals
+    });
+  } catch (e) {
+    res.status(500).json({ ready: false, error: e.message });
+  }
+});
+
 // Статика
 app.use(express.static(path.join(__dirname, 'public')));
 

@@ -4,8 +4,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
+// Sub-apps
+import testDashboard from '../test-dashboard/server.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 3002;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
 const CACHE_DIR = path.join(__dirname, 'cache');
 
@@ -163,6 +166,17 @@ app.get('/api/data', (req, res) => {
 });
 
 // Refresh
+// New logic data endpoint
+app.get('/api/data/new', async (req, res) => {
+  const aggNewPath = path.join(CACHE_DIR, 'agg_new.json');
+  try {
+    const data = JSON.parse(await fs.readFile(aggNewPath, 'utf-8'));
+    res.json(data);
+  } catch (e) {
+    res.status(503).json({ error: 'New logic data not loaded' });
+  }
+});
+
 app.post('/api/refresh', async (req, res) => {
   if (dataState.loading) return res.json({ ok: false, message: 'Already loading' });
   res.json({ ok: true, message: 'Refresh started' });
@@ -467,7 +481,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
-// Fallback
+// Fallback for drop-dashboard only
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 export default app;

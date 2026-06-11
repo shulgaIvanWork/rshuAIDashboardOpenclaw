@@ -11,7 +11,7 @@ module.exports = {
       cwd: '/root/.openclaw/workspace/projects/rshu-dashboard',
       script: 'server.js',
       env: {
-        BITRIX_BASE: 'https://24.uprav.ru/rest/479/a98jbqufylu1si1e/'
+        BITRIX_BASE: 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/'
       }
     },
     {

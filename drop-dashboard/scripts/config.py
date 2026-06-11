@@ -10,7 +10,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CACHE_DIR = os.path.join(SCRIPT_DIR, '..', 'cache')
 
 # Bitrix24 REST-endpoint (BASE + метод + .json)
-BASE = "https://24.uprav.ru/rest/479/a98jbqufylu1si1e/"
+BASE = "https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/"
 
 # Отчётный год
 YEAR = 2026

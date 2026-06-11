@@ -6,7 +6,6 @@ import https from 'https';
 import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 3004;
 
 const app = express();
 app.use(express.json());
@@ -21,7 +20,7 @@ const ROISTAT_KEY = 'ac4693c25f23612c38a6bfaec8d5a00f';
 const ROISTAT_PROJECT = 229682;
 const ROISTAT_BASE = 'https://cloud.roistat.com/api/v1';
 
-const BITRIX_WEBHOOK = 'https://24.uprav.ru/rest/479/a98jbqufylu1si1e';
+const BITRIX_WEBHOOK = 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql';
 
 // ============== УТИЛИТЫ ==============
 function fetchUrl(url, headers = {}, body = null) {
@@ -97,7 +96,6 @@ app.get('/api/metrika-sources', async (req, res) => {
 });
 
 app.get('/api/metrika-sources-by-day', async (req, res) => {
-  // For source+date breakdown — limited scope
   try {
     const data = await fetchUrl(
       `${METRIKA_BASE}/stat/v1/data?ids=${METRIKA_COUNTER}&date1=2026-05-01&date2=2026-05-31&metrics=ym:s:visits&dimensions=ym:s:trafficSource,ym:s:date&limit=500&sort=ym:s:date`,
@@ -117,7 +115,6 @@ app.get('/api/roistat-orders', async (req, res) => {
       { 'Api-key': ROISTAT_KEY }
     );
     const total = data.total || 0;
-    // source breakdown from sample
     const srcCount = {};
     (data.data || []).forEach(o => {
       const src = o.source_type || 'Не указан';
@@ -138,19 +135,12 @@ app.get('/api/roistat-calls', async (req, res) => {
     );
     const total = data.total || 0;
     const calls = data.data || [];
-    const callers = new Set();
-    let answered = 0, totalDuration = 0;
-    calls.forEach(c => {
-      if (c.caller) callers.add(c.caller);
-      const dur = parseInt(c.duration) || 0;
-      if (dur > 0) { answered++; totalDuration += dur; }
-    });
-    // Filter to May only
+    
     const mayCalls = calls.filter(c => (c.date || '').startsWith('2026-05'));
     const mayAnswered = mayCalls.filter(c => (parseInt(c.duration)||0) > 0);
     const mayCallers = new Set(mayCalls.map(c => c.caller).filter(Boolean));
     const mayDuration = mayAnswered.reduce((s,c) => s + (parseInt(c.duration)||0), 0);
-    // by day (May only)
+
     const byDay = {};
     mayCalls.forEach(c => {
       const day = (c.date || '').slice(0, 10);
@@ -187,9 +177,14 @@ app.get('/api/roistat-calls', async (req, res) => {
 // ============== API: Product Ranking ==============
 app.get('/api/product-ranking', (req, res) => {
   try {
-    const xlsPath = '/root/.openclaw/media/inbound/выгрузка_май_2026---9ad4389d-5044-4205-9365-619164f35751.xls';
-    if (!fs.existsSync(xlsPath)) {
-      return res.json({ error: 'Файл выгрузки не найден' });
+    const xlsDir = '/root/.openclaw/media/inbound/';
+    let xlsPath = null;
+    if (fs.existsSync(xlsDir)) {
+      const files = fs.readdirSync(xlsDir).filter(f => f.startsWith('выгрузка_') && (f.endsWith('.xls') || f.endsWith('.xlsx')));
+      if (files.length > 0) xlsPath = path.join(xlsDir, files.sort().reverse()[0]);
+    }
+    if (!xlsPath || !fs.existsSync(xlsPath)) {
+      return res.json({ error: 'Файл выгрузки не найден. Подложите выгрузку из Bitrix24 в /root/.openclaw/media/inbound/' });
     }
     const html = fs.readFileSync(xlsPath, 'utf-8');
     const rows = html.match(/<tr>(.*?)<\/tr>/gs) || [];
@@ -291,10 +286,37 @@ app.get('/api/roistat-funnel', (req, res) => {
   }
 });
 
+// ============== API: Мотивации ДРОП 2026 ==============
+app.get('/api/motivations', (req, res) => {
+  try {
+    const dataPath = path.join(__dirname, 'data', 'motivations.json');
+    if (!fs.existsSync(dataPath)) {
+      return res.json({ error: 'Файл с данными мотиваций не найден' });
+    }
+    const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============== API: Анализ экспортных листов (источники/форматы) ==============
+app.get('/api/export-analysis', (req, res) => {
+  try {
+    const dataPath = path.join(__dirname, 'data', 'export_analysis.json');
+    if (!fs.existsSync(dataPath)) {
+      return res.json({ error: 'Файл с анализом экспорта не найден' });
+    }
+    const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============== API: Bitrix24 ==============
 app.get('/api/bitrix-deals', async (req, res) => {
   try {
-    // Batch all category counts
     const results = {};
     const categories = [
       { id: '0', name: 'sale' },
@@ -332,7 +354,6 @@ app.get('/api/bitrix-deals', async (req, res) => {
       );
       const inProg = inProgRes.total || 0;
 
-      // Revenue for WON positive deals
       let revenue = 0;
       if (wonPositive > 0) {
         const revRes = await fetchUrl(
@@ -340,7 +361,6 @@ app.get('/api/bitrix-deals', async (req, res) => {
         );
         if (revRes.result) {
           revenue = revRes.result.reduce((sum, d) => sum + (parseFloat(d.OPPORTUNITY) || 0), 0);
-          // If more than 50, estimate
           if (revRes.total > 50 && revRes.result.length > 0) {
             const avg = revenue / revRes.result.length;
             revenue = avg * wonPositive;
@@ -364,19 +384,37 @@ app.get('/api/bitrix-deals', async (req, res) => {
   }
 });
 
-// ============== FRONTEND ==============
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web-interface', 'public', 'test-dashboard.html'));
+// ============== API: Новая логика (06.06.26) ==============
+app.get('/api/data/new', async (req, res) => {
+  try {
+    // Пробуем сначала локальный кэш
+    const localPath = path.join(__dirname, 'data', 'agg_new.json');
+    if (fs.existsSync(localPath)) {
+      const data = JSON.parse(fs.readFileSync(localPath, 'utf-8'));
+      return res.json(data);
+    }
+    // Fallback на кэш drop-dashboard
+    const dropPath = path.resolve(__dirname, '..', 'drop-dashboard', 'cache', 'agg_new.json');
+    if (fs.existsSync(dropPath)) {
+      const data = JSON.parse(fs.readFileSync(dropPath, 'utf-8'));
+      return res.json(data);
+    }
+    res.status(503).json({ error: 'Новые данные (06.06.26) не загружены' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'web-interface', 'public', 'test-dashboard.html'));
+// ============== FRONTEND ==============
+
+app.get('/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 export default app;
 
-// Прямой запуск
+// Прямой запуск (для отладки)
 const thisFile = fileURLToPath(import.meta.url);
 if (process.argv[1] === thisFile) {
-  app.listen(PORT, '0.0.0.0', () => console.log(`🍀 Тест-дашборд на http://0.0.0.0:${PORT}`));
+  app.listen(3004, '0.0.0.0', () => console.log(`🍀 Тест-дашборд на http://0.0.0.0:3004`));
 }

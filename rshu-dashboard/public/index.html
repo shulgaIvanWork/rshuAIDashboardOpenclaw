@@ -417,16 +417,14 @@ function renderAprilPage(data) {
 
   area.innerHTML = `
     <div class="kpis" id="kpiApril">
-      <div class="kpi" style="border-top-color:#1565C0"><div class="label">Поступления в периоде</div><div class="val">${(data.totalPaidSum||0).toLocaleString()} ₽</div><div class="sub">${data.totalPaidCnt||0} оплат</div></div>
+      <div class="kpi" style="border-top-color:#1565C0"><div class="label">Поступления в периоде</div><div class="val">${(data.totalPaidSum||0).toLocaleString()} ₽</div><div class="sub">${data.totalPaidCnt||0} оплат ${data.paidSumDelta > 0 ? "↑" : data.paidSumDelta < 0 ? "↓" : ""} ${Math.abs(data.paidSumDelta || 0).toFixed(1)}%</div></div>
       <div class="kpi"><div class="label">Средний чек</div><div class="val">${Math.round(data.avgCheck||0).toLocaleString()} ₽</div><div class="sub">${data.avgCheckDelta > 0 ? '↑' : data.avgCheckDelta < 0 ? '↓' : ''} ${Math.abs(data.avgCheckDelta || 0).toFixed(1)}% к прошлому месяцу</div></div>
-      <div class="kpi"><div class="label">Конверсия (факт)</div><div class="val">${(data.conversionFact||0).toFixed(1)}%</div><div class="sub">по закрытым сделкам</div></div>
-      <div class="kpi"><div class="label">Конверсия (потенциал)</div><div class="val">${(data.conversionPotential||0).toFixed(1)}%</div><div class="sub">если все в работе закроются успешно</div></div>
+      <div class="kpi"><div class="label">Конверсия (факт)</div><div class="val">${(data.conversionFact||0).toFixed(1)}%</div><div class="sub">по закрытым сделкам ${data.convFactDelta > 0 ? "↑" : data.convFactDelta < 0 ? "↓" : ""} ${Math.abs(data.convFactDelta || 0).toFixed(1)}%</div></div>
       <div class="kpi" style="border-top-color:#9C27B0"><div class="label">📊 Конверсия (взвешенная)</div><div class="val">${(data.conversionWeighted||0).toFixed(1)}%</div><div class="sub">с учётом весов стадий</div></div>
-      <div class="kpi" style="border-top-color:#00838F"><div class="label">🔄 Цикл сделки</div><div class="val">${data.dealCycleDays||0} дн.</div><div class="sub">среднее от создания до оплаты</div></div>
-      <div class="kpi" style="border-top-color:#9C27B0"><div class="label">📄 Выставлено счетов</div><div class="val">${(data.invoiceSum||0).toLocaleString()} ₽</div><div class="sub">${data.invoiceCnt||0} счетов · оплачено ${data.invoicePaid||0} / ${(data.invoicePaidSum||0).toLocaleString()} ₽ · конв. ${data.invoiceCnt ? ((data.invoicePaid||0)/data.invoiceCnt*100).toFixed(1) : 0}%</div></div>
-      <div class="kpi" style="border-top-color:#2E7D32"><div class="label">③ Все лиды за период</div><div class="val">${(data.totalCreatedSum||0).toLocaleString()} ₽</div><div class="sub">${data.totalCreatedCnt||0} сделок</div></div>
-      <div class="kpi" style="border-top-color:#E67E22"><div class="label">② В Sale + на квалификации</div><div class="val">${(data.saleAndPreSaleInWorkSum||0).toLocaleString()} ₽</div><div class="sub">${data.saleAndPreSaleInWork||0} сделок</div></div>
-      <div class="kpi" style="border-top-color:#22c55e"><div class="label">④ Оплачено</div><div class="val">${(data.paidFromCreatedSum||0).toLocaleString()} ₽</div><div class="sub">${data.paidFromCreated||0} из ${data.totalPaidCnt||0} оплат месяца (${data.totalPaidCnt ? ((data.paidFromCreated/data.totalPaidCnt)*100).toFixed(1) : 0}%)</div></div>
+      <div class="kpi" style="border-top-color:#00838F"><div class="label">🔄 Цикл сделки</div><div class="val">${data.dealCycleDays||0} дн.</div><div class="sub">среднее от создания до оплаты ${data.dealCycleDelta > 0 ? '↑' : data.dealCycleDelta < 0 ? '↓' : ''} ${Math.abs(data.dealCycleDelta || 0).toFixed(1)}% к апрелю</div></div>
+      <div class="kpi" style="border-top-color:#9C27B0"><div class="label">📄 Выставлено счетов в периоде</div><div class="val">${(data.invoiceSum||0).toLocaleString()} ₽</div><div class="sub">${data.invoiceCnt||0} счетов · ${data.invCntDelta > 0 ? '↑' : data.invCntDelta < 0 ? '↓' : ''} ${Math.abs(data.invCntDelta || 0).toFixed(1)}% к апрелю</div></div>
+      <div class="kpi" style="border-top-color:#2E7D32"><div class="label">③ Все лиды за период</div><div class="val">${(data.totalCreatedSum||0).toLocaleString()} ₽</div><div class="sub">${data.totalCreatedCnt||0} сделок · ${data.createdCntDelta > 0 ? '↑' : data.createdCntDelta < 0 ? '↓' : ''} ${Math.abs(data.createdCntDelta || 0).toFixed(1)}% к апрелю</div></div>
+      <div class="kpi" style="border-top-color:#22c55e"><div class="label">⑤ Оплачено в том же периоде</div><div class="val">${(data.paidFromCreatedSum||0).toLocaleString()} ₽</div><div class="sub">${data.paidFromCreated||0} из ${data.totalPaidCnt||0} · конв. ${data.totalCreatedCnt ? ((data.paidFromCreated/data.totalCreatedCnt)*100).toFixed(1) : 0}% к созданным · ${data.paidFromCreatedCntDelta > 0 ? '↑' : data.paidFromCreatedCntDelta < 0 ? '↓' : ''} ${Math.abs(data.paidFromCreatedCntDelta || 0).toFixed(1)}% к апрелю</div></div>
       <div class="kpi" style="border-top-color:#1565C0"><div class="label">① Воронка Sale</div><div class="val">${(data.createdSaleSum||0).toLocaleString()} ₽</div><div class="sub">${data.createdSale||0} сделок</div></div>
       <div class="kpi"><div class="label">Лучшая неделя</div><div class="val">${bestLabel || '—'}</div><div class="sub">${(bestSum||0).toLocaleString()} ₽</div></div>
       <div class="kpi"><div class="label">Последняя неделя</div><div class="val">${(last.paidSum||0).toLocaleString()} ₽</div><div class="sub">${last.paidCnt||0} оплат <span class="delta ${delta>=0?'pos':'neg'}">${delta>=0?'↑':'↓'} ${Math.abs(delta).toFixed(1)}%</span></div></div>
@@ -703,16 +701,28 @@ function drawAprilCharts(periods) {
   // HTML-воронка (песочные часы)
   const funnelDiv = document.getElementById('funnelContainer');
   if (funnelDiv && aprilData) {
+    const totalLeads = aprilData.totalCreatedCnt || 0;
+    const saleCreated = aprilData.createdSale || 0;
+    const presaleF = aprilData.lostPreSale || 0;
+    const saleP = aprilData.inWorkSale || 0;
+    const paid = aprilData.paidFromCreated || 0;
+    // Sale F (проиграно) = totalLost - PreSaleF
+    const saleF = (aprilData.totalLostCnt || 0) - presaleF;
+    // Sale S без оплаты = Sale - P - F - paid (paid уже внутри S)
+    const saleWonNotPaid = Math.max(0, saleCreated - saleP - saleF - paid);
+    
     const steps = [
-      { label: 'Все лиды за период', val: aprilData.totalCreatedCnt || 0, color: '#42A5F5' },
-      { label: 'В Sale + на квалификации', val: (aprilData.createdSale || 0) + (aprilData?.saleAndPreSaleInWork || 0), color: '#1E88E5' },
-      { label: 'Воронка Sale', val: aprilData.createdSale || 0, color: '#1565C0' },
-      { label: '✅ Оплачено', val: aprilData.paidFromCreated || 0, color: '#22c55e' },
-      { label: '🔄 В работе (Sale)', val: aprilData.inWorkSale || 0, color: '#FDD835' },
-      { label: '❌ + отказы (Sale)', val: aprilData.inWorkAndLostSale || 0, color: '#FF9800' },
-      { label: '📄 Отказы (PreSale)', val: aprilData.lostPreSale || 0, color: '#ef5350' },
-      { label: '📦 Все неоплаченные', val: (aprilData.totalCreatedCnt || 0) - (aprilData.paidFromCreated || 0), color: '#819ca9' },
-      { label: '🔁 Все лиды (замыкание)', val: aprilData.totalCreatedCnt || 0, color: '#42A5F5' }
+      // Верхняя половина (сужение)
+      { label: '① Все лиды (создано)', val: totalLeads, color: '#42A5F5' },
+      { label: '② В Sale + на квалификации', val: aprilData.saleAndPreSaleInWork || 0, color: '#1E88E5' },
+      { label: '③ Воронка Sale', val: saleCreated, color: '#1565C0' },
+      // Нижняя половина (расширение — только Sale)
+      { label: '✅ Оплачено', val: paid, color: '#22c55e' },
+      { label: '🔄 В работе', val: saleP, color: '#FDD835' },
+      { label: '🏆 Выиграно (ожидает оплаты)', val: saleWonNotPaid, color: '#7B1FA2' },
+      { label: '❌ Проиграно (Sale)', val: saleF, color: '#ef5350' },
+      // Отсев до воронки
+      { label: '📄 Не прошли квалификацию (PreSale)', val: presaleF, color: '#819ca9' }
     ];
     const maxVal = steps[0].val || 1;
     let html = '';
@@ -949,12 +959,13 @@ document.getElementById('productsTabBtn').addEventListener('click', async functi
   area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка рейтинга продуктов…</div></div>';
   
   try {
-    const data = await fetch('/rshu-dashboard/api/product-ranking').then(r => r.json());
+    const data = await fetch('/rshu-dashboard/api/product-ranking-year').then(r => r.json());
     if (data.error) {
       area.innerHTML = '<div class="error-state">❌ ' + data.error + '</div>';
       return;
     }
-    document.getElementById('sourceInfo').textContent = '⭐ Рейтинг продуктов · май 2026 · всего оплат: ' + data.total_all + ' · основной: ' + data.main.count + ' / ' + data.main.revenue.toLocaleString() + ' ₽ · ILP: ' + data.ilp.count + ' · Корп: ' + data.corp.count;
+    const dRange = data.dateRange ? ' · ' + data.dateRange.from + ' — ' + data.dateRange.to : '';
+    document.getElementById('sourceInfo').textContent = '⭐ Рейтинг продуктов · 2026 · всего оплат: ' + data.total_all + dRange + ' · основной: ' + data.main.count + ' / ' + data.main.revenue.toLocaleString() + ' ₽ · ILP: ' + data.ilp.count + ' · Корп: ' + data.corp.count;
     renderProductsPage(data);
   } catch (e) {
     area.innerHTML = '<div class="error-state">❌ Ошибка: ' + e.message + '</div>';

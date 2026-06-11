@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>РШУ дашборды</title>
+  <link rel="stylesheet" href="/style.css?v=3">
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-logo">📊 РШУ дашборды</span>
+        <span class="sidebar-user"><%= user.name %><% if (user.role === 'guest') { %> <span style="font-size:0.7rem;opacity:0.5">(гость)</span><% } %></span>
+      </div>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-footer">
+        <a href="/dashboards" class="sidebar-link" style="color:#C8A45C; font-weight:600;">📊 Дашборды</a>
+        <% if (user.role === 'admin') { %><a href="/admin" class="sidebar-link">👥 Пользователи</a><% } %>
+        <a href="/logout" class="sidebar-link logout-link">🚪 Выйти</a>
+      </div>
+    </aside>
+
+    <main style="flex:1; overflow-y:auto; background:#f4f6fb;">
+      <div class="dashboards-page">
+        <h1>📊 Дашборды</h1>
+        <% dashboards.forEach(function(d) { %>
+          <div class="dashboard-card-wrapper">
+            <a href="<%= d.url %>" target="_blank" style="text-decoration:none;color:inherit;flex:1;">
+              <div class="dashboard-card">
+                <div class="dashboard-icon"><%= d.icon %></div>
+                <div class="dashboard-info">
+                  <h3>
+                    <%= d.name %>
+                    <% if (d.status === 'draft') { %><span style="font-size:0.65rem;background:#ffeaa7;color:#8b6914;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">черновик</span><% } %>
+                    <% if (d.status === 'ready') { %><span style="font-size:0.65rem;background:#d4edda;color:#155724;padding:1px 6px;border-radius:4px;vertical-align:middle;margin-left:4px;">опубликован</span><% } %>
+                  </h3>
+                  <p><%= d.description %></p>
+                </div>
+              </div>
+            </a>
+            <% if (user.role === 'admin') { %>
+              <div class="dashboard-toggle">
+                <label class="toggle-switch" title="Переключить статус">
+                  <input type="checkbox" class="toggle-input" data-dashboard="<%= d.name %>" <%= d.status === 'ready' ? 'checked' : '' %> />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label"><%= d.status === 'ready' ? 'опубликован' : 'черновик' %></span>
+              </div>
+            <% } %>
+          </div>
+        <% }) %>
+        <% if (dashboards.length === 0) { %>
+          <p style="color:#888;text-align:center;padding:40px;">Пока нет дашбордов</p>
+        <% } %>
+      </div>
+    </main>
+
+<% if (user.role === 'admin') { %>
+<style>
+.dashboard-card-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.dashboard-card {
+  flex: 1;
+}
+.dashboard-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 60px;
+}
+.toggle-label {
+  font-size: 0.6rem;
+  color: #888;
+  white-space: nowrap;
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+.toggle-input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #ccc;
+  border-radius: 20px;
+  transition: 0.3s;
+}
+.toggle-slider:before {
+  content: "";
+  position: absolute;
+  height: 14px; width: 14px;
+  left: 3px; bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.toggle-input:checked + .toggle-slider {
+  background: #4CAF50;
+}
+.toggle-input:checked + .toggle-slider:before {
+  transform: translateX(16px);
+}
+</style>
+<script>
+document.querySelectorAll('.toggle-input').forEach(function(el) {
+  el.addEventListener('change', function() {
+    const name = this.dataset.dashboard;
+    const status = this.checked ? 'ready' : 'draft';
+    fetch('/api/dashboards/' + encodeURIComponent(name) + '/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        const label = this.closest('.dashboard-toggle').querySelector('.toggle-label');
+        label.textContent = status === 'ready' ? 'опубликован' : 'черновик';
+      } else {
+        this.checked = !this.checked;
+        alert('Ошибка: ' + (data.error || 'неизвестная'));
+      }
+    }.bind(this))
+    .catch(function() {
+      this.checked = !this.checked;
+      alert('Ошибка соединения');
+    }.bind(this));
+  });
+});
+</script>
+<% } %>
+  </div>
+</body>
+</html>
