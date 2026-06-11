@@ -27,12 +27,11 @@ function saveUsers(users) {
 const FileStoreSession = FileStore(session);
 
 // --------------- Sub-apps ---------------
-import dropDashboard from '../drop-dashboard/server.js';
-import dropDashboardNew from '../drop-dashboard-new/server.js';
-import dashDashboard from '../dash/server.js';
-import testDashboard from '../test-dashboard/server.js';
-import rshuDashboard from '../rshu-dashboard/server.js';
-import komDashboard from '../kom-dashboard/server.js';
+import dropDashboard from '../dashboards/drop-dashboard/server.js';
+import dropDashboardNew from '../dashboards/drop-dashboard-new/server.js';
+import testDashboard from '../dashboards/test-dashboard/server.js';
+import rshuDashboard from '../dashboards/rshu-dashboard/server.js';
+import komDashboard from '../dashboards/kom-dashboard/server.js';
 
 // --------------- App ---------------
 const app = express();
@@ -100,8 +99,7 @@ app.use('/rshu-dashboard', requireAuth, rshuDashboard);
 app.use('/kom-dashboard', requireAuth, komDashboard);
 app.use('/drop-dashboard', requireAuth, dropDashboard);
 app.use('/drop-dashboard-new', requireAuth, dropDashboardNew);
-app.use('/dash', requireAuth, dashDashboard);
-app.use('/dashboard', requireAuth, dashDashboard);
+
 app.use('/test-dashboard', requireAuth, testDashboard);
 
 // --------------- Dashboards page ---------------
