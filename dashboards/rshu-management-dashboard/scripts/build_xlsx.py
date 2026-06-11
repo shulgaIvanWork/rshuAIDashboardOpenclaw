@@ -287,10 +287,13 @@ for i, m in enumerate(agg["mgr_top"]):
         c = ws_m.cell(row=r, column=j+1, value=v); c.border = B
         if j == 5 and isinstance(v,(int,float)): c.number_format = '0.0"%"'
         if j in (6,7) and isinstance(v,(int,float)): c.number_format = '#,##0 ₽'
-ws_m.conditional_formatting.add(f"H5:H{4+len(agg['mgr_top'])}",
-    ColorScaleRule(start_type="min",start_color="FFFFFF",
-                   mid_type="percentile",mid_value=50,mid_color="C8E6C9",
-                   end_type="max",end_color="1B5E20"))
+try:
+    ws_m.conditional_formatting.add(f"H5:H{4+len(agg['mgr_top'])}",
+        ColorScaleRule(start_type="min",start_color="FFFFFF",
+                       mid_type="percentile",mid_value=50,mid_color="C8E6C9",
+                       end_type="max",end_color="1B5E20"))
+except Exception:
+    pass
 for col, w in [("A",5),("B",35),("C",13),("D",8),("E",10),("F",10),("G",18),("H",20)]:
     ws_m.column_dimensions[col].width = w
 
