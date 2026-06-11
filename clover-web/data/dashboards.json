@@ -18,5 +18,9 @@
   "rshu-management-dashboard": {
     "label": "Управленческий дашборд РШУ",
     "icon": "📈"
+  },
+  "participants-dashboard": {
+    "label": "👥 Участники",
+    "icon": "👥"
   }
 }

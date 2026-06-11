@@ -29,6 +29,7 @@ const FileStoreSession = FileStore(session);
 // --------------- Sub-apps ---------------
 import dropDashboard from '../dashboards/drop-dashboard/server.js';
 import rshuManagementDashboard from '../dashboards/rshu-management-dashboard/server.js';
+import participantsDashboard from '../dashboards/participants-dashboard/server.js';
 import testDashboard from '../dashboards/test-dashboard/server.js';
 import rshuDashboard from '../dashboards/rshu-dashboard/server.js';
 import komDashboard from '../dashboards/kom-dashboard/server.js';
@@ -100,6 +101,7 @@ app.use('/kom-dashboard', requireAuth, komDashboard);
 app.use('/drop-dashboard', requireAuth, dropDashboard);
 app.use('/rshu-management-dashboard', requireAuth, rshuManagementDashboard);
 
+app.use('/participants-dashboard', requireAuth, participantsDashboard);
 app.use('/test-dashboard', requireAuth, testDashboard);
 
 // --------------- Dashboards page ---------------
@@ -269,6 +271,7 @@ function getAvailableDashboards(user) {
     'drop-dashboard': { url: '/drop-dashboard/' },
     'rshu-management-dashboard': { url: '/rshu-management-dashboard/' },
     'kom-dashboard': { url: '/kom-dashboard/' },
+    'participants-dashboard': { url: '/participants-dashboard/' },
     'test-dashboard': { url: '/test-dashboard/' }
   };
 

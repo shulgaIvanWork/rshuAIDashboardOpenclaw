@@ -87,6 +87,10 @@ window.BASE_PATH = _m ? '/' + _m[1] : '';
   
   <div class="tabs" id="tabBar">
     <div class="tab active" data-tab="mainNew">📊 Новая логика (06.06.26)</div>
+    <div class="tab" style="display:none" data-tab="main">📊 Главная</div>
+    <div class="tab" style="display:none" data-tab="main">📊 Главная</div>
+    <div class="tab" data-tab="participants">👥 Участники прошлой недели</div>
+    <div class="tab" data-tab="participantsCur">👥 Участники текущей недели</div>
   </div>
   
   <div id="contentArea" style="display:none">
@@ -97,7 +101,21 @@ window.BASE_PATH = _m ? '/' + _m[1] : '';
     <div class="loading-state" id="loadingStateNew"><div class="spinner"></div><div>Загрузка данных…</div></div>
   </div>
   
+  <div id="participantsArea" style="display:none">
+    <div class="card" id="participantsCard">
+      <h2 id="participantsTitle">👥 Участники ООМ / ОМ за прошлую неделю</h2>
+      <div class="sub" style="margin:-8px 0 14px">Тематика, программа, участник, компания, регион, сумма оплаты</div>
+      <div id="participantsTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div></div>
+    </div>
+  </div>
   
+  <div id="participantsCurArea" style="display:none">
+    <div class="card" id="participantsCurCard">
+      <h2 id="participantsCurTitle">👥 Участники ООМ / ОМ за текущую неделю</h2>
+      <div class="sub" style="margin:-8px 0 14px">Тематика, программа, участник, компания, регион, сумма оплаты</div>
+      <div id="participantsCurTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -120,7 +138,11 @@ document.getElementById('tabBar').addEventListener('click', function(e) {
   tab.classList.add('active');
   document.getElementById('contentArea').style.display = tabName === 'main' ? 'block' : 'none';
   document.getElementById('contentAreaNew').style.display = tabName === 'mainNew' ? 'block' : 'none';
+  document.getElementById('participantsArea').style.display = tabName === 'participants' ? 'block' : 'none';
+  document.getElementById('participantsCurArea').style.display = tabName === 'participantsCur' ? 'block' : 'none';
   currentTab = tabName;
+  if (tabName === 'participants') loadParticipants();
+  if (tabName === 'participantsCur') loadParticipantsCurrent();
 });
 
 async function api(path) {
@@ -1031,6 +1053,151 @@ async function loadParticipants() {
   }
 }
 
+// --- Current week participants ---
+async function loadParticipantsCurrent() {
+  const wrap = document.getElementById('participantsCurTableWrap');
+  wrap.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div>';
+  try {
+    const res = await api('/api/participants/current');
+    if (!res.participants) {
+      wrap.innerHTML = '<div class="error-state">❌ '+(res.error||'Нет данных')+'</div>';
+      return;
+    }
+    const title = document.getElementById('participantsCurTitle');
+    title.textContent = '👥 Участники ООМ / ОМ за ' + res.weekLabel + ' · всего ' + res.total + ' сделок';
+    
+    let html = '<table class="sortable" id="participantsCurTable"><thead><tr>' +
+      '<th class="sort" data-col="0">#</th>' +
+      '<th class="sort" data-col="1" style="text-align:left;min-width:180px">Программа / Тематика</th>' +
+      '<th class="sort" data-col="2" style="text-align:left;min-width:80px">Формат</th>' +
+      '<th class="sort" data-col="3" style="text-align:left;min-width:140px">Участник</th>' +
+      '<th class="sort" data-col="4" style="text-align:left;min-width:100px">Регион</th>' +
+      '<th class="sort" data-col="5" style="text-align:left;min-width:200px">Компания</th>' +
+      '<th class="sort" data-col="6" style="text-align:right">Сумма, ₽</th>' +
+      '<th class="sort" data-col="7">Дата</th>' +
+      '<th class="sort" data-col="8">Статус</th>' +
+      '<th class="sort" data-col="9" style="text-align:left">Менеджер</th>' +
+      '<th class="sort" data-col="10">Ранее учились?</th>' +
+      '</tr></thead><tbody>';
+    
+    for (let i = 0; i < res.participants.length; i++) {
+      const p = res.participants[i];
+      const rowClass = i < 3 ? ' class="top3"' : '';
+      const prevBadge = p.hadPrevTraining 
+        ? '<span class="badge-prev">✅ Да (' + p.prevTrainingDate + ')</span>' 
+        : '<span class="badge-new">🆕 Нет</span>';
+      const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
+      const fmtColor = p.format === 'ОМ (Онлайн)' ? '#43A047' : '#1976D2';
+      const fmtLabel = p.format === 'ОМ (Онлайн)' ? '🌐 ОМ' : '🏫 ООМ';
+      const regionLabel = p.region ? escapeHtml(p.region) : '—';
+      html += '<tr' + rowClass + '>' +
+        '<td>' + (i + 1) + '</td>' +
+        '<td class="tdleft"><span class="deal-title">' + escapeHtml(p.title) + '</span></td>' +
+        '<td><span style="color:' + fmtColor + ';font-weight:600">' + fmtLabel + '</span></td>' +
+        '<td class="tdleft">' + escapeHtml(p.participant) + '</td>' +
+        '<td class="tdleft">' + regionLabel + '</td>' +
+        '<td class="tdleft">' + escapeHtml(p.company.substring(0, 60)) + (p.company.length > 60 ? '…' : '') + '</td>' +
+        '<td class="tdright">' + amount + '</td>' +
+        '<td>' + p.date + '</td>' +
+        '<td>' + p.stage + '</td>' +
+        '<td class="tdleft">' + escapeHtml(p.manager) + '</td>' +
+        '<td>' + prevBadge + '</td>' +
+        '</tr>';
+    }
+    
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    
+    setTimeout(() => {
+      const tbl = document.getElementById('participantsCurTable');
+      if (!tbl) return;
+      const ths = tbl.querySelectorAll('thead th.sort');
+      ths.forEach(th => {
+        th.addEventListener('click', () => {
+          const col = parseInt(th.dataset.col);
+          const tbody = tbl.querySelector('tbody');
+          if (!tbody) return;
+          const rows = Array.from(tbody.querySelectorAll('tr'));
+          const isAsc = th.classList.contains('asc');
+          ths.forEach(h => h.classList.remove('asc', 'desc'));
+          th.classList.add(isAsc ? 'desc' : 'asc');
+          rows.sort((a, b) => {
+            const va = (a.cells[col]?.innerText || '').trim();
+            const vb = (b.cells[col]?.innerText || '').trim();
+            const na = parseFloat(va.replace(/[^\d\-.,]/g, '').replace(',', ''));
+            const nb = parseFloat(vb.replace(/[^\d\-.,]/g, '').replace(',', ''));
+            if (!isNaN(na) && !isNaN(nb)) return isAsc ? na - nb : nb - na;
+            return isAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+          });
+          rows.forEach(r => tbody.appendChild(r));
+        });
+      });
+    }, 100);
+  } catch (e) {
+    wrap.innerHTML = '<div class="error-state">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function loadArtifacts() {
+  var block = document.getElementById('newArtifactsBlock');
+  if (!block) return;
+  try {
+    var a = await api('/api/artifacts');
+    if (!a || !a.summary) { block.innerHTML = '<div class="muted">Нет данных по артефактам</div>'; return; }
+    var s = a.summary;
+    var h = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
+    
+    // Возвраты
+    h += '<div style="background:#FFF3E0;border-radius:8px;padding:10px;border-left:4px solid #E65100">';
+    h += '<div style="font-size:12px;color:#E65100;font-weight:600">🔄 Возвраты покупателям</div>';
+    h += '<div style="font-size:20px;font-weight:700">' + fmt(s.returns.sum) + ' ₽</div>';
+    h += '<div style="font-size:12px;color:#666">' + s.returns.cnt + ' сделок</div></div>';
+    
+    // В работе + оплата
+    h += '<div style="background:#E3F2FD;border-radius:8px;padding:10px;border-left:4px solid #1976D2">';
+    h += '<div style="font-size:12px;color:#1976D2;font-weight:600">⚠️ Сделки в работе с оплатой</div>';
+    h += '<div style="font-size:20px;font-weight:700">' + fmt(s.inProgressPaid.sum) + ' ₽</div>';
+    h += '<div style="font-size:12px;color:#666">' + s.inProgressPaid.cnt + ' сделок</div></div>';
+    
+    // WON без даты
+    h += '<div style="background:#F3E5F5;border-radius:8px;padding:10px;border-left:4px solid #9C27B0">';
+    h += '<div style="font-size:12px;color:#9C27B0;font-weight:600">❓ WON без даты оплаты</div>';
+    h += '<div style="font-size:20px;font-weight:700">' + fmt(s.wonNoPay.sum) + ' ₽</div>';
+    h += '<div style="font-size:12px;color:#666">' + s.wonNoPay.cnt + ' сделок</div></div>';
+    
+    // Технические
+    h += '<div style="background:#ECEFF1;border-radius:8px;padding:10px;border-left:4px solid #78909C">';
+    h += '<div style="font-size:12px;color:#78909C;font-weight:600">⛔ Технические сделки (0₽)</div>';
+    h += '<div style="font-size:20px;font-weight:700">' + fmt(s.tech.cnt) + ' шт</div>';
+    h += '<div style="font-size:12px;color:#666">WON с нулевой суммой</div></div>';
+    
+    // Отрицательная длительность
+    h += '<div style="background:#FFEBEE;border-radius:8px;padding:10px;border-left:4px solid #C62828">';
+    h += '<div style="font-size:12px;color:#C62828;font-weight:600">🔴 Оплата раньше создания</div>';
+    h += '<div style="font-size:20px;font-weight:700">' + fmt(s.negativeDuration.cnt) + ' шт</div>';
+    h += '<div style="font-size:12px;color:#666">UF_DATE_PAY_1C &lt; DATE_CREATE</div></div>';
+    
+    h += '</div>';
+    
+    // Детали (первые 10 возвратов)
+    if (a.details && a.details.returns && a.details.returns.length > 0) {
+      h += '<details><summary style="cursor:pointer;font-weight:600;font-size:13px;color:#E65100">▶ Детали возвратов (' + a.details.returns.length + ')</summary>';
+      h += '<div style="max-height:200px;overflow-y:auto;margin-top:8px"><table style="font-size:11px"><tr><th>#</th><th>Сделка</th><th>Сумма</th><th>Дата</th></tr>';
+      a.details.returns.slice(0,10).forEach(function(r,i){
+        h += '<tr><td>' + (i+1) + '</td><td>' + escapeHtml(r.title || '—').substring(0,40) + '</td><td>' + fmt(r.sum) + ' ₽</td><td>' + (r.date||'') + '</td></tr>';
+      });
+      h += '</table></div></details>';
+    }
+    
+    block.innerHTML = h;
+  } catch(e) {
+    block.innerHTML = '<div class="muted">Ошибка загрузки артефактов: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+function escapeHtml(s) {
+  return s ? String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
+}
 </script>
 </body>
 </html>
