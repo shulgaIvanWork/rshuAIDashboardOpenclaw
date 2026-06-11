@@ -27,10 +27,17 @@ let aggCache = null;
 // --- Load cache ---
 async function loadCache() {
   try {
-    aggCache = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg_new.json'), 'utf-8'));
+    const raw = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg.json'), 'utf-8'));
+    // Add OOM/KOM aliases (agg.json doesn't have oom_* fields)
+    raw.oom_ytd = { ...raw.ytd };
+    raw.oom_prev = { ...raw.prev };
+    raw.oom_cur = { ...raw.cur };
+    raw.oom_leads_ytd = raw.leads_ytd;
+    raw.kom_leads_ytd = raw.kom_ytd?.won_relevant_cnt || 0;
+    aggCache = raw;
     dataState.ready = true;
     dataState.loadedAt = new Date().toISOString();
-    console.log(`✓ Cache loaded: ${aggCache.weeks.length} weeks`);
+    console.log(`✓ Cache loaded: ${aggCache.weeks.length} weeks, ${aggCache.ytd.won_relevant_cnt} deals`);
   } catch (e) {
     console.log('Cache not found:', e.message);
   }
@@ -120,7 +127,13 @@ function runRefresh() {
           return reject(new Error(`Pipeline exit code ${code}`));
         }
 
-        aggCache = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg_new.json'), 'utf-8'));
+        const raw = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg.json'), 'utf-8'));
+        raw.oom_ytd = { ...raw.ytd };
+        raw.oom_prev = { ...raw.prev };
+        raw.oom_cur = { ...raw.cur };
+        raw.oom_leads_ytd = raw.leads_ytd;
+        raw.kom_leads_ytd = raw.kom_ytd?.won_relevant_cnt || 0;
+        aggCache = raw;
         dataState.ready = true;
         dataState.loadedAt = new Date().toISOString();
         dataState.loading = false;
@@ -164,11 +177,16 @@ app.get('/api/data', (req, res) => {
 });
 
 // Refresh
-// New logic data endpoint (тот же agg_new.json, что и /api/data)
+// New logic data endpoint (тот же agg.json, что и /api/data)
 app.get('/api/data/new', async (req, res) => {
-  const aggNewPath = path.join(CACHE_DIR, 'agg_new.json');
+  const aggNewPath = path.join(CACHE_DIR, 'agg.json');
   try {
     const data = JSON.parse(await fs.readFile(aggNewPath, 'utf-8'));
+    data.oom_ytd = { ...data.ytd };
+    data.oom_prev = { ...data.prev };
+    data.oom_cur = { ...data.cur };
+    data.oom_leads_ytd = data.leads_ytd;
+    data.kom_leads_ytd = data.kom_ytd?.won_relevant_cnt || 0;
     res.json(data);
   } catch (e) {
     res.status(503).json({ error: 'New logic data not loaded' });

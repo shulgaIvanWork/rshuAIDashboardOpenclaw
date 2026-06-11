@@ -13,7 +13,7 @@ EXPORT_URL = "https://24.uprav.ru/web_services/crm/export.php"
 SECRET     = "14b0fc053c141e47a5974b3859f5753f"
 CATEGORIES = [0, 8, 19]
 LIMIT = 50
-MAX_OFFSET = 5000
+MAX_OFFSET = 30000
 
 SELECT = [
     "ID", "TITLE", "STAGE_ID", "STAGE_SEMANTIC_ID", "CATEGORY_ID",
