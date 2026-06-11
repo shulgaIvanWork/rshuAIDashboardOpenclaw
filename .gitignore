@@ -25,15 +25,15 @@ output/
 __pycache__/
 *.pyc
 
-# Web-interface sessions & dialogs (runtime data)
-web-interface/data/sessions/*
-web-interface/data/dialogs/*
-
 # IDE
 .vscode/
 .idea/
 
 # PM2
 pm2-logrotate/
-# Sensitive config
-web-interface/data/users.json
+
+# Runtime data (sessions auto-created by express-session)
+clover-web/data/sessions/*
+
+# Sensitive config (passwords, user DB)
+clover-web/data/users.json
