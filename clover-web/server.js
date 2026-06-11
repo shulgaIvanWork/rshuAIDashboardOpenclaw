@@ -28,7 +28,7 @@ const FileStoreSession = FileStore(session);
 
 // --------------- Sub-apps ---------------
 import dropDashboard from '../dashboards/drop-dashboard/server.js';
-import dropDashboardNew from '../dashboards/drop-dashboard-new/server.js';
+import rshuManagementDashboard from '../dashboards/rshu-management-dashboard/server.js';
 import testDashboard from '../dashboards/test-dashboard/server.js';
 import rshuDashboard from '../dashboards/rshu-dashboard/server.js';
 import komDashboard from '../dashboards/kom-dashboard/server.js';
@@ -98,7 +98,7 @@ app.get('/logout', (req, res) => {
 app.use('/rshu-dashboard', requireAuth, rshuDashboard);
 app.use('/kom-dashboard', requireAuth, komDashboard);
 app.use('/drop-dashboard', requireAuth, dropDashboard);
-app.use('/drop-dashboard-new', requireAuth, dropDashboardNew);
+app.use('/rshu-management-dashboard', requireAuth, rshuManagementDashboard);
 
 app.use('/test-dashboard', requireAuth, testDashboard);
 
@@ -267,7 +267,7 @@ function getAvailableDashboards(user) {
   const knownProjects = {
     'rshu-dashboard': { url: '/rshu-dashboard/' },
     'drop-dashboard': { url: '/drop-dashboard/' },
-    'drop-dashboard-new': { url: '/drop-dashboard-new/' },
+    'rshu-management-dashboard': { url: '/rshu-management-dashboard/' },
     'kom-dashboard': { url: '/kom-dashboard/' },
     'test-dashboard': { url: '/test-dashboard/' }
   };

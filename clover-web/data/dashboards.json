@@ -15,8 +15,8 @@
     "label": "🧪 Тестовый дашборд (прогноз)",
     "icon": "🧪"
   },
-  "drop-dashboard-new": {
-    "label": "ДРОП — Отчёт по продажам (копия)",
+  "rshu-management-dashboard": {
+    "label": "Управленческий дашборд РШУ",
     "icon": "📈"
   }
 }
