@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const DASHBOARDS_FILE = path.join(DATA_DIR, 'dashboards.json');
-const PROJECTS_DIR = path.resolve(__dirname, '..');
+const PROJECTS_DIR = path.resolve(__dirname, '../dashboards');
 
 // Загружаем пользователей (перечитывать при каждом запросе, чтобы видеть изменения)
 function loadUsers() {
@@ -300,7 +300,7 @@ function getAvailableDashboards(user) {
     const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-      if (['web-interface', 'dashboard2', 'clover-web'].includes(entry.name)) continue;
+      if (entry.name.startsWith('.') || entry.name === 'web-interface' || entry.name === 'dashboard2') continue;
 
       const meta = getDashboardStatus(entry.name);
 
