@@ -46,7 +46,7 @@ LEADS_STATE  = os.path.join(CACHE_DIR, 'leads_state.json')
 DEALS_JSON = os.path.join(CACHE_DIR, 'deals_2026.json')
 DICTS_JSON = os.path.join(CACHE_DIR, 'dicts.json')
 CC_JSON    = os.path.join(CACHE_DIR, 'company_contact.json')
-AGG_JSON   = os.path.join(CACHE_DIR, 'agg.json')
+AGG_JSON   = os.path.join(CACHE_DIR, 'agg_new.json')
 
 # Таймаут HTTP-запросов (сек)
 TIMEOUT = 90

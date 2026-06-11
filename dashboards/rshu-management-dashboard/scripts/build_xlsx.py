@@ -98,10 +98,13 @@ for j, v in enumerate(totals):
     if j == 7: c.number_format = '0.0'
     if j in (8, 9, 11): c.number_format = '0.0 "%"'
 
-ws.conditional_formatting.add(f"F{start_row+1}:F{start_row+len(weeks)}",
-    ColorScaleRule(start_type="min", start_color="FFFFFF",
-                   mid_type="percentile", mid_value=50, mid_color="FFD180",
-                   end_type="max", end_color="2E7D32"))
+try:
+    ws.conditional_formatting.add(f"F{start_row+1}:F{start_row+len(weeks)}",
+        ColorScaleRule(start_type="min", start_color="FFFFFF",
+                       mid_type="percentile", mid_value=50, mid_color="FFD180",
+                       end_type="max", end_color="2E7D32"))
+except Exception:
+    pass
 for i, w in enumerate([7,16,8,8,8,17,15,10,11,11,10,15]):
     ws.column_dimensions[get_column_letter(i+1)].width = w
 
