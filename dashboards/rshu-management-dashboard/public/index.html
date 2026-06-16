@@ -185,10 +185,8 @@ async function loadAll() {
     dataCache = d;
     
     // Устанавливаем dateFrom/dateTo по умолчанию: с первой недели до today
-    var firstWeek = d.weeks && d.weeks[0];
-    if (firstWeek && firstWeek.mon) {
-      document.getElementById('dateFrom').value = firstWeek.mon;
-    }
+    // По умолчанию: с 1 января текущего года
+    document.getElementById('dateFrom').value = '2026-01-01';
     var todayStr = new Date().toISOString().substring(0, 10);
     document.getElementById('dateTo').value = todayStr;
     dateFromCache = document.getElementById('dateFrom').value;
@@ -764,11 +762,11 @@ async function renderPageMainNew(d) {
     }
     var last = weeks[lastIdx] || {};
     var prev = weeks[lastIdx - 1] || {};
-    var delta = 0;
+    var wkDelta = 0;
     if (prev.postupleniya && prev.postupleniya > 0) {
-      delta = (last.postupleniya - prev.postupleniya) / prev.postupleniya * 100;
+      wkDelta = (last.postupleniya - prev.postupleniya) / prev.postupleniya * 100;
     } else if (last.postupleniya > 0) {
-      delta = 100;
+      wkDelta = 100;
     }
     var ytd = d.ytd || {};
     var srcTop = d.src_rating || [];
@@ -787,7 +785,7 @@ async function renderPageMainNew(d) {
     html += '</ul></div>';
     // Неделя
     html += '<div><b>📈 Неделя W'+cw+':</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(delta>0?'📈 +':'📉 ')+Math.abs(delta).toFixed(1)+'% к прошлой</li>';
+    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(wkDelta>0?'📈 +':'📉 ')+Math.abs(wkDelta).toFixed(1)+'% к прошлой</li>';
     html += '<li>Сделок: <b>'+(last.won_cnt||0)+'</b></li>';
     html += '<li>Лидов: <b>'+fmt(d.leads_cur||0)+'</b></li>';
     html += '</ul></div>';
@@ -799,7 +797,7 @@ async function renderPageMainNew(d) {
     html += '</ul></div>';
     // Рекомендации
     html += '<div><b>💡 Рекомендации:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += (delta < 0 ? '<li>⚠️ Падение недели к прошлой — проанализировать причины</li>' : '<li>✅ Неделя стабильна или растёт</li>');
+    html += (wkDelta < 0 ? '<li>⚠️ Падение недели к прошлой — проанализировать причины</li>' : '<li>✅ Неделя стабильна или растёт</li>');
     html += (srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка — поработать с качеством лидов</li>' : '';
     html += '<li>📌 Средняя скорость закрытия: '+(ytd.median_close_days_won||0)+' дн. (медиана)</li>';
     html += '</ul></div>';
