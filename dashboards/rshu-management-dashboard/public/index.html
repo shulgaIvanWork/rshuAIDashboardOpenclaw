@@ -754,6 +754,57 @@ async function renderPageMainNew(d) {
     html += '</div>';
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
+
+    // --- Ключевые выводы ---
+    var cw = d.weeks ? d.weeks.length : 0;
+    var weeks = d.weeks || [];
+    var lastIdx = weeks.length - 1;
+    while (lastIdx > 0 && weeks[lastIdx] && weeks[lastIdx].postupleniya === 0 && weeks[lastIdx].oplata === 0) {
+      lastIdx--;
+    }
+    var last = weeks[lastIdx] || {};
+    var prev = weeks[lastIdx - 1] || {};
+    var delta = 0;
+    if (prev.postupleniya && prev.postupleniya > 0) {
+      delta = (last.postupleniya - prev.postupleniya) / prev.postupleniya * 100;
+    } else if (last.postupleniya > 0) {
+      delta = 100;
+    }
+    var ytd = d.ytd || {};
+    var srcTop = d.src_rating || [];
+    var fmtData = Object.entries(d.fmt_ytd || {}).filter(function(e){return e[0] !== 'period';}).sort(function(a,b){return (b[1].sum||0) - (a[1].sum||0);});
+    var mgrTop = d.mgr_top || [];
+
+    html += '<div class="card" style="background:linear-gradient(135deg,#f8f9ff,#eef1f8)">';
+    html += '<h2>📋 Ключевые выводы</h2>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">';
+    // Общая картина
+    html += '<div><b>📊 Общая картина YTD:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<li>Поступления: <b>'+fmt(ytd.postupleniya)+' ₽</b> ('+ytd.won_relevant_cnt+' сделок)</li>';
+    html += '<li>Средний чек: <b>'+fmt(ytd.avg_check)+' ₽</b></li>';
+    html += '<li>Срок WON: простой <b>'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</b> · взвешенный <b>'+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн.</b></li>';
+    html += '<li>Лидов: <b>'+fmt(d.leads_ytd)+'</b></li>';
+    html += '</ul></div>';
+    // Неделя
+    html += '<div><b>📈 Неделя W'+cw+':</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(delta>0?'📈 +':'📉 ')+Math.abs(delta).toFixed(1)+'% к прошлой</li>';
+    html += '<li>Сделок: <b>'+(last.won_cnt||0)+'</b></li>';
+    html += '<li>Лидов: <b>'+fmt(d.leads_cur||0)+'</b></li>';
+    html += '</ul></div>';
+    // Лидеры
+    html += '<div><b>🏆 Лидеры:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '—')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽)</li>';
+    html += '<li>Формат: <b>'+(fmtData.length > 0 ? escapeHtml(fmtData[0][0]) : '—')+'</b> ('+fmt(fmtData.length > 0 ? fmtData[0][1].sum : 0)+' ₽)</li>';
+    html += '<li>'+(mgrTop.length > 0 ? 'Менеджер: <b>'+escapeHtml(mgrTop[0].name)+'</b> ('+fmt(mgrTop[0].postupleniya)+' ₽)' : '')+'</li>';
+    html += '</ul></div>';
+    // Рекомендации
+    html += '<div><b>💡 Рекомендации:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += (delta < 0 ? '<li>⚠️ Падение недели к прошлой — проанализировать причины</li>' : '<li>✅ Неделя стабильна или растёт</li>');
+    html += (srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка — поработать с качеством лидов</li>' : '';
+    html += '<li>📌 Средняя скорость закрытия: '+(ytd.median_close_days_won||0)+' дн. (медиана)</li>';
+    html += '</ul></div>';
+    html += '</div></div>';
+
     html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div></div>';
 
     // Batch update all at once
