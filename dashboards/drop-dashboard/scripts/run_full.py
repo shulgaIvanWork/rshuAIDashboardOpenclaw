@@ -1,33 +1,36 @@
 """
-run_full.py — ПОЛНАЯ пересборка с нуля.
+run_full.py — ПОЛНАЯ ПЕРЕСБОРКА для нового дашборда (Новая логика).
 
-Удаляет все кэшированные данные и выгружает всё заново из Битрикс24.
+Обновляет сделки через CRM Export API (fetch_refresh.py),
+справочники (fetch_dicts.py), затем запускает новый анализ (analyze_new.py).
+
 Используйте:
     - при первом запуске на новом сервере
-    - в начале нового года (смените YEAR в config.py)
     - при подозрении на битые данные
+    - по кнопке «Обновить» на дашборде
 
 Запуск:  python run_full.py
 
 Порядок шагов:
-    1. Сброс состояния
-    2. fetch_deals.py --reset  (все батчи, до конца)
-    3. fetch_leads.py --reset  (все батчи, до конца)
-    4. merge.py
-    5. fetch_dicts.py
-    6. analyze.py
-    7. build_html.py
-    8. build_xlsx.py
+    1. fetch_refresh.py   — обновление сделок через CRM Export API
+    2. fetch_dicts.py     — обновление справочников Bitrix24
+    3. analyze_new.py     — новый анализ (agg_new.json)
 """
 import subprocess, sys, os, time
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 def run(script, args=""):
-    cmd = [sys.executable, script] + (args.split() if args else [])
+    full_path = os.path.join(SCRIPT_DIR, script)
+    if not os.path.exists(full_path):
+        print(f"\n❌  {full_path} не найден, пропускаем")
+        return
+    cmd = [sys.executable, full_path] + (args.split() if args else [])
     print(f"\n{'='*60}")
     print(f"▶  {' '.join(cmd)}")
     print('='*60)
     t0 = time.time()
-    result = subprocess.run(cmd, check=False)
+    result = subprocess.run(cmd, cwd=SCRIPT_DIR, check=False)
     elapsed = time.time() - t0
     if result.returncode != 0:
         print(f"\n❌  {script} завершился с ошибкой (код {result.returncode})")
@@ -36,32 +39,19 @@ def run(script, args=""):
 
 
 print("=" * 60)
-print("ПОЛНАЯ ВЫГРУЗКА — удаляем кэш и загружаем заново")
+print("ПОЛНАЯ ПЕРЕСБОРКА (новая логика)")
 print("=" * 60)
 
-# --- Шаг 1: Сделки (оба потока, все батчи) ---
-# --batches 9999 = загружать до исчерпания
-run("fetch_deals.py", "--reset --batches 9999")
+# --- Шаг 1: Сделки через CRM Export API (быстро) ---
+run("fetch_refresh.py")
 
-# --- Шаг 2: Лиды ---
-run("fetch_leads.py", "--reset --batches 9999")
-
-# --- Шаг 3: Слияние ---
-run("merge.py")
-
-# --- Шаг 4: Справочники (после deals_2026.json — нужны UID) ---
+# --- Шаг 2: Справочники ---
 run("fetch_dicts.py")
 
-# --- Шаг 5: Анализ ---
-run("analyze.py")
-
-# --- Шаг 6: Отчёты ---
-run("build_html.py")
-run("build_xlsx.py")
+# --- Шаг 3: Новый анализ (agg_new.json) ---
+run("analyze_new.py")
 
 print("\n" + "=" * 60)
-print("✅  Полная выгрузка завершена!")
-import config
-print(f"    HTML:  {config.OUTPUT_DIR}/{config.HTML_FILE}")
-print(f"    Excel: {config.OUTPUT_DIR}/{config.XLSX_FILE}")
+print("✅  Полная пересборка завершена!")
+print("    agg_new.json — готов к загрузке на дашборд")
 print("=" * 60)

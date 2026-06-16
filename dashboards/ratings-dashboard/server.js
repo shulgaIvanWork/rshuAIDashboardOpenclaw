@@ -28,8 +28,12 @@ let aggCache = null;
 async function loadCache() {
   try {
     const raw = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg.json'), 'utf-8'));
-    // OOM/KOM данные берутся из agg.json (рассчитываются в analyze_new.py)
-    // Больше не копируем из ytd — это затирало правильные OOM-цифры
+    // Add OOM/KOM aliases (agg.json doesn't have oom_* fields)
+    raw.oom_ytd = { ...raw.ytd };
+    raw.oom_prev = { ...raw.prev };
+    raw.oom_cur = { ...raw.cur };
+    /* raw.oom_leads_ytd = raw.leads_ytd; — оставляем значение из agg.json */
+    /* raw.kom_leads_ytd = raw.kom_leads_ytd || ... — оставляем из agg.json */
     aggCache = raw;
     dataState.ready = true;
     dataState.loadedAt = new Date().toISOString();
@@ -83,7 +87,8 @@ function runRefresh() {
         'fetch_refresh': 'Выгрузка сделок (CRM Export API)',
         'fetch_dicts': 'Загрузка справочников',
         'analyze_new': 'Анализ данных (новая логика)',
-};
+        'build_xlsx': 'Сборка Excel-отчёта',
+      };
       
       // Определяем фазу
       for (const [key, label] of Object.entries(phases)) {
@@ -123,7 +128,10 @@ function runRefresh() {
         }
 
         const raw = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg.json'), 'utf-8'));
-        // OOM/KOM данные — из agg.json (analyze_new.py)
+        raw.oom_ytd = { ...raw.ytd };
+        raw.oom_prev = { ...raw.prev };
+        raw.oom_cur = { ...raw.cur };
+        /* raw.oom_leads_ytd = raw.leads_ytd; — оставляем значение из agg.json */
         /* raw.kom_leads_ytd = raw.kom_leads_ytd || ... — оставляем из agg.json */
         aggCache = raw;
         dataState.ready = true;
@@ -174,7 +182,10 @@ app.get('/api/data/new', async (req, res) => {
   const aggNewPath = path.join(CACHE_DIR, 'agg.json');
   try {
     const data = JSON.parse(await fs.readFile(aggNewPath, 'utf-8'));
-    // OOM/KOM данные — из agg.json (analyze_new.py), не переопределяем
+    data.oom_ytd = { ...data.ytd };
+    data.oom_prev = { ...data.prev };
+    data.oom_cur = { ...data.cur };
+    // data.oom_leads_ytd и data.kom_leads_ytd — из agg.json, не переопределяем
     res.json(data);
   } catch (e) {
     res.status(503).json({ error: 'New logic data not loaded' });
@@ -337,6 +348,17 @@ app.get('/api/forecast', async (req, res) => {
   }
 });
 
+// Download Excel
+app.get('/api/export', async (req, res) => {
+  const xlsxPath = path.join(CACHE_DIR, 'output', 'Отчёт_продажи_2026.xlsx');
+  try {
+    await fs.access(xlsxPath);
+    res.download(xlsxPath, 'Отчёт_продажи_2026.xlsx');
+  } catch {
+    res.status(404).json({ error: 'Excel file not found. Run refresh first.' });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, path) => {
     if (path.endsWith('.html')) {
@@ -362,7 +384,7 @@ export default app;
 const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url);
 if (isDirectRun) {
   await loadCache();
-  app.listen(PORT, '0.0.0.0', () => console.log(`🍀 Дроп-дашборд на http://0.0.0.0:${PORT}`));
+  app.listen(PORT, '0.0.0.0', () => console.log(`🍀 Рейтинги на http://0.0.0.0:${PORT}`));
 } else {
   await loadCache();
 }

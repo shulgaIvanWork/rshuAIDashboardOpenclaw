@@ -7,7 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Управленческий дашборд РШУ 2026</title>
+  <title>Рейтинги 2026</title>
   <script>
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function fmt(n){return (n||0).toLocaleString('ru-RU');}
@@ -40,6 +40,7 @@ window.BASE_PATH = _m ? '/' + _m[1] : '';
 </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f6fb; padding: 24px; color: #1f2a44; }
@@ -105,11 +106,12 @@ window.BASE_PATH = _m ? '/' + _m[1] : '';
 </head>
 <body>
 <div class="wrap">
-  <h1>Управленческий дашборд РШУ 2026</h1>
-  <p class="sub" id="sourceInfo">Битрикс24 · загрузка...</p>
+  <h1>Рейтинги 2026</h1>
+  <p class="sub" id="sourceInfo">Топ-20 продуктов · Источники · Менеджеры · Топ-20 компаний</p>
   <div class="loading-bar" id="loadingBar"><div class="fill" id="loadingFill"></div></div>
   <div class="toolbar">
     <button id="refreshBtn">🔄 Обновить данные</button>
+    <button id="exportBtn" disabled>📎 Экспорт в Excel</button>
   </div>
   
   <div id="dateFilterBar" style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;background:#fff;padding:12px 16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
@@ -121,9 +123,7 @@ window.BASE_PATH = _m ? '/' + _m[1] : '';
     <span id="filterInfo" style="font-size:12px;color:#888"></span>
   </div>
   
-  <div id="contentArea" style="display:none">
-    <div class="loading-state" id="loadingState"><div class="spinner"></div><div>Загрузка данных…</div></div>
-  </div>
+
   
   <div id="contentAreaNew">
     <div class="loading-state" id="loadingStateNew"><div class="spinner"></div><div>Загрузка данных…</div></div>
@@ -182,11 +182,14 @@ async function loadAll() {
     const d = await api('/api/data/new');
     if (!d || !d.ytd) return;
     document.getElementById('loadingFill').style.width = '100%';
+    document.getElementById('exportBtn').disabled = false;
     dataCache = d;
     
     // Устанавливаем dateFrom/dateTo по умолчанию: с первой недели до today
-    // По умолчанию: с 1 января текущего года
-    document.getElementById('dateFrom').value = '2026-01-01';
+    var firstWeek = d.weeks && d.weeks[0];
+    if (firstWeek && firstWeek.mon) {
+      document.getElementById('dateFrom').value = firstWeek.mon;
+    }
     var todayStr = new Date().toISOString().substring(0, 10);
     document.getElementById('dateTo').value = todayStr;
     dateFromCache = document.getElementById('dateFrom').value;
@@ -251,8 +254,8 @@ function buildFilteredData(orig, filteredWeeks) {
   
   // ООМ YTD — берём из оригинала, переписываем только посчитанные поля
   var oom_ytd = JSON.parse(JSON.stringify(orig.oom_ytd || {}));
-  oom_ytd.postupleniya = sumField('oom_postupleniya');
-  oom_ytd.won_relevant_cnt = sumField('oom_won_cnt');
+  oom_ytd.postupleniya = sumField('postupleniya');
+  oom_ytd.won_relevant_cnt = sumField('oplata');
   oom_ytd.avg_check = oom_ytd.won_relevant_cnt > 0 ? Math.round(oom_ytd.postupleniya / oom_ytd.won_relevant_cnt) : oom_ytd.avg_check || 0;
   out.oom_ytd = oom_ytd;
   
@@ -268,8 +271,8 @@ function buildFilteredData(orig, filteredWeeks) {
   var prev = filteredWeeks[filteredWeeks.length - 2] || {};
   out.cur = { postupleniya: last.postupleniya || 0, won_relevant_cnt: last.oplata || 0 };
   out.prev = { postupleniya: prev.postupleniya || 0, won_relevant_cnt: prev.oplata || 0 };
-  out.oom_cur = { postupleniya: last.oom_postupleniya || 0, won_relevant_cnt: last.oom_won_cnt || 0 };
-  out.oom_prev = { postupleniya: prev.oom_postupleniya || 0, won_relevant_cnt: prev.oom_won_cnt || 0 };
+  out.oom_cur = { postupleniya: last.postupleniya || 0, won_relevant_cnt: last.oplata || 0 };
+  out.oom_prev = { postupleniya: prev.postupleniya || 0, won_relevant_cnt: prev.oplata || 0 };
   out.kom_cur = { postupleniya: last.kom_postupleniya || 0, won_relevant_cnt: last.kom_won_cnt || 0 };
   out.kom_prev = { postupleniya: prev.kom_postupleniya || 0, won_relevant_cnt: prev.kom_won_cnt || 0 };
   out.cur_week = last.week || orig.cur_week;
@@ -279,7 +282,7 @@ function buildFilteredData(orig, filteredWeeks) {
   out.leads_ytd = sumField('leads');
   out.leads_cur = last.leads || 0;
   out.leads_prev = prev.leads || 0;
-  out.oom_leads_ytd = sumField('oom_leads');
+  out.oom_leads_ytd = sumField('leads');
   out.kom_leads_ytd = orig.kom_leads_ytd || sumField("kom_won_cnt");
   
   // Форматы — из отфильтрованных недель
@@ -666,233 +669,53 @@ async function renderPageMainNew(d) {
     if (!d) d = await api('/api/data/new');
     if (!d || !d.ytd) { areaNew.innerHTML = '<div class="error-state">Нет данных</div>'; return; }
 
-    function kpi(label, val, sub, cls) {
-      var c = cls === 'oom' ? '#00bcd4' : (cls === 'kom' ? '#9C27B0' : '#1f2a44');
-      return '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">'+label+'</div><div class="val">'+val+'</div><div class="sub">'+(sub||'')+'</div></div>';
-    }
-    function delta(a,b) {
-      if (!b) return '';
-      var p = b>0?((a-b)/b*100).toFixed(1):0, s=(p>0?'\u2191':(p<0?'\u2193':'\u2192'));
-      return ' <span style="color:'+(p>0?'#2E7D32':(p<0?'#C62828':'#888'))+';font-size:12px">'+s+' '+Math.abs(p)+'%</span>';
-    }
-    function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev) {
-      var c = cls==='kom'?'#9C27B0':(cls==='oom'?'#00bcd4':'#1f2a44');
-      var wkLabel = wkCur && wkCur.label_dates ? ' · '+wkCur.label_dates : '';
-      var r = '<div class="kpis"><div style="grid-column:1/-1;font-size:15px;font-weight:700;margin:4px 0;color:'+c+'">'+title+'<span style="font-size:12px;color:#888;font-weight:400">'+wkLabel+'</span></div>'
-        + kpi('Поступления',fmt(ytd.postupleniya)+' \u20bd',fmt(ytd.won_relevant_cnt)+' сд.',cls)
-        + '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">📋 Лиды всего</div><div class="val" style="font-size:22px;font-weight:700">'+fmt(leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt)+'</div><div class="sub" style="text-align:right;font-size:15px;font-weight:600">конв. '+((qualLeads/leadsYtd*100).toFixed(1))+'%</div><div class="lbl" style="margin-top:6px">квал. лиды (MQL)</div><div class="val" style="font-size:22px;font-weight:700;color:'+c+'">'+fmt(qualLeads)+'</div><div class="sub" style="text-align:right;font-size:12px">с начала года</div></div>'
-        + '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">📈 Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val" style="font-size:22px;font-weight:700">'+fmtPct(leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0)+'%</div><div class="sub" style="font-size:12px;color:'+c+'">всех лидов</div></div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val" style="font-size:22px;font-weight:700;color:'+c+'">'+fmtPct(qualLeads>0?(ytd.won_relevant_cnt/qualLeads*100):0)+'%</div><div class="sub" style="font-size:12px">квал. лидов (MQL)</div></div></div>'
-        + '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">💰 Средний чек</div><div class="val" style="font-size:22px;font-weight:700">'+fmt(ytd.avg_check)+' \u20bd</div><div class="sub" style="text-align:right;font-size:12px">средний</div><div class="val" style="font-size:22px;font-weight:700;color:'+c+'">'+fmt(ytd.median_check)+' \u20bd</div><div class="sub" style="text-align:right;font-size:12px">медиана</div><div class="sub" style="text-align:right;font-size:11px;color:#888;margin-top:2px">мин '+fmt(ytd.min_check)+' · макс '+fmt(ytd.max_check)+'</div></div>'
-        + kpi('Цикл сделки',(ytd.avg_close_days_won||0).toFixed(1)+' дн.','с начала года',cls)
-        + kpi('\u041d\u0435\u0434\u0435\u043b\u044f: поступления',fmt(cur.postupleniya)+' \u20bd'+delta(cur.postupleniya, prev.postupleniya),'',cls)
-        + '<div class="kpi" style="border-top:3px solid '+c+'">'+'<div class="lbl">Неделя: лиды</div>'+'<div style="display:flex;justify-content:space-between;align-items:baseline">'+'<div class="val" style="font-size:22px;font-weight:700">'+fmt(leadsCur != null ? leadsCur : cur.won_relevant_cnt)+'</div>'+'<div class="sub" style="font-size:12px">'+(leadsPrev != null ? delta(leadsCur, leadsPrev) : (prev ? delta(cur.won_relevant_cnt, prev.won_relevant_cnt) : ''))+'</div>'+'</div>'+'<div class="lbl" style="margin-top:4px;font-size:11px">квал. лиды (MQL)</div>'+'<div style="display:flex;justify-content:space-between;align-items:baseline">'+'<div class="val" style="font-size:22px;font-weight:700;color:'+c+'">'+fmt(mqlCur != null ? mqlCur : (wkCur ? (wkCur.mql || 0) : 0))+'</div>'+'<div class="sub" style="font-size:12px">'+(mqlPrev != null ? delta(mqlCur||0, mqlPrev||0) : (wkPrev ? delta(wkCur ? (wkCur.mql||0) : 0, wkPrev ? (wkPrev.mql||0) : 0) : ''))+'</div>'+'</div>'+'</div>'
-        + '</div>';
-      return r;
-    }
-
-    var b2b = d.btype_ytd||{}, b2bRow = (b2b.B2B||{cnt:0,sum:0}), b2cRow = (b2b.B2C||{cnt:0,sum:0}), totB2b = b2bRow.sum+b2cRow.sum||1;
-    var weeks = d.weeks||[], labels = weeks.map(function(w){return w.label_dates || w.label_short || 'Неделя'+String(w.week).padStart(2,'0');});
-    var fmtKeys = Object.keys(d.fmt_ytd||{}).filter(function(k){return k!=='period';});
-    
-    // Используем последнюю ПОЛНУЮ неделю (пропускаем текущую, если в ней 0 оплат)
-    var lastIdx = weeks.length - 1;
-    while (lastIdx > 0 && weeks[lastIdx] && weeks[lastIdx].postupleniya === 0 && weeks[lastIdx].oplata === 0) {
-      lastIdx--;
-    }
-    var wkCur = weeks[lastIdx] || {};
-    var wkPrev = weeks[lastIdx - 1] || {};
-    var wkCurData = { postupleniya: wkCur.postupleniya || 0, won_relevant_cnt: wkCur.oplata || 0 };
-    var wkPrevData = { postupleniya: wkPrev.postupleniya || 0, won_relevant_cnt: wkPrev.oplata || 0 };
-    var wkCurLeads = wkCur.leads || 0;
-    var wkPrevLeads = wkPrev.leads || 0;
-    var oomCurData = { postupleniya: wkCur.oom_postupleniya || 0, won_relevant_cnt: wkCur.oom_won_cnt || 0 };
-    var oomPrevData = { postupleniya: wkPrev.oom_postupleniya || 0, won_relevant_cnt: wkPrev.oom_won_cnt || 0 };
-    var komCurData = { postupleniya: wkCur.kom_postupleniya || 0, won_relevant_cnt: wkCur.kom_won_cnt || 0 };
-    var komPrevData = { postupleniya: wkPrev.kom_postupleniya || 0, won_relevant_cnt: wkPrev.kom_won_cnt || 0 };
-    var oomMqlCur = wkCur.oom_mql || 0;
-    var oomMqlPrev = wkPrev.oom_mql || 0;
-    var komMqlCur = (wkCur.mql || 0) - oomMqlCur;
-    var komMqlPrev = (wkPrev.mql || 0) - oomMqlPrev;
-
     var html = '';
-    // KPI sections
-    html += section('ИТОГ (ООМ + КОМ)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0);
-    html += section('ООМ (Открытое обучение)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev);
-    html += section('КОМ (Корпоративное обучение)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev);
 
-    // Charts row
-    html += '<div class="twocol" style="margin-top:16px">';
-    html += '<div class="card"><h2>Воронка по неделям</h2><div class="chartbox"><canvas id="newChFunnel"></canvas></div></div>';
-    html += '<div class="card"><h2>Конверсии воронки <span style="font-size:12px;color:#888;font-weight:400">Лиды→MQL→SQL→Счёт→Оплата</span></h2><div class="chartbox"><canvas id="newChConv"></canvas></div></div>';
-    html += '</div>';
-
+    // Топ-20 продуктов + Источники
     html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Поступления по неделям</h2><div class="chartbox"><canvas id="newChPos"></canvas></div></div>';
-    html += '<div class="card"><h2>Форматы</h2><div class="chartbox"><canvas id="newChFmt"></canvas></div></div>';
+    html += '<div class="card"><h2>Топ-20 продуктов</h2><div id="newProductsTable"></div></div>';
+    html += '<div class="card"><h2>Источники</h2><div id="newSrcTable"></div></div>';
     html += '</div>';
+    html += '<div class="card"><h2>Менеджеры</h2><div id="newMgrsTable"></div></div>';
+    html += '<div class="card"><h2>Топ-20 компаний</h2><div id="newCompaniesTable"></div></div>';
 
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
-    html += '<div class="card"><h2>WON / LOSE</h2><div class="chartbox-sm"><canvas id="newChWl"></canvas></div></div>';
-    html += '</div>';
-
-    // WON/LOSE stacked + avg check
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>WON vs LOSE по неделям</h2><div class="chartbox"><canvas id="newChCnt"></canvas></div></div>';
-    html += '<div class="card"><h2>Средний чек по неделям</h2><div class="chartbox"><canvas id="newChAvg"></canvas></div></div>';
-    html += '</div>';
-
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Скорость WON, дн.</h2><div class="chartbox"><canvas id="newChDur"></canvas></div></div>';
-    html += '<div class="card"><h2>Скорость Pre Sale, дн.</h2><div class="chartbox"><canvas id="newChPreSale"></canvas></div></div>';
-    html += '</div>';
-
-    // B2B table
-    var b2bTbl = '<table style="font-size:11px;margin-top:8px"><tr><th>Тип</th><th>Шт</th><th>Сумма</th><th>%</th></tr>'
-      +'<tr><td>B2B</td><td>'+b2bRow.cnt+'</td><td>'+fmt(b2bRow.sum)+'</td><td>'+(b2bRow.sum/totB2b*100).toFixed(1)+'%</td></tr>'
-      +'<tr><td>B2C</td><td>'+b2cRow.cnt+'</td><td>'+fmt(b2cRow.sum)+'</td><td>'+(b2cRow.sum/totB2b*100).toFixed(1)+'%</td></tr></table>';
-
-    // Tables section
-    html += '<div class="threecol" style="margin-top:8px">';
-    html += '<div class="card"><h3>Форматы</h3><div id="newFmtTable"></div></div>';
-    html += '<div class="card"><h3>MBA</h3><div id="newMbaTable"></div></div>';
-    html += '<div class="card"><h3>Тип покупателя</h3>'+b2bTbl+'</div>';
-    html += '</div>';
-
-    html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
-
-    // --- Ключевые выводы ---
-    var cw = d.weeks ? d.weeks.length : 0;
-    var weeks = d.weeks || [];
-    var lastIdx = weeks.length - 1;
-    while (lastIdx > 0 && weeks[lastIdx] && weeks[lastIdx].postupleniya === 0 && weeks[lastIdx].oplata === 0) {
-      lastIdx--;
-    }
-    var last = weeks[lastIdx] || {};
-    var prev = weeks[lastIdx - 1] || {};
-    var wkDelta = 0;
-    if (prev.postupleniya && prev.postupleniya > 0) {
-      wkDelta = (last.postupleniya - prev.postupleniya) / prev.postupleniya * 100;
-    } else if (last.postupleniya > 0) {
-      wkDelta = 100;
-    }
-    var ytd = d.ytd || {};
-    var srcTop = d.src_rating || [];
-    var fmtData = Object.entries(d.fmt_ytd || {}).filter(function(e){return e[0] !== 'period';}).sort(function(a,b){return (b[1].sum||0) - (a[1].sum||0);});
-    var mgrTop = d.mgr_top || [];
-
-    html += '<div class="card" style="background:linear-gradient(135deg,#f8f9ff,#eef1f8)">';
-    html += '<h2>📋 Ключевые выводы</h2>';
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">';
-    // Общая картина
-    html += '<div><b>📊 Общая картина YTD:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Поступления: <b>'+fmt(ytd.postupleniya)+' ₽</b> ('+ytd.won_relevant_cnt+' сделок)</li>';
-    html += '<li>Средний чек: <b>'+fmt(ytd.avg_check)+' ₽</b></li>';
-    html += '<li>Срок WON: простой <b>'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</b> · взвешенный <b>'+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн.</b></li>';
-    html += '<li>Лидов: <b>'+fmt(d.leads_ytd)+'</b></li>';
-    html += '</ul></div>';
-    // Неделя
-    html += '<div><b>📈 Неделя W'+cw+':</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(wkDelta>0?'📈 +':'📉 ')+Math.abs(wkDelta).toFixed(1)+'% к прошлой</li>';
-    html += '<li>Сделок: <b>'+(last.won_cnt||0)+'</b></li>';
-    html += '<li>Лидов: <b>'+fmt(d.leads_cur||0)+'</b></li>';
-    html += '</ul></div>';
-    // Лидеры
-    html += '<div><b>🏆 Лидеры:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '—')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽)</li>';
-    html += '<li>Формат: <b>'+(fmtData.length > 0 ? escapeHtml(fmtData[0][0]) : '—')+'</b> ('+fmt(fmtData.length > 0 ? fmtData[0][1].sum : 0)+' ₽)</li>';
-    html += '<li>'+(mgrTop.length > 0 ? 'Менеджер: <b>'+escapeHtml(mgrTop[0].name)+'</b> ('+fmt(mgrTop[0].postupleniya)+' ₽)' : '')+'</li>';
-    html += '</ul></div>';
-    // Рекомендации
-    html += '<div><b>💡 Рекомендации:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += (wkDelta < 0 ? '<li>⚠️ Падение недели к прошлой — проанализировать причины</li>' : '<li>✅ Неделя стабильна или растёт</li>');
-    html += (srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка — поработать с качеством лидов</li>' : '';
-    html += '<li>📌 Средняя скорость закрытия: '+(ytd.median_close_days_won||0)+' дн. (медиана)</li>';
-    html += '</ul></div>';
-    html += '</div></div>';
-
-    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div></div>';
-
-    // Batch update all at once
     areaNew.innerHTML = html;
 
-    // Now fill in table data (elements exist now)
-    var fmtData = d.fmt_ytd||{};
-    var fmtStr = '<table style="font-size:11px"><tr><th>Формат</th><th>Сумма</th><th>Шт</th><th>Ср.чек</th></tr>';
-    for (var fk in fmtData) {
-      if (fk==='period') continue;
-      var fv = fmtData[fk];
-      fmtStr += '<tr><td>'+escapeHtml(fk)+'</td><td>'+fmt(fv.sum)+' \u20bd</td><td>'+fv.cnt+'</td><td>'+fmt(Math.round(fv.sum/fv.cnt))+' \u20bd</td></tr>';
-    }
-    fmtStr += '</table>';
-    var el = document.getElementById('newFmtTable');
-    if (el) el.innerHTML = fmtStr;
-
-    var mbaData = d.mba_rating||[];
-    var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' \u20bd</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' \u20bd</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#888;font-size:12px">Нет данных по MBA</div>';
-    el = document.getElementById('newMbaTable'); if(el) el.innerHTML = mbaStr;
-
-
-
-    var weekStr = '<table style="font-size:11px"><tr><th>Неделя</th><th>Лиды</th><th>MQL</th><th>SQL</th><th>Счёт</th><th>Оплачено</th><th>Поступл.</th><th>Ср.чек</th><th>Цикл</th><th>Лиды\u2192MQL</th><th>MQL\u2192SQL</th><th>SQL\u2192Счёт</th><th>Счёт\u2192Оплата</th></tr>';
-    var tL=0,tM=0,tS=0,tO=0,tP0=0;
-    weeks.forEach(function(w){
-      weekStr += '<tr><td><b>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</b></td><td>'+w.leads+'</td><td>'+w.mql+'</td><td>'+w.sql+'</td><td><b>'+(w.invoice_cnt||0)+'</b></td><td><b>'+w.oplata+'</b></td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td></tr>';
-      tL+=w.leads||0; tM+=w.mql||0; tS+=w.sql||0; tO+=w.oplata||0; tP0+=w.postupleniya||0;
+    // Fill tables
+    var prods = d.top_products||[];
+    var prodStr = '<table style="font-size:11px"><tr><th>#</th><th>Продукт</th><th>Кол-во</th><th>Выручка</th><th>Ср.чек</th></tr>';
+    prods.slice(0,20).forEach(function(p,i){
+      if(!p.name) return;
+      var ps=p.sum||p.deals_sum||0, pc=p.cnt||p.deals||0;
+      prodStr += '<tr><td>'+(i+1)+'</td><td><b>'+escapeHtml(p.name)+'</b></td><td>'+pc+'</td><td>'+fmt(ps)+' ₽</td><td>'+fmt(Math.round(ps/(pc||1)))+' ₽</td></tr>';
     });
-    weekStr += '<tr style="font-weight:700;border-top:2px solid #333"><td>ИТОГО</td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td></td><td></td><td></td></tr></table>';
-    el = document.getElementById('newWeekTable'); if(el) el.innerHTML = weekStr;
+    prodStr += '</table>';
+    var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
 
+    var src = d.src_rating||[];
+    var srcStr = '<table style="font-size:11px"><tr><th>Источник</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th></tr>';
+    src.slice(0,15).forEach(function(s){if(!s.name||s.name==='ИТОГО')return;srcStr+='<tr><td>'+escapeHtml(s.name)+'</td><td>'+fmt(s.postupleniya)+' ₽</td><td>'+s.deals+'</td><td>'+fmt(s.avg_check)+' ₽</td></tr>';});
+    srcStr += '</table>';
+    el = document.getElementById('newSrcTable'); if(el) el.innerHTML = srcStr;
 
+    var mgrs = d.mgr_top||[];
+    var mgrStr = '<table style="font-size:11px"><tr><th>Менеджер</th><th>Лидов</th><th>Оплачено</th><th>Поступления</th><th>Ср.чек</th><th>Конв.%</th></tr>';
+    mgrs.forEach(function(m){var cv=m.leads>0?(m.won/m.leads*100).toFixed(1):0;mgrStr+='<tr><td><b>'+escapeHtml(m.name)+'</b></td><td>'+m.leads+'</td><td>'+m.won+'</td><td>'+fmt(m.postupleniya)+' ₽</td><td>'+fmt(m.avg_check)+' ₽</td><td>'+cv+'%</td></tr>';});
+    mgrStr += '</table>';
+    el = document.getElementById('newMgrsTable'); if(el) el.innerHTML = mgrStr;
 
-    // Load artifacts
-    loadArtifacts();
-
-    // Charts (canvas elements now exist)
-    setTimeout(function(){
-      if (window.Chart) {
-        try {
-          if (document.getElementById('newChFunnel')) new Chart(document.getElementById('newChFunnel'), {type:'bar', data:{labels:labels,datasets:[{label:'Лиды',data:weeks.map(function(w){return w.leads||0;}),backgroundColor:'#B0BEC5',borderRadius:4},{label:'MQL',data:weeks.map(function(w){return w.mql||0;}),backgroundColor:'#1976D2',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.sql||0;}),backgroundColor:'#C8A45C',borderRadius:4},{label:'Счёт',data:weeks.map(function(w){return w.invoice_cnt||0;}),backgroundColor:'#FF9800',borderRadius:4},{label:'Оплачено',data:weeks.map(function(w){return w.oplata||0;}),backgroundColor:'#2E7D32',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
-        } catch(e){}
-        try {
-          if (document.getElementById('newChConv')) new Chart(document.getElementById('newChConv'), {type:'line', data:{labels:labels,datasets:[{label:'Лиды\u2192MQL %',data:weeks.map(function(w){return w.conv_lead_mql||0;}),borderColor:'#B0BEC5',tension:0.3,fill:false},{label:'MQL\u2192SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#1976D2',tension:0.3,fill:false},{label:'SQL\u2192Счёт %',data:weeks.map(function(w){return w.conv_sql_invoice||0;}),borderColor:'#FF9800',tension:0.3,fill:false},{label:'Счёт\u2192Оплата %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
-        } catch(e){}
-        try {
-          if (document.getElementById('newChPos')) new Chart(document.getElementById('newChPos'), {type:'bar', data:{labels:labels,datasets:[{label:'Поступления',data:weeks.map(function(w){return w.postupleniya||0;}),backgroundColor:'#1f2a44',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
-          // qual funnel
-          if (document.getElementById('ch_funnel_new_qual')) new Chart(document.getElementById('ch_funnel_new_qual'), {type:'bar', data:{labels:labels,datasets:[{label:'MQL',data:weeks.map(function(w){return w.mql||0;}),backgroundColor:'#1976D2',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.sql||0;}),backgroundColor:'#C8A45C',borderRadius:4},{label:'Оплачено',data:weeks.map(function(w){return w.oplata||0;}),backgroundColor:'#2E7D32',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
-          if (document.getElementById('ch_conv_new_qual')) new Chart(document.getElementById('ch_conv_new_qual'), {type:'line', data:{labels:labels,datasets:[{label:'MQL→SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#1976D2',tension:0.3,fill:false},{label:'SQL→Сделки %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
-        } catch(e){}
-        try {
-          if (document.getElementById('newChFmt')){var fl=[],fv=[];for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fv.push(fmtData[fk].sum||0);}new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fl,datasets:[{data:fv,backgroundColor:['#1976D2','#FF9800','#FFD54F','#9B2D3C']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}}}});}
-        } catch(e){}
-        try {
-          if (document.getElementById('newChB2b')) new Chart(document.getElementById('newChB2b'),{type:'doughnut',data:{labels:['B2B','B2C'],datasets:[{data:[b2bRow.sum,b2cRow.sum],backgroundColor:['#1976D2','#F57C00']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'}}}});
-        } catch(e){}
-        try {
-          var wT=weeks.reduce(function(s,w){return s+(w.won_cnt||0);},0), lT=weeks.reduce(function(s,w){return s+(w.lost_cnt||0);},0);
-          if (document.getElementById('newChWl')) new Chart(document.getElementById('newChWl'),{type:'doughnut',data:{labels:['WON','LOSE'],datasets:[{data:[wT,lT],backgroundColor:['#2E7D32','#C62828']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
-        } catch(e){}
-        try {
-          if (document.getElementById('newChCnt')) new Chart(document.getElementById('newChCnt'),{type:'bar',data:{labels:labels,datasets:[{label:'WON',data:weeks.map(function(w){return w.won_cnt||0;}),backgroundColor:'#2E7D32',borderRadius:4},{label:'LOSE',data:weeks.map(function(w){return w.lost_cnt||0;}),backgroundColor:'#C62828',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
-        } catch(e){}
-        try {
-          if (document.getElementById('newChAvg')) new Chart(document.getElementById('newChAvg'),{type:'line',data:{labels:labels,datasets:[{label:'Средний чек',data:weeks.map(function(w){return w.avg_check||0;}),borderColor:'#1976D2',backgroundColor:'rgba(25,118,210,.1)',tension:0.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
-        } catch(e){}
-        try {
-          if (document.getElementById('newChDur')) new Chart(document.getElementById('newChDur'),{type:'line',data:{labels:labels,datasets:[{label:'Цикл сделки, дн.',data:weeks.map(function(w){return w.avg_dur||0;}),borderColor:'#C8A45C',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
-        } catch(e){}
-        try {
-          if (document.getElementById('newChPreSale')) new Chart(document.getElementById('newChPreSale'),{type:'line',data:{labels:labels,datasets:[{label:'Pre Sale, дн.',data:weeks.map(function(w){return w.avg_presale_dur||0;}),borderColor:'#FF9800',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
-        } catch(e){}
-      }
-    }, 100);
+    var comps = d.top_companies || [];
+    var compStr = '<table style="font-size:11px"><tr><th>#</th><th>Компания</th><th>Поступления</th><th>Сделок</th><th>Ср.чек</th><th>Последняя оплата</th></tr>';
+    comps.forEach(function(c, i){compStr+='<tr><td>'+(i+1)+'</td><td><b>'+escapeHtml(c.name)+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+c.last_date+'</td></tr>';});
+    compStr += '</table>';
+    el = document.getElementById('newCompaniesTable'); if(el) el.innerHTML = compStr;
 
   } catch(e) {
-    areaNew.innerHTML = '<div class="error-state" style="cursor:pointer" onclick="this.style.display=\'none\'\">\u274c <b>Ошибка вкладки «Новая логика»</b><br>'+escapeHtml(e.message)+'<br><br><small style="color:#999">(нажмите чтобы закрыть, время: ' + new Date().toLocaleTimeString('ru-RU') + ')</small></div>';
+    areaNew.innerHTML = '<div class="error-state">❌ <b>Ошибка загрузки</b><br>'+escapeHtml(e.message)+'</div>';
     console.error('renderPageMainNew error:', e);
   }
 }
+
 
 function renderWeekRow(w, isCurrent) {
   return `<tr${isCurrent ? " class='cur'" : ''}>
@@ -1173,6 +996,17 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+// --- Export ---
+document.getElementById('exportBtn').addEventListener('click', async function() {
+  try {
+    const res = await fetch((window.BASE_PATH || '') + '/api/export');
+    if (!res.ok) { const err = await res.json(); alert(err.error || 'Excel не найден'); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'Отчёт_продажи_2026.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  } catch (e) { alert('Ошибка: ' + e.message); }
+});
 
 // Защищённый запуск: ошибка не должна блокировать UI
 loadAll().catch(function(e) {

@@ -416,7 +416,6 @@ for w in range(1, cur_w + 1):
         "leads": 0, "avg_check": 0, "durs": [],
         "mql": 0, "sql": 0, "oplata": 0,
         "kom_postupleniya": 0.0, "kom_won_cnt": 0, "invoice_cnt": 0,
-        "oom_postupleniya": 0.0, "oom_won_cnt": 0, "oom_leads": 0, "oom_mql": 0,
         "fmt_oom": 0.0, "fmt_om": 0.0, "fmt_sdo": 0.0, "fmt_kom": 0.0,
         "presale_durs": [],
     }
@@ -459,8 +458,6 @@ for r in rows:
             else:
                 weekly[wk]["won_cnt"]       += 1
                 weekly[wk]["oplata"]         += 1
-                weekly[wk]["oom_postupleniya"] += r["OPP"]
-                weekly[wk]["oom_won_cnt"]       += 1
             # По форматам
             fmt_keys = {"ООМ (Очное)": "fmt_oom", "ОМ (Онлайн)": "fmt_om", "СДО": "fmt_sdo", "КОМ": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
@@ -475,8 +472,6 @@ for r in rows:
         wk = r["DC"].date().isocalendar()[1]
         if wk in weekly:
             weekly[wk]["mql"] += 1
-            if r["IS_OOM"]:
-                weekly[wk]["oom_mql"] += 1
 
     # SQL = сделки на стадиях DETAILS+ или со счётом
     # Стадии где точно прошли SQL: DETAILS, PROPOSAL, 2, 6, WON
@@ -524,8 +519,6 @@ for r in rows:
         wk = r["DC"].date().isocalendar()[1]
         if wk in weekly:
             weekly[wk]["leads"] += 1
-            if r["IS_OOM"]:
-                weekly[wk]["oom_leads"] += 1
 
 for w, d in weekly.items():
     d["avg_check"]       = d["postupleniya"] / d["won_cnt"] if d["won_cnt"] else 0
