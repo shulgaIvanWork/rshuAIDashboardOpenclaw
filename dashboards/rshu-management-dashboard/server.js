@@ -32,8 +32,8 @@ async function loadCache() {
     raw.oom_ytd = { ...raw.ytd };
     raw.oom_prev = { ...raw.prev };
     raw.oom_cur = { ...raw.cur };
-    raw.oom_leads_ytd = raw.leads_ytd;
-    raw.kom_leads_ytd = raw.kom_ytd?.won_relevant_cnt || 0;
+    /* raw.oom_leads_ytd = raw.leads_ytd; — оставляем значение из agg.json */
+    /* raw.kom_leads_ytd = raw.kom_leads_ytd || ... — оставляем из agg.json */
     aggCache = raw;
     dataState.ready = true;
     dataState.loadedAt = new Date().toISOString();
@@ -87,8 +87,7 @@ function runRefresh() {
         'fetch_refresh': 'Выгрузка сделок (CRM Export API)',
         'fetch_dicts': 'Загрузка справочников',
         'analyze_new': 'Анализ данных (новая логика)',
-        'build_xlsx': 'Сборка Excel-отчёта',
-      };
+};
       
       // Определяем фазу
       for (const [key, label] of Object.entries(phases)) {
@@ -131,8 +130,8 @@ function runRefresh() {
         raw.oom_ytd = { ...raw.ytd };
         raw.oom_prev = { ...raw.prev };
         raw.oom_cur = { ...raw.cur };
-        raw.oom_leads_ytd = raw.leads_ytd;
-        raw.kom_leads_ytd = raw.kom_ytd?.won_relevant_cnt || 0;
+        /* raw.oom_leads_ytd = raw.leads_ytd; — оставляем значение из agg.json */
+        /* raw.kom_leads_ytd = raw.kom_leads_ytd || ... — оставляем из agg.json */
         aggCache = raw;
         dataState.ready = true;
         dataState.loadedAt = new Date().toISOString();
@@ -185,8 +184,7 @@ app.get('/api/data/new', async (req, res) => {
     data.oom_ytd = { ...data.ytd };
     data.oom_prev = { ...data.prev };
     data.oom_cur = { ...data.cur };
-    data.oom_leads_ytd = data.leads_ytd;
-    data.kom_leads_ytd = data.kom_ytd?.won_relevant_cnt || 0;
+    // data.oom_leads_ytd и data.kom_leads_ytd — из agg.json, не переопределяем
     res.json(data);
   } catch (e) {
     res.status(503).json({ error: 'New logic data not loaded' });
@@ -346,17 +344,6 @@ app.get('/api/forecast', async (req, res) => {
   } catch (e) {
     console.error('/api/forecast error:', e.message);
     res.status(500).json({ error: e.message });
-  }
-});
-
-// Download Excel
-app.get('/api/export', async (req, res) => {
-  const xlsxPath = path.join(CACHE_DIR, 'output', 'Отчёт_продажи_2026.xlsx');
-  try {
-    await fs.access(xlsxPath);
-    res.download(xlsxPath, 'Отчёт_продажи_2026.xlsx');
-  } catch {
-    res.status(404).json({ error: 'Excel file not found. Run refresh first.' });
   }
 });
 
