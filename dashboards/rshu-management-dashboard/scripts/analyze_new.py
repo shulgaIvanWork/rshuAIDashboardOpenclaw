@@ -166,10 +166,13 @@ def detect_format(title, uf_format):
     return "ОМ (Онлайн)"
 
 
-def detect_b2b(did):
-    """B2B только по COMPANY_ID."""
-    c = cc.get(did, {})
-    return "B2B" if c.get("COMPANY_ID", "0") != "0" else "B2C"
+def detect_b2b(x):
+    """B2B по COMPANY_ID из данных сделки (не из company_contact.json)."""
+    cid = x.get("COMPANY_ID", "0")
+    # КОМ (категория 19) — всегда B2B
+    if int(x.get("CATEGORY_ID", 0)) == 19:
+        return "B2B"
+    return "B2B" if cid and str(cid) != "0" else "B2C"
 
 
 def is_paid(r):
@@ -222,7 +225,7 @@ for x in deals_raw:
         "FORMAT":    detect_format(x.get("TITLE", ""), x.get("UF_FORMAT", "")),
         "UF_FORMAT": str(x.get("UF_FORMAT", "")),
         "COMPANY_ID": str(x.get("COMPANY_ID", "0")),
-        "BTYPE":     detect_b2b(x["ID"]),
+        "BTYPE":     detect_b2b(x),  # передаём всю сделку для COMPANY_ID + CATEGORY_ID
         "PRODUCT":   normalize_product(x.get("TITLE", "")),
         "IS_KOM":    is_kom,
         "IS_OOM":    not is_kom,
@@ -362,9 +365,9 @@ m_oom_cur  = metrics(ws_cur_pay,  is_oom_block=True)
 m_oom_ytd  = metrics(ytd_subset, is_oom_block=True)
 
 
-MQL_SALE_STAGES_W = {'UC_4RJOR4', 'DETAILS', 'PROPOSAL', '2', '6', 'WON', 'LOSE',
+MQL_SALE_STAGES = {'UC_4RJOR4', 'DETAILS', 'PROPOSAL', '2', '6', 'WON', 'LOSE',
                      'UC_F2YC3N', 'UC_VKPN0N', 'UC_W6SCHG', 'UC_670ME2'}
-NOT_MQL_SALE_W = {'NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'}
+NOT_MQL_SALE = {'NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'}
 def is_qual_lead_w(r):
     if r["CAT_ID"] not in VALID_CATS:
         return False
@@ -372,9 +375,9 @@ def is_qual_lead_w(r):
         return False
     if r["CAT_ID"] == 0:
         st = r.get("STAGE")
-        if st in NOT_MQL_SALE_W:
+        if st in NOT_MQL_SALE:
             return False
-        if st in MQL_SALE_STAGES_W:
+        if st in MQL_SALE_STAGES:
             return True
         return False
     if r["CAT_ID"] == 19:
@@ -413,9 +416,9 @@ for w in range(1, cur_w + 1):
         "label_dates": f"{mon.strftime('%d.%m')}—{sun.strftime('%d.%m')}",
         "created_cnt": 0, "created_sum": 0.0,
         "postupleniya": 0.0, "won_cnt": 0, "lost_cnt": 0,
-        "leads": 0, "avg_check": 0, "durs": [],
+        "leads": 0, "avg_check": 0, "durs": [], "chks": [],
         "mql": 0, "sql": 0, "oplata": 0,
-        "kom_postupleniya": 0.0, "kom_won_cnt": 0, "invoice_cnt": 0,
+        "kom_postupleniya": 0.0, "kom_won_cnt": 0, "kom_lost_cnt": 0, "invoice_cnt": 0,
         "oom_postupleniya": 0.0, "oom_won_cnt": 0, "oom_leads": 0, "oom_mql": 0,
         "fmt_oom": 0.0, "fmt_om": 0.0, "fmt_sdo": 0.0, "fmt_kom": 0.0,
         "presale_durs": [],
@@ -435,13 +438,19 @@ for r in rows:
         wk = r["CL"].date().isocalendar()[1]
         if wk in weekly and r["SEM"] == "F":
             weekly[wk]["lost_cnt"] += 1
+    # КОМ lost_cnt — C19:LOSE
+    if r["IS_KOM"] and r["STAGE"] and "LOSE" in r["STAGE"] and r["CL"] and r["CL"].year == YEAR:
+        wk = r["CL"].date().isocalendar()[1]
+        if wk in weekly:
+            weekly[wk]["kom_lost_cnt"] += 1
 
     # Счёт отправлен — по UF_CRM_1753272713011 (дата счёт отправлен)
+    # Учитываются ВСЕ сделки (ООМ + КОМ) — КОМ при переходе в Sale
     if r.get("UF_CRM_1753272713011"):
         inv_date = parse_dt(r.get("UF_CRM_1753272713011"))
         if inv_date and inv_date.year == YEAR:
             wk = inv_date.date().isocalendar()[1]
-            if wk in weekly and not r["IS_KOM"]:
+            if wk in weekly:
                 weekly[wk]["invoice_cnt"] += 1
 
     # postupleniya / won_cnt / oplata — по дате оплаты, только 0|8|19
@@ -458,9 +467,10 @@ for r in rows:
                 weekly[wk]["kom_won_cnt"]       += 1
             else:
                 weekly[wk]["won_cnt"]       += 1
-                weekly[wk]["oplata"]         += 1
                 weekly[wk]["oom_postupleniya"] += r["OPP"]
                 weekly[wk]["oom_won_cnt"]       += 1
+                weekly[wk]["chks"].append(r["OPP"])
+            weekly[wk]["oplata"] += 1  # все оплаты (ООМ + КОМ)
             # По форматам
             fmt_keys = {"ООМ (Очное)": "fmt_oom", "ОМ (Онлайн)": "fmt_om", "СДО": "fmt_sdo", "КОМ": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
@@ -513,9 +523,9 @@ for r in rows:
                     weekly[wk]["presale_durs"].append(d)
 
 # === Новые функции для воронки ===
-MQL_SALE_STAGES_W = {'UC_4RJOR4', 'DETAILS', 'PROPOSAL', '2', '6', 'WON', 'LOSE',
+MQL_SALE_STAGES = {'UC_4RJOR4', 'DETAILS', 'PROPOSAL', '2', '6', 'WON', 'LOSE',
                      'UC_F2YC3N', 'UC_VKPN0N', 'UC_W6SCHG', 'UC_670ME2'}
-NOT_MQL_SALE_W = {'NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'}
+NOT_MQL_SALE = {'NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'}
 
 
 for r in rows:
@@ -529,6 +539,7 @@ for r in rows:
 
 for w, d in weekly.items():
     d["avg_check"]       = d["postupleniya"] / d["won_cnt"] if d["won_cnt"] else 0
+    d["median_check"]     = sorted(d["chks"])[len(d["chks"]) // 2] if d["chks"] else 0
     d["avg_dur"]         = sum(d["durs"])        / len(d["durs"])        if d["durs"]        else 0
     d["avg_presale_dur"] = sum(d["presale_durs"]) / len(d["presale_durs"]) if d["presale_durs"] else 0
     d["conv_lead_mql"]   = d["mql"]    / d["leads"]  * 100 if d["leads"]  else 0
@@ -537,7 +548,222 @@ for w, d in weekly.items():
     d["conv_sql_oplata"]  = d["oplata"] / d["sql"]    * 100 if d["sql"]    else 0
     d["conv_invoice_oplata"] = d["oplata"] / d["invoice_cnt"] * 100 if d["invoice_cnt"] else 0
     del d["durs"]
+    del d["chks"]
     del d["presale_durs"]
+
+# === Stacked bar: этапы воронки по неделям ===
+print("== Stacked bar (новая воронка) ==")
+
+# Инициализация stack-полей
+for w in weekly:
+    weekly[w].update({
+        "stack_pay": 0,  "stack_pay_sum": 0.0,   # Оплата 🟩
+        "stack_inv": 0,  "stack_inv_sum": 0.0,   # Счёт 🟪
+        "stack_sql": 0,  "stack_sql_sum": 0.0,   # SQL 🟦
+        "stack_mql": 0,                            # MQL 🔵
+        "stack_nq": 0,                             # Не квал 🟨
+        "stack_rej": 0,                            # Отказы 🟥
+        "stack_rej_nq": 0,                          # Отказы неКвал 🟠
+        # Стек 2: созданные на неделе, статус на сегодня
+        "stack2_pay": 0, "stack2_pay_sum": 0.0,
+        "stack2_inv": 0, "stack2_inv_sum": 0.0,
+        "stack2_sql": 0, "stack2_sql_sum": 0.0,
+        "stack2_mql": 0,
+        "stack2_nq": 0,
+        "stack2_rej": 0,  "stack2_rej_nq": 0,  # Отказы квал / неКвал
+    })
+
+# Вспомогательные функции для определения статуса на неделе
+# === Функции классификации стадий ===
+
+# Стек 1 (Продажи): урезанные стадии (только активные в работе)
+def _is_sql1(st, r):
+    if st in ("DETAILS", "PROPOSAL", "2", "6"):
+        return True
+    if r["CAT_ID"] == 19 and r["SEM"] != "S":
+        ks = (st or '').replace('C19:','')
+        if ks in ("EXECUTING", "UC_C670BC", "UC_I443UQ"):
+            return True
+    return False
+
+def _is_mql1(st, r):
+    if r["CAT_ID"] == 0:
+        if st in ("UC_4RJOR4", "UC_W6SCHG"):
+            return True
+        return False
+    if r["CAT_ID"] == 8:
+        return False  # PreSale → НеКвал
+    if r["CAT_ID"] == 19:
+        if r["SEM"] == "S": return False
+        if r["SEM"] == "F": return False
+        if st and 'LOSE' in st: return False
+        ks = (st or '').replace('C19:','')
+        if ks in ("EXECUTING", "UC_C670BC", "UC_I443UQ"):
+            return False
+        return True
+    return False
+
+# Стек 2 (Маркетинг): полные стадии KPI (показываем весь путь лида)
+def _is_sql2(st, r):
+    if st in ("DETAILS", "PROPOSAL", "2", "6", "WON"):
+        return True
+    if r["CAT_ID"] == 19 and r["SEM"] != "S":
+        ks = (st or '').replace('C19:','')
+        if ks in ("EXECUTING", "UC_C670BC", "UC_I443UQ"):
+            return True
+    if r.get("UF_CRM_1753272713011") and st in ("LOSE", "UC_F2YC3N", "UC_W6SCHG", "UC_670ME2", "UC_VKPN0N"):
+        return True
+    return False
+
+def _is_mql2(st, r):
+    if r["CAT_ID"] == 0:
+        if st in NOT_MQL_SALE:
+            return False
+        if st in MQL_SALE_STAGES:
+            return True
+        return False
+    if r["CAT_ID"] == 19:
+        if r["SEM"] == "S": return False
+        if r["SEM"] == "F": return False
+        if st and 'LOSE' in st: return False
+        ks = (st or '').replace('C19:','')
+        if ks in ("EXECUTING", "UC_C670BC", "UC_I443UQ"):
+            return False
+        return True
+    return False
+
+def _get_effective_stage(r, week_sun):
+    """
+    Определяет эффективную стадию сделки на заданную неделю.
+    Если MOVED_TIME известен и случился позже недели — используем PREVIOUS_STAGE_ID.
+    """
+    st = r.get("STAGE", "")
+    moved = parse_dt(r.get("MOVED_TIME"))
+    if moved and moved.date() > week_sun:
+        prev = r.get("PREVIOUS_STAGE_ID", "")
+        if prev:
+            return prev
+    return st
+
+for w_idx in sorted(weekly.keys()):
+    try:
+        mon = date.fromisocalendar(YEAR, w_idx, 1)
+    except ValueError:
+        continue
+    sun = min(date.fromisocalendar(YEAR, w_idx, 7), TODAY)
+    
+    for r in rows:
+        if r["CAT_ID"] not in VALID_CATS:
+            continue
+        
+        seg = None
+        
+        # Сначала проверяем события НА ЭТОЙ неделе
+        # 1. Оплата (по точной дате)
+        pd = r.get("PAY_DT")
+        if pd and mon <= pd.date() <= sun and r["OPP"] >= MIN_OPP:
+            seg = "stack_pay"
+        
+        # 2. Счёт (по точной дате)
+        if seg is None:
+            inv = parse_dt(r.get("UF_CRM_1753272713011"))
+            if inv and mon <= inv.date() <= sun:
+                seg = "stack_inv"
+        
+        # 3. Отказ (по CLOSEDATE на неделе)
+        if seg is None:
+            if r["SEM"] == "F" and r["CL"] and mon <= r["CL"].date() <= sun and r["CLOSED"] == "Y":
+                seg = "stack_rej"
+            elif r["CAT_ID"] == 19 and r["STAGE"] and 'LOSE' in r["STAGE"] and r["CL"] and mon <= r["CL"].date() <= sun:
+                seg = "stack_rej"  # C19:LOSE с датой закрытия на неделе
+        
+        # Если события на этой неделе нет — проверяем, была ли сделка завершена РАНЬШЕ
+        if seg is None:
+            # Технические WON (WON + OPP<11)
+            tech_won = r["SEM"] == "S" and r["OPP"] < MIN_OPP
+            # Сделка неактивна на этой неделе:
+            # 1. Была оплачена до этой недели
+            pay_before = pd and pd.date() < mon
+            # 2. Была проиграна до этой недели (SEM=F + закрыта)
+            rej_before = r["SEM"] == "F" and r["CL"] and r["CL"].date() < mon and r["CLOSED"] == "Y"
+            # 3. Формально закрыта до этой недели (WON/копии с CLOSED=Y)
+            closed_before = r["CLOSED"] == "Y" and r["CL"] and r["CL"].date() < mon
+            # 4. КОМ LOSE-статус (C19:LOSE) — отказ, не должен быть в стеке
+            kom_lose = r["CAT_ID"] == 19 and r["STAGE"] and 'LOSE' in r["STAGE"]
+            # 5. WON + CLOSED=Y — закрытая сделка (CLOSEDATE может быть в будущем — тех.артефакт)
+            won_closed = r["CLOSED"] == "Y" and r["STAGE"] in ("WON", "C8:WON")
+            
+            if pay_before or rej_before or closed_before or kom_lose or won_closed or tech_won:
+                pass  # не считаем на этой неделе
+            else:
+                # C8:LOSE → отказы неКвал
+                if r["CAT_ID"] == 8 and r["STAGE"] == "C8:LOSE":
+                    seg = "stack_rej_nq"
+                # 4-6. Определяем статус по стадии (если сделка ещё активна)
+                created = r["DC"]
+                if created and created.date() <= sun:
+                    eff_stage = _get_effective_stage(r, sun)
+                    if _is_sql1(eff_stage, r):
+                        seg = "stack_sql"
+                    elif _is_mql1(eff_stage, r):
+                        seg = "stack_mql"
+                    else:
+                        seg = "stack_nq"
+        
+        if seg:
+            weekly[w_idx][seg] += 1
+            # Сумма для Оплата, Счёт, SQL
+            if seg in ("stack_pay", "stack_inv", "stack_sql"):
+                weekly[w_idx][seg + "_sum"] += r["OPP"]
+print(f"  Недель: {len(weekly)}, строк: {sum(w['stack_pay']+w['stack_inv']+w['stack_sql']+w['stack_mql']+w['stack_nq']+w['stack_rej']+w['stack_rej_nq'] for w in weekly.values())}")
+
+# === Stack 2: созданные на неделе × статус на сегодня ===
+print("== Stacked bar 2 (маркетинг) ==")
+for w_idx in sorted(weekly.keys()):
+    try:
+        mon = date.fromisocalendar(YEAR, w_idx, 1)
+    except ValueError:
+        continue
+    sun = min(date.fromisocalendar(YEAR, w_idx, 7), TODAY)
+    for r in rows:
+        if r["CAT_ID"] not in VALID_CATS:
+            continue
+        if r["SEM"] == "S" and r["OPP"] < MIN_OPP:
+            continue
+        dc = r["DC"]
+        if not dc or not (mon <= dc.date() <= sun):
+            continue
+        # Исключаем C8:WON (копии PreSale→Sale)
+        if r["CAT_ID"] == 8 and r["STAGE"] == "C8:WON":
+            continue
+        seg = None
+        pd = r.get("PAY_DT")
+        if pd and pd.date() <= sun and r["OPP"] >= MIN_OPP:
+            seg = "stack2_pay"
+        if seg is None:
+            inv = parse_dt(r.get("UF_CRM_1753272713011"))
+            if inv and inv.date() <= sun:
+                seg = "stack2_inv"
+        if seg is None:
+            # C8:LOSE — отказ неКвал (PreSale, не прошли квалификацию)
+            if r["CAT_ID"] == 8 and r["STAGE"] == "C8:LOSE":
+                seg = "stack2_rej_nq"
+            elif r["SEM"] == "F" and r["CL"] and r["CL"].date() <= sun and r["CLOSED"] == "Y":
+                seg = "stack2_rej"
+        if seg is None:
+            eff_stage = _get_effective_stage(r, sun)
+            if _is_sql2(eff_stage, r):
+                seg = "stack2_sql"
+            elif _is_mql2(eff_stage, r):
+                seg = "stack2_mql"
+            else:
+                seg = "stack2_nq"
+        if seg:
+            weekly[w_idx][seg] += 1
+            if seg in ("stack2_pay", "stack2_inv", "stack2_sql"):
+                weekly[w_idx][seg + "_sum"] += r["OPP"]
+s2 = sum(w['stack2_pay']+w['stack2_inv']+w['stack2_sql']+w['stack2_mql']+w['stack2_nq']+w['stack2_rej'] for w in weekly.values())
+print(f"  Всего строк в стеке 2: {s2}")
 
 # === Источники + полная аналитика ===
 print("== Источники ==")
@@ -859,10 +1085,10 @@ created_cat_list = [
 # Квал лиды (MQL) = Sale (стадии MQL+, без NEW/Аларм/Взят/Консульт, ВКЛ WON) + КОМ (без WON-копий)
 # PreSale не входит
 # Стадии MQL в Sale: WON считается (это успешные сделки)
-MQL_SALE_STAGES = {'UC_4RJOR4', 'DETAILS', 'PROPOSAL', '2', '6', 'WON', 'LOSE',
+MQL_SALE_STAGES_W = {'UC_4RJOR4', 'DETAILS', 'PROPOSAL', '2', '6', 'WON', 'LOSE',
                    'UC_F2YC3N', 'UC_VKPN0N', 'UC_W6SCHG', 'UC_670ME2'}
 # Стадии ДО MQL (не входят)
-NOT_MQL_SALE = {'NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'}
+NOT_MQL_SALE_W = {'NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'}
 
 def is_qual_lead(r):
     if r["CAT_ID"] not in VALID_CATS:
@@ -871,9 +1097,9 @@ def is_qual_lead(r):
         return False  # тех.нулевые WON
     if r["CAT_ID"] == 0:
         # Sale: стадии MQL+ (ВКЛЮЧАЯ WON), без NEW/Аларм/Взят/Консульт
-        if r.get("STAGE") in NOT_MQL_SALE:
+        if r.get("STAGE") in NOT_MQL_SALE_W:
             return False
-        if r.get("STAGE") in MQL_SALE_STAGES:
+        if r.get("STAGE") in MQL_SALE_STAGES_W:
             return True
         return False
     if r["CAT_ID"] == 19:

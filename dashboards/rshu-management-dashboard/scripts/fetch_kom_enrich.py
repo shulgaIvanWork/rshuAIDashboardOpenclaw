@@ -24,10 +24,13 @@ WEBHOOK = "https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/"
 # Поля для дозагрузки (только те, что нужны для is_kom_deal)
 KOM_FIELDS = [
     'ID',
-    'UF_CRM_1683882427069',   # Галочка КОМ
-    'UF_FORMAT',               # Формат (инфоблок)
-    'UF_CRM_1498466811',       # Направление
-    'UF_CRM_1765896709800',    # Тип обучения
+    'UF_CRM_1683882427069',      # Галочка КОМ
+    'UF_FORMAT',                  # Формат (инфоблок)
+    'UF_CRM_1498466811',          # Направление
+    'UF_CRM_1765896709800',       # Тип обучения
+    'UF_CRM_1753272713011',       # Дата счёт отправлен (для воронки)
+    'MOVED_TIME',                  # Когда перешла на текущую стадию
+    'PREVIOUS_STAGE_ID',           # Предыдущая стадия
 ]
 
 def rest_call(method, params=None):
@@ -105,17 +108,20 @@ def main():
     deals_dict = {x['ID']: x for x in deals}
     
     # Определяем текущее состояние КОМ-полей
-    def has_kom_fields(x):
-        """Проверяет, есть ли у сделки КОМ-поля."""
-        return bool(x.get('UF_CRM_1683882427069') or x.get('UF_FORMAT') or 
-                    x.get('UF_CRM_1498466811') or x.get('UF_CRM_1765896709800'))
+    # Сделки, у которых нет всех нужных полей
+    def needs_fetch(x):
+        """Проверяет, нужно ли догружать данные для сделки."""
+        has_kom = bool(x.get('UF_CRM_1683882427069') or x.get('UF_FORMAT') or 
+                       x.get('UF_CRM_1498466811') or x.get('UF_CRM_1765896709800'))
+        has_inv = bool(x.get('UF_CRM_1753272713011'))
+        has_moved = bool(x.get('MOVED_TIME'))
+        return not (has_kom and has_inv and has_moved)
     
-    # Сделки без КОМ-полей (нужно догрузить)
-    need_fetch = [x for x in deals if not has_kom_fields(x)]
-    print(f"  Без КОМ-полей: {len(need_fetch)}")
+    need_fetch = [x for x in deals if needs_fetch(x)]
+    print(f"  Нуждаются в дозагрузке: {len(need_fetch)}")
     
     if not need_fetch:
-        print("  ✅ Все сделки уже имеют КОМ-поля")
+        print("  ✅ Все сделки уже имеют все поля")
         return
     
     # Ограничим: только оплаченные (UF_DATE_PAY_1C) — чтобы не дёргать API зря

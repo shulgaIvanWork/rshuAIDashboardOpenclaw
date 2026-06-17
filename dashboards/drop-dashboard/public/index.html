@@ -116,7 +116,7 @@ window.BASE_PATH = _m ? '/' + _m[1] : '';
     <div class="row2" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
       <div class="card" id="newFmtCard"><h2>Форматы обучения</h2><div class="chartbox" style="height:200px"><canvas id="newChFmt"></canvas></div><div id="newFmtTable"></div></div>
       <div class="card" id="newMbaCard"><h2>MBA / MMBA</h2><div id="newMbaTable"></div></div>
-      <div class="card" id="newWlCard"><h2>WON vs LOSE</h2><div class="chartbox" style="height:200px"><canvas id="newChWl"></canvas></div></div>
+      <div class="card" id="newWlCard"><h2>Оплаты vs Отказы</h2><div class="chartbox" style="height:200px"><canvas id="newChWl"></canvas></div></div>
     </div>
     <div class="card" id="newTopProducts" style="margin-bottom:16px"><h2>ТОП-20 продуктов</h2><div style="overflow-x:auto;max-height:400px;overflow-y:auto"><div id="newProductsTable"></div></div></div>
     <div class="card" id="newWeekDetail" style="margin-bottom:16px"><h2>Детализация по неделям</h2><div style="overflow-x:auto;max-height:500px;overflow-y:auto"><div id="newWeekTable"></div></div></div>
@@ -294,7 +294,7 @@ function renderPage(data) {
 
     <!-- B2B + Formats -->
     <div class="twocol">
-      <div class="card"><h2>B2B vs B2C · WON vs LOSE</h2>
+      <div class="card"><h2>B2B vs B2C · Оплаты vs Отказы</h2>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="chartbox-sm"><canvas id="ch_b2b"></canvas></div>
           <div class="chartbox-sm"><canvas id="ch_wl"></canvas></div>
@@ -383,7 +383,7 @@ function renderPage(data) {
 
     <!-- Charts row -->
     <div class="twocol">
-      <div class="card"><h2>Кол-во сделок: WON vs LOSE</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
+      <div class="card"><h2>Кол-во сделок: Оплаты vs Отказы</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
       <div class="card"><h2>Средний чек по неделям, ₽</h2><div class="chartbox"><canvas id="ch_avg"></canvas></div></div>
     </div>
 
@@ -501,7 +501,17 @@ function initTableSort() {
   });
 }
 
+// Хранилище графиков новой вкладки
+let chartInstancesNew = {};
+
+function destroyNewCharts() {
+  Object.keys(chartInstancesNew).forEach(id => {
+    if (chartInstancesNew[id]) { chartInstancesNew[id].destroy(); delete chartInstancesNew[id]; }
+  });
+}
+
 async function renderPageMainNew() {
+  destroyNewCharts();
   document.getElementById('loadingStateNew').style.display = 'block';
   try {
     const d = await api('/api/data/new');
@@ -571,7 +581,7 @@ async function renderPageMainNew() {
     const labels = weeks.map(function(w) { return w.label_short || 'W'+String(w.week).padStart(2,'0'); });
 
     if (document.getElementById('newChB2b') && window.Chart) {
-      new Chart(document.getElementById('newChB2b'), {
+      chartInstancesNew.newChB2b = new Chart(document.getElementById('newChB2b'), {
         type: 'doughnut',
         data: { labels: ['B2B', 'B2C'], datasets: [{ data: [b2b.sum, b2c.sum], backgroundColor: ['#1976D2', '#F57C00'] }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
@@ -579,7 +589,7 @@ async function renderPageMainNew() {
     }
 
     if (document.getElementById('newChFunnel') && window.Chart) {
-      new Chart(document.getElementById('newChFunnel'), {
+      chartInstancesNew.newChFunnel = new Chart(document.getElementById('newChFunnel'), {
         type: 'bar',
         data: { labels: labels, datasets: [
           { label: 'MQL', data: weeks.map(function(w){return w.mql||0;}), backgroundColor: '#1976D2', borderRadius: 4 },
@@ -595,7 +605,7 @@ async function renderPageMainNew() {
     }
 
     if (document.getElementById('newChConv') && window.Chart) {
-      new Chart(document.getElementById('newChConv'), {
+      chartInstancesNew.newChConv = new Chart(document.getElementById('newChConv'), {
         type: 'line',
         data: { labels: labels, datasets: [
           { label: 'MQL\u2192SQL %', data: weeks.map(function(w){return w.conv_mql_sql||0;}), borderColor: '#1976D2', tension: 0.3, fill: false },
@@ -606,7 +616,7 @@ async function renderPageMainNew() {
     }
 
     if (document.getElementById('newChPos') && window.Chart) {
-      new Chart(document.getElementById('newChPos'), {
+      chartInstancesNew.newChPos = new Chart(document.getElementById('newChPos'), {
         type: 'bar',
         data: { labels: labels, datasets: [{ label: 'Поступления', data: weeks.map(function(w){return w.postupleniya||0;}), backgroundColor: '#1f2a44', borderRadius: 4 }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } }, scales: { y: { beginAtZero: true } } }
@@ -617,7 +627,7 @@ async function renderPageMainNew() {
     if (document.getElementById('newChFmt') && window.Chart) {
       const fmtLabels = []; const fmtVals = [];
       for (var fk in fmtData) { if (fk === 'period') continue; fmtLabels.push(fk); fmtVals.push(fmtData[fk].sum || 0); }
-      new Chart(document.getElementById('newChFmt'), {
+      chartInstancesNew.newChFmt = new Chart(document.getElementById('newChFmt'), {
         type: 'doughnut',
         data: { labels: fmtLabels, datasets: [{ data: fmtVals, backgroundColor: ['#1976D2','#FF9800','#FFD54F','#9B2D3C'] }] },
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
@@ -627,10 +637,10 @@ async function renderPageMainNew() {
     const totalWon = weeks.reduce(function(s,w){return s+(w.won_cnt||0);},0);
     const totalLost = weeks.reduce(function(s,w){return s+(w.lost_cnt||0);},0);
     if (document.getElementById('newChWl') && window.Chart) {
-      new Chart(document.getElementById('newChWl'), {
+      chartInstancesNew.newChWl = new Chart(document.getElementById('newChWl'), {
         type: 'doughnut',
-        data: { labels: ['WON', 'LOSE'], datasets: [{ data: [totalWon, totalLost], backgroundColor: ['#2E7D32', '#C62828'] }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        data: { labels: ['Оплаты', 'Отказы'], datasets: [{ data: [totalWon, totalLost], backgroundColor: ['#2E7D32', '#C62828'] }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.label + ': ' + Number(c.parsed).toLocaleString('ru-RU') + ' (доля: ' + (c.parsed/(totalWon+totalLost||1)*100).toFixed(1) + '%)' } } } }
       });
     }
 
@@ -782,7 +792,7 @@ function drawCharts(data) {
   const lostTotal = lost_n.reduce((a, b) => a + b, 0);
   chartInstances.ch_wl = new Chart(document.getElementById('ch_wl'), {
     type: 'doughnut',
-    data: { labels: ['WON', 'LOSE'], datasets: [{ data: [wonTotal, lostTotal], backgroundColor: [green, red] }] },
+    data: { labels: ['Оплаты', 'Отказы'], datasets: [{ data: [wonTotal, lostTotal], backgroundColor: [green, red] }] },
     options: { ...common, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.label + ': ' + Number(c.parsed).toLocaleString('ru-RU') + ' (доля: ' + (c.parsed/(wonTotal+lostTotal)*100).toFixed(1) + '%)' } } } },
     plugins: [ChartDataLabels]
   });
@@ -812,8 +822,8 @@ function drawCharts(data) {
   chartInstances.ch_cnt = new Chart(document.getElementById('ch_cnt'), {
     type: 'bar',
     data: { labels, datasets: [
-      { label: 'Выиграно', data: won_n, backgroundColor: green, borderRadius: 4 },
-      { label: 'Проиграно', data: lost_n, backgroundColor: red, borderRadius: 4 }
+      { label: 'Оплаты', data: won_n, backgroundColor: green, borderRadius: 4 },
+      { label: 'Отказы', data: lost_n, backgroundColor: red, borderRadius: 4 }
     ]},
     options: { ...common, plugins: { ...commonPlugin, legend: { position: 'top' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true } } }
   });

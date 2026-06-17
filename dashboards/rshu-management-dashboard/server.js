@@ -254,6 +254,19 @@ app.get('/api/artifacts', async (req, res) => {
         manager: d.ASSIGNED_BY_ID, created: d.DATE_CREATE
       }));
     
+    // Форматы без UF_FORMAT (правило 2: ключевые слова)
+    const formatRule2 = withPay
+      .filter(d => {
+        if (parseFloat(d.OPPORTUNITY || 0) < 11) return false;
+        if (!['0','8','19'].includes(String(d.CATEGORY_ID))) return false;
+        if (d.UF_FORMAT) return false;
+        return true;
+      })
+      .map(d => ({
+        id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0,
+        date: d.UF_DATE_PAY_1C, cat: d.CATEGORY_ID
+      }));
+    
     // PreSale сделки, определённые как КОМ (для проверки)
     function isKomDeal(d) {
       const cat = String(d.CATEGORY_ID);
@@ -291,7 +304,8 @@ app.get('/api/artifacts', async (req, res) => {
         negativeDuration: { cnt: negativeDur.length, sum: negativeDur.reduce((a,b) => a + (parseFloat(b.OPPORTUNITY) || 0), 0) },
         otherCatPaid: { cnt: otherCatPaid.length, sum: otherCatPaid.reduce((a,b) => a + b.sum, 0) },
         komInPresale: { cnt: komInPresale.length },
-        nextYear: { cnt: nextYear.length, sum: nextYear.reduce((a,b) => a + b.sum, 0) }
+        nextYear: { cnt: nextYear.length, sum: nextYear.reduce((a,b) => a + b.sum, 0) },
+        formatRule2: { cnt: formatRule2.length, sum: formatRule2.reduce((a,b) => a + b.sum, 0) }
       },
       details: {
         returns: returns.slice(0, 50),
@@ -302,7 +316,8 @@ app.get('/api/artifacts', async (req, res) => {
         })),
         otherCatPaid: otherCatPaid.slice(0, 50),
         komInPresale: komInPresale.slice(0, 50),
-        nextYear: nextYear.slice(0, 50)
+        nextYear: nextYear.slice(0, 50),
+        formatRule2: formatRule2.slice(0, 50)
       }
     });
   } catch (e) {
@@ -336,6 +351,13 @@ app.get('/api/forecast', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// Раздача session-файлов (лог, решения, TODO)
+app.use('/sessions', express.static(path.join(__dirname, 'sessions'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.md')) res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+  }
+}));
 
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, path) => {
