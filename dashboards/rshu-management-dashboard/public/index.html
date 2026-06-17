@@ -407,7 +407,7 @@ function renderPage(data) {
 
     <!-- B2B + Formats -->
     <div class="twocol">
-      <div class="card"><h2>B2B vs B2C · WON vs LOSE</h2>
+      <div class="card"><h2>B2B vs B2C · Оплаты vs Отказы</h2>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="chartbox-sm"><canvas id="ch_b2b"></canvas></div>
           <div class="chartbox-sm"><canvas id="ch_wl"></canvas></div>
@@ -501,7 +501,7 @@ function renderPage(data) {
 
     <!-- Charts row -->
     <div class="twocol">
-      <div class="card"><h2>Кол-во сделок: WON vs LOSE</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
+      <div class="card"><h2>Кол-во сделок: Оплаты vs Отказы</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
       <div class="card"><h2>Средний чек по неделям, ₽</h2><div class="chartbox"><canvas id="ch_avg"></canvas></div></div>
     </div>
 
@@ -1050,8 +1050,8 @@ function drawCharts(data) {
   chartInstances.ch_cnt = new Chart(document.getElementById('ch_cnt'), {
     type: 'bar',
     data: { labels, datasets: [
-      { label: 'Выиграно', data: won_n, backgroundColor: green, borderRadius: 4 },
-      { label: 'Проиграно', data: lost_n, backgroundColor: red, borderRadius: 4 }
+      { label: 'Оплаты', data: won_n, backgroundColor: green, borderRadius: 4 },
+      { label: 'Отказы', data: lost_n, backgroundColor: red, borderRadius: 4 }
     ]},
     options: { ...common, plugins: { ...commonPlugin, legend: { position: 'top' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true } } }
   });
