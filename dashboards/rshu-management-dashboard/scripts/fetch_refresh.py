@@ -13,7 +13,7 @@ EXPORT_URL = "https://24.uprav.ru/web_services/crm/export.php"
 SECRET     = "14b0fc053c141e47a5974b3859f5753f"
 CATEGORIES = [0, 8, 19]
 LIMIT = 50
-MAX_OFFSET = 50000
+MAX_OFFSET = 5000
 
 SELECT = [
     "ID", "TITLE", "STAGE_ID", "STAGE_SEMANTIC_ID", "CATEGORY_ID",
@@ -67,10 +67,18 @@ def fetch_category_simple(cat_id):
             print(f"  [CAT {cat_id}] offset={offset} empty — done")
             break
         
+        prev_total = len(all_deals)
         for d in items:
             all_deals[d["ID"]] = d
         
-        print(f"  [CAT {cat_id}] offset={offset}: {len(items)} items, total={len(all_deals)}")
+        cur_total = len(all_deals)
+        print(f"  [CAT {cat_id}] offset={offset}: {len(items)} items, total={cur_total}")
+        
+        # Если после пачки нет новых ID — дошли до лимита API, выходим
+        if cur_total == prev_total:
+            print(f"  [CAT {cat_id}] offset={offset}: нет новых сделок — стоп")
+            break
+        
         offset += LIMIT
         time.sleep(0.2)
     
