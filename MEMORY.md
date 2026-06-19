@@ -110,3 +110,9 @@ all_ids = sorted(numeric_ids, key=int)
    - Пересчитать всё по правилам
    - Показать артефакты
    - Указать что не соответствует правилам и требует проверки
+
+## 📖 CRM Bitrix24 — Справочник кастомных полей
+
+Создан `CRM_FIELDS_REFERENCE.md` — полный справочник кастомных полей CRM Bitrix24 (COMPANY, CONTACT, DEAL).
+Формат: Код | Название | Тип. Обновлён 2026-06-19 из выгрузки crm_fields_*.xlsx.
+Смотреть: [CRM_FIELDS_REFERENCE.md](CRM_FIELDS_REFERENCE.md)
