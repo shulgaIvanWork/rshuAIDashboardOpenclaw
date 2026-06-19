@@ -231,7 +231,7 @@ function renderPage(data) {
   // Formats table
   const fmtData = Object.entries(data.fmt_ytd || {}).filter(([k]) => k !== 'period').sort((a,b) => b[1].sum - a[1].sum);
   const totFmt = fmtData.reduce((s, [,v]) => s + v.sum, 0) || 1;
-  const fmtColors = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#3079D2", "СДО": "#F57C00", "КОМ": "#7A2E2E" };
+  const fmtColors = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#00bcd4", "СДО": "#F57C00", "КОМ": "#9C27B0" };
 
   // Sources (with full analytics)
   const srcTop = data.src_rating || [];
@@ -249,7 +249,7 @@ function renderPage(data) {
   area.innerHTML = `
     <div id="kpiContainer">
       <!-- ========== Ряд 1: ОБЩАЯ (ООМ + КОМ) ========== -->
-      <div style="margin:0 0 4px"><span style="font-size:15px;font-weight:700;color:#093EB4">ОБЩАЯ (ООМ + КОМ)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
+      <div style="margin:0 0 4px"><span style="font-size:15px;font-weight:700;color:#1f2a44">ОБЩАЯ (ООМ + КОМ)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
       <div class="kpis">
         <div class="kpi"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(ytd.postupleniya)} ₽</div><div class="sub">${ytd.won_relevant_cnt} сделок</div></div>
         <div class="kpi"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.qual_lead_ytd)}</b> · конв. ${data.qual_lead_ytd && data.leads_ytd ? (data.qual_lead_ytd/data.leads_ytd*100).toFixed(1) : 0}%</div></div>
@@ -261,7 +261,7 @@ function renderPage(data) {
       </div>
 
       <!-- ========== Ряд 2: ООМ ========== -->
-      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#3079D2">ООМ (Открытое обучение)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
+      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#00bcd4">ООМ (Открытое обучение)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
       <div class="kpis">
         <div class="kpi oom"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(oom_ytd.postupleniya)} ₽</div><div class="sub">${oom_ytd.won_relevant_cnt} сделок</div></div>
         <div class="kpi oom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.oom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.oom_qual_lead_ytd)}</b> · конв. ${data.oom_qual_lead_ytd && data.oom_leads_ytd ? (data.oom_qual_lead_ytd/data.oom_leads_ytd*100).toFixed(1) : 0}%</div></div>
@@ -273,7 +273,7 @@ function renderPage(data) {
       </div>
 
       <!-- ========== Ряд 3: КОМ ========== -->
-      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#7A2E2E">КОМ (Корпоративное обучение)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
+      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#9C27B0">КОМ (Корпоративное обучение)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
       <div class="kpis">
         <div class="kpi kom"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(kom.postupleniya)} ₽</div><div class="sub">${kom.won_relevant_cnt} сделок</div></div>
         <div class="kpi kom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.kom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.kom_qual_lead_ytd)}</b></div></div>
@@ -530,7 +530,7 @@ async function renderPageNewLogic() {
     function kpi(l,v,s,c) { return '<div class=kpi'+(c?' '+c:'')+'><div class=lbl>'+l+'</div><div class=val>'+v+'</div><div class=sub>'+s+'</div></div>'; }
     var w=data.weeks||[], lst=w[w.length-1]||{}, prv=w[w.length-2]||{}, cw=data.cur_week||0;
     function rw(t,ytd,cur,kom) {
-      var h='<div class=kpis><div style="grid-column:1/-1;font-size:15px;font-weight:700;margin:4px 0;color:'+(kom?'#7A2E2E':'#093EB4')+'">'+t+'</div>';
+      var h='<div class=kpis><div style="grid-column:1/-1;font-size:15px;font-weight:700;margin:4px 0;color:'+(kom?'#9C27B0':'#1f2a44')+'">'+t+'</div>';
       h+=kpi('Поступления',fmt(ytd.postupleniya)+' руб',ytd.won_relevant_cnt+'сд.');
       h+=kpi('Лиды',fmt(ytd.created_cnt),'в работе '+(ytd.created_cnt-ytd.won_relevant_cnt-ytd.lose_cnt));
       h+=kpi('Конверсия',(ytd.conv_deal_pct||0).toFixed(1)+'%','');
@@ -555,7 +555,7 @@ async function renderPageMainNew(d) {
     if (!d || !d.ytd) { areaNew.innerHTML = '<div class="error-state">Нет данных</div>'; return; }
 
     function kpi(label, val, sub, cls) {
-      var c = cls === 'oom' ? '#3079D2' : (cls === 'kom' ? '#7A2E2E' : '#093EB4');
+      var c = cls === 'oom' ? '#00bcd4' : (cls === 'kom' ? '#9C27B0' : '#1f2a44');
       return '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">'+label+'</div><div class="val">'+val+'</div><div class="sub">'+(sub||'')+'</div></div>';
     }
     function delta(a,b) {
@@ -564,7 +564,7 @@ async function renderPageMainNew(d) {
       return ' <span style="color:'+(p>0?'#2E7D32':(p<0?'#C62828':'#475569'))+';font-size:12px">'+s+' '+Math.abs(p)+'%</span>';
     }
     function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev) {
-      var c = cls==='kom'?'#7A2E2E':(cls==='oom'?'#3079D2':'#093EB4');
+      var c = cls==='kom'?'#9C27B0':(cls==='oom'?'#00bcd4':'#1f2a44');
       var wkLabel = wkCur && wkCur.label_dates ? ' · '+wkCur.label_dates : '';
       var r = '<div class="kpis"><div style="grid-column:1/-1;font-size:15px;font-weight:700;margin:4px 0;color:'+c+'">'+title+'<span style="font-size:12px;color:#475569;font-weight:400">'+wkLabel+'</span></div>'
         + kpi('Поступления',fmt(ytd.postupleniya)+' \u20bd',fmt(ytd.won_relevant_cnt)+' сд.',cls)
@@ -627,8 +627,8 @@ async function renderPageMainNew(d) {
     // Ряд 2: Оплаты/Отказы пончик + Оплаты vs Отказы stacked
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>Оплаты / Отказы</h2><div class="twocol" style="gap:12px">';
-    html += '<div><h3 style="text-align:center;font-size:14px;color:#3079D2;margin-bottom:4px">ООМ</h3><div class="chartbox-sm"><canvas id="newChWlOom"></canvas></div><div id="newChWlOomTbl"></div></div>';
-    html += '<div><h3 style="text-align:center;font-size:14px;color:#7A2E2E;margin-bottom:4px">КОМ</h3><div class="chartbox-sm"><canvas id="newChWlKom"></canvas></div><div id="newChWlKomTbl"></div></div>';
+    html += '<div><h3 style="text-align:center;font-size:14px;color:#00bcd4;margin-bottom:4px">ООМ</h3><div class="chartbox-sm"><canvas id="newChWlOom"></canvas></div><div id="newChWlOomTbl"></div></div>';
+    html += '<div><h3 style="text-align:center;font-size:14px;color:#9C27B0;margin-bottom:4px">КОМ</h3><div class="chartbox-sm"><canvas id="newChWlKom"></canvas></div><div id="newChWlKomTbl"></div></div>';
     html += '</div></div>';
     html += '<div class="card"><h2>Оплаты vs Отказы по неделям</h2><div class="chartbox"><canvas id="newChCnt"></canvas></div></div>';
     html += '</div>';
@@ -752,12 +752,12 @@ async function renderPageMainNew(d) {
           if (document.getElementById('newChConv')) new Chart(document.getElementById('newChConv'), {type:'line', data:{labels:labels,datasets:[{label:'Лиды\u2192MQL %',data:weeks.map(function(w){return w.conv_lead_mql||0;}),borderColor:'#B0BEC5',tension:0.3,fill:false},{label:'MQL\u2192SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL\u2192Счёт %',data:weeks.map(function(w){return w.conv_sql_invoice||0;}),borderColor:'#43A047',tension:0.3,fill:false},{label:'Счёт\u2192Оплата %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
         } catch(e){}
         try {
-          if (document.getElementById('newChPos')) new Chart(document.getElementById('newChPos'), {type:'bar', data:{labels:labels,datasets:[{label:'ООМ',data:weeks.map(function(w){return w.oom_postupleniya||0;}),backgroundColor:'#3079D2',borderRadius:4},{label:'КОМ',data:weeks.map(function(w){return w.kom_postupleniya||0;}),backgroundColor:'#7A2E2E',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:'auto',color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:9},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=(weeks[i].oom_postupleniya||0)+(weeks[i].kom_postupleniya||0);return tot?tot.toLocaleString('ru-RU')+' ₽':'';}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+          if (document.getElementById('newChPos')) new Chart(document.getElementById('newChPos'), {type:'bar', data:{labels:labels,datasets:[{label:'ООМ',data:weeks.map(function(w){return w.oom_postupleniya||0;}),backgroundColor:'#00bcd4',borderRadius:4},{label:'КОМ',data:weeks.map(function(w){return w.kom_postupleniya||0;}),backgroundColor:'#9C27B0',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:'auto',color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:9},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=(weeks[i].oom_postupleniya||0)+(weeks[i].kom_postupleniya||0);return tot?tot.toLocaleString('ru-RU')+' ₽':'';}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
           // qual funnel
           if (document.getElementById('ch_funnel_new_qual')) new Chart(document.getElementById('ch_funnel_new_qual'), {type:'bar', data:{labels:labels,datasets:[{label:'MQL',data:weeks.map(function(w){return w.mql||0;}),backgroundColor:'#3079D2',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.sql||0;}),backgroundColor:'#9A7B3F',borderRadius:4},{label:'Оплачено',data:weeks.map(function(w){return w.oplata||0;}),backgroundColor:'#2E7D32',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
           if (document.getElementById('ch_conv_new_qual')) new Chart(document.getElementById('ch_conv_new_qual'), {type:'line', data:{labels:labels,datasets:[{label:'MQL→SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL→Сделки %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
           try {
-          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtShort=function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtShort(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#3079D2','#43A047','#9A7B3F','#7A2E2E']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
+          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtShort=function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtShort(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#1976D2','#43A047','#FFD54F','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
           } catch(e){}
         } catch(e){}
         try {
@@ -917,7 +917,7 @@ function drawCharts(data) {
   });
 
   // Formats stacked bar (weekly)
-  const fmtColorsArr = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#3079D2", "СДО": "#F57C00", "КОМ": "#7A2E2E" };
+  const fmtColorsArr = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#00bcd4", "СДО": "#F57C00", "КОМ": "#9C27B0" };
   const fmtKeys = ["ООМ (Очное)", "СДО", "ОМ (Онлайн)", "КОМ"];
   const fmt_week = {
     "ООМ (Очное)": weeks.map(w => w.fmt_oom || 0),
