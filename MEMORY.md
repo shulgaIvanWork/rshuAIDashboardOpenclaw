@@ -49,6 +49,32 @@
 
 **Пока Ольга не скажет "делай" / "выкатывай" — ничего на фронт не публиковать.**
 
+## 📝 Правило: защита от None-значений в пайплайне данных
+
+При работе с CRM Export API / REST API Bitrix24, когда COMPANY_ID или CONTACT_ID приходит как None, обработка через str(None) даёт 'None', что ломает int() сортировку.
+
+**Вечный фикс — применять во всех скриптах работы с company_id/contact_id:**
+
+```python
+raw = ccinfo.get("COMPANY_ID", d.get("COMPANY_ID", "0"))
+if raw is None or str(raw).strip() in ("", "0", "None"):
+    continue
+```
+
+И при сортировке:
+```python
+numeric_ids = [x for x in need_fetch if x.isdigit()]
+all_ids = sorted(numeric_ids, key=int)
+```
+
+**Актуальные скрипты с этой проблемой (все починены 19.06):**
+- `fetch_companies_ext_batch.py`
+- `fetch_contacts_batch.py`
+
+**Также важно:**
+- `run_full.py` ДОЛЖЕН включать `fetch_pay_dates.py` и `fetch_kom_enrich.py` — без них данные КОМ и UF_DATE_PAY_1C не дозагружаются
+- `fetch_pay_dates.py` оптимизирован: фильтрует кандидатов (OPP≥11, кат 0/8/19, не WON-копии) вместо всех 24k сделок без даты
+
 ## 🚫 Правило: не додумывать, только прямые указания
 
 **Правки дашборда — только по прямым указаниям Ольги.**
