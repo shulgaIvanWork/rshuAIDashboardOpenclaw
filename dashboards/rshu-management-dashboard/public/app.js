@@ -187,10 +187,6 @@ function buildFilteredData(orig, filteredWeeks) {
   if (totPay > 0) {
     ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.median_check || 0) * (w.oplata || 0); }, 0) / totPay;
     ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.avg_dur || 0) * (w.oplata || 0); }, 0) / totPay;
-    oom_ytd.median_check = ytd.median_check;
-    kom_ytd.median_check = ytd.median_check;
-    oom_ytd.avg_close_days_won = ytd.avg_close_days_won;
-    kom_ytd.avg_close_days_won = ytd.avg_close_days_won;
   }
   out.ytd = ytd;
   
