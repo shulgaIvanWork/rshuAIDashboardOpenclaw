@@ -569,7 +569,7 @@ async function renderPageMainNew(d) {
       var kc = cls==='kom'?'kpi-kom':(cls==='oom'?'kpi-oom':'kpi-total');
       var wkLabel = wkCur && wkCur.label_dates ? '<span class="kpi-dates"> \u00b7 '+wkCur.label_dates+'</span>' : '';
       var r = '<div class="kpis"><div class="kpi-header '+cc+'">'+title+wkLabel+'</div>'
-        + kpi('Поступления',fmt(ytd.postupleniya)+' \u20bd',fmt(ytd.won_relevant_cnt)+' сд.',cls)
+        + '<div class="kpi '+kc+'"><div class="lbl">Поступления</div><div class="row"><div class="val-big">'+fmt(ytd.postupleniya)+' \u20bd</div><span class="si">('+fmt(ytd.won_relevant_cnt)+' сд.)</span></div></div>'
         + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udccb Лиды всего</div><div class="row"><div class="val-big">'+fmt(leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt)+'</div><span class="si">конв. '+((qualLeads/leadsYtd*100).toFixed(1))+'%</span></div><div class="lbl2">квал. лиды (MQL)</div><div class="row"><div class="val-big '+cc+'">'+fmt(qualLeads)+'</div><span class="si">с начала года</span></div></div>'
         + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcc8 Конверсия</div><div class="row"><div class="val-big">'+fmtPct(leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0)+'%</div><span class="si">всех лидов</span></div><div class="row"><div class="val-big '+cc+'">'+fmtPct(qualLeads>0?(ytd.won_relevant_cnt/qualLeads*100):0)+'%</div><span class="si">квал. лидов (MQL)</span></div></div>'
         + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcb0 Средний чек</div><div class="row"><div class="val-big">'+fmt(ytd.avg_check)+' \u20bd</div><span class="si">средний</span></div><div class="row"><div class="val-big '+cc+'">'+fmt(ytd.median_check)+' \u20bd</div><span class="si">медиана</span></div></div>'
