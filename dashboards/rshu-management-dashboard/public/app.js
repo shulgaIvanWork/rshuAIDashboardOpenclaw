@@ -554,26 +554,28 @@ async function renderPageMainNew(d) {
     if (!d) d = await api('/api/data/new');
     if (!d || !d.ytd) { areaNew.innerHTML = '<div class="error-state">Нет данных</div>'; return; }
 
-    function kpi(label, val, sub, cls) {
-      var c = cls === 'oom' ? '#00bcd4' : (cls === 'kom' ? '#9C27B0' : '#1f2a44');
-      return '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">'+label+'</div><div class="val">'+val+'</div><div class="sub">'+(sub||'')+'</div></div>';
+        function kpi(label, val, sub, cls) {
+      var kpiCls = cls === 'oom' ? 'kpi-oom' : (cls === 'kom' ? 'kpi-kom' : 'kpi-total');
+      return '<div class="kpi '+kpiCls+'"><div class="lbl">'+label+'</div><div class="val">'+val+'</div><div class="sub">'+(sub||'')+'</div></div>';
     }
     function delta(a,b) {
       if (!b) return '';
       var p = b>0?((a-b)/b*100).toFixed(1):0, s=(p>0?'\u2191':(p<0?'\u2193':'\u2192'));
-      return ' <span style="color:'+(p>0?'#2E7D32':(p<0?'#C62828':'#475569'))+';font-size:12px">'+s+' '+Math.abs(p)+'%</span>';
+      var cl = p>0?'delta-up':(p<0?'delta-down':'delta-flat');
+      return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
     }
     function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev) {
-      var c = cls==='kom'?'#9C27B0':(cls==='oom'?'#00bcd4':'#1f2a44');
-      var wkLabel = wkCur && wkCur.label_dates ? ' · '+wkCur.label_dates : '';
-      var r = '<div class="kpis"><div style="grid-column:1/-1;font-size:15px;font-weight:700;margin:4px 0;color:'+c+'">'+title+'<span style="font-size:12px;color:#475569;font-weight:400">'+wkLabel+'</span></div>'
+      var cc = cls==='kom'?'c-kom':(cls==='oom'?'c-oom':'c-total');
+      var kc = cls==='kom'?'kpi-kom':(cls==='oom'?'kpi-oom':'kpi-total');
+      var wkLabel = wkCur && wkCur.label_dates ? '<span class="kpi-dates"> \u00b7 '+wkCur.label_dates+'</span>' : '';
+      var r = '<div class="kpis"><div class="kpi-header '+cc+'">'+title+wkLabel+'</div>'
         + kpi('Поступления',fmt(ytd.postupleniya)+' \u20bd',fmt(ytd.won_relevant_cnt)+' сд.',cls)
-        + '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">📋 Лиды всего</div><div class="val" style="font-size:22px;font-weight:700">'+fmt(leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt)+'</div><div class="sub" style="text-align:right;font-size:15px;font-weight:600">конв. '+((qualLeads/leadsYtd*100).toFixed(1))+'%</div><div class="lbl" style="margin-top:6px">квал. лиды (MQL)</div><div class="val" style="font-size:22px;font-weight:700;color:'+c+'">'+fmt(qualLeads)+'</div><div class="sub" style="text-align:right;font-size:12px">с начала года</div></div>'
-        + '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">📈 Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val" style="font-size:22px;font-weight:700">'+fmtPct(leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0)+'%</div><div class="sub" style="font-size:12px;color:'+c+'">всех лидов</div></div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val" style="font-size:22px;font-weight:700;color:'+c+'">'+fmtPct(qualLeads>0?(ytd.won_relevant_cnt/qualLeads*100):0)+'%</div><div class="sub" style="font-size:12px">квал. лидов (MQL)</div></div></div>'
-        + '<div class="kpi" style="border-top:3px solid '+c+'"><div class="lbl">💰 Средний чек</div><div class="val" style="font-size:22px;font-weight:700">'+fmt(ytd.avg_check)+' \u20bd</div><div class="sub" style="text-align:right;font-size:12px">средний</div><div class="val" style="font-size:22px;font-weight:700;color:'+c+'">'+fmt(ytd.median_check)+' \u20bd</div><div class="sub" style="text-align:right;font-size:12px">медиана</div><div class="sub" style="text-align:right;font-size:11px;color:#475569;margin-top:2px">мин '+fmt(ytd.min_check)+' · макс '+fmt(ytd.max_check)+'</div></div>'
-        + kpi('Цикл сделки',(ytd.avg_close_days_won||0).toFixed(1)+' дн.','с начала года',cls)
+        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udccb Лиды всего</div><div class="val-big">'+fmt(leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt)+'</div><div class="sub-right f12">конв. '+((qualLeads/leadsYtd*100).toFixed(1))+'%</div><div class="lbl2">квал. лиды (MQL)</div><div class="val-big '+cc+'">'+fmt(qualLeads)+'</div><div class="sub-right">с начала года</div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcc8 Конверсия</div><div class="row"><div class="val-big">'+fmtPct(leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0)+'%</div><div class="sub">всех лидов</div></div><div class="row"><div class="val-big '+cc+'">'+fmtPct(qualLeads>0?(ytd.won_relevant_cnt/qualLeads*100):0)+'%</div><div class="sub">квал. лидов (MQL)</div></div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcb0 Средний чек</div><div class="val-big">'+fmt(ytd.avg_check)+' \u20bd</div><div class="sub-right">средний</div><div class="val-big '+cc+'">'+fmt(ytd.median_check)+' \u20bd</div><div class="sub-right">медиана</div><div class="minmax">мин '+fmt(ytd.min_check)+' \u00b7 макс '+fmt(ytd.max_check)+'</div></div>'
+        + kpi('\u0426\u0438\u043a\u043b сделки',(ytd.avg_close_days_won||0).toFixed(1)+' дн.','с начала года',cls)
         + kpi('\u041d\u0435\u0434\u0435\u043b\u044f: поступления',fmt(cur.postupleniya)+' \u20bd'+delta(cur.postupleniya, prev.postupleniya),'',cls)
-        + '<div class="kpi" style="border-top:3px solid '+c+'">'+'<div class="lbl">Неделя: лиды</div>'+'<div style="display:flex;justify-content:space-between;align-items:baseline">'+'<div class="val" style="font-size:22px;font-weight:700">'+fmt(leadsCur != null ? leadsCur : cur.won_relevant_cnt)+'</div>'+'<div class="sub" style="font-size:12px">'+(leadsPrev != null ? delta(leadsCur, leadsPrev) : (prev ? delta(cur.won_relevant_cnt, prev.won_relevant_cnt) : ''))+'</div>'+'</div>'+'<div class="lbl" style="margin-top:4px;font-size:11px">квал. лиды (MQL)</div>'+'<div style="display:flex;justify-content:space-between;align-items:baseline">'+'<div class="val" style="font-size:22px;font-weight:700;color:'+c+'">'+fmt(mqlCur != null ? mqlCur : (wkCur ? (wkCur.mql || 0) : 0))+'</div>'+'<div class="sub" style="font-size:12px">'+(mqlPrev != null ? delta(mqlCur||0, mqlPrev||0) : (wkPrev ? delta(wkCur ? (wkCur.mql||0) : 0, wkPrev ? (wkPrev.mql||0) : 0) : ''))+'</div>'+'</div>'+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Неделя: лиды</div><div class="val-big">'+fmt(leadsCur != null ? leadsCur : cur.won_relevant_cnt)+'</div><div class="sub">'+(leadsPrev != null ? delta(leadsCur, leadsPrev) : (prev ? delta(cur.won_relevant_cnt, prev.won_relevant_cnt) : ''))+'</div><div class="lbl2">квал. лиды (MQL)</div><div class="val-big '+cc+'">'+fmt(mqlCur != null ? mqlCur : (wkCur ? (wkCur.mql || 0) : 0))+'</div><div class="sub">'+(mqlPrev != null ? delta(mqlCur||0, mqlPrev||0) : (wkPrev ? delta(wkCur ? (wkCur.mql||0) : 0, wkPrev ? (wkPrev.mql||0) : 0) : ''))+'</div></div>'
         + '</div>';
       return r;
     }
