@@ -643,11 +643,8 @@ async function renderPageMainNew(d) {
       +'<tr><td>B2B</td><td>'+b2bRow.cnt+'</td><td>'+fmt(b2bRow.sum)+'</td><td>'+(b2bRow.sum/totB2b*100).toFixed(1)+'%</td></tr>'
       +'<tr><td>B2C</td><td>'+b2cRow.cnt+'</td><td>'+fmt(b2cRow.sum)+'</td><td>'+(b2cRow.sum/totB2b*100).toFixed(1)+'%</td></tr></table>';
 
-    // Tables section — Форматы только под графиком, MBA + Тип покупателя на всю ширину
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h3>MBA</h3><div id="newMbaTable"></div></div>';
-    html += '<div class="card"><h3>Тип покупателя</h3>'+b2bTbl+'</div>';
-    html += '</div>';
+    // Tables section — MBA (Тип покупателя — под графиком B2B/B2C, без дублирования)
+    html += '<div class="card" style="margin-top:8px"><h3>MBA</h3><div id="newMbaTable"></div></div>';
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
