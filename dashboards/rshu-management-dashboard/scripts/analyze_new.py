@@ -416,7 +416,7 @@ for w in range(1, cur_w + 1):
         "label_dates": f"{mon.strftime('%d.%m')}—{sun.strftime('%d.%m')}",
         "created_cnt": 0, "created_sum": 0.0,
         "postupleniya": 0.0, "won_cnt": 0, "lost_cnt": 0,
-        "leads": 0, "avg_check": 0, "durs": [], "chks": [], "kom_chks": [], "kom_durs": [],
+        "leads": 0, "avg_check": 0, "durs": [], "chks": [],
         "mql": 0, "sql": 0, "oplata": 0,
         "kom_postupleniya": 0.0, "kom_won_cnt": 0, "kom_lost_cnt": 0, "invoice_cnt": 0,
         "oom_postupleniya": 0.0, "oom_won_cnt": 0, "oom_leads": 0, "oom_mql": 0,
@@ -465,7 +465,6 @@ for r in rows:
             if r["IS_KOM"]:
                 weekly[wk]["kom_postupleniya"] += r["OPP"]
                 weekly[wk]["kom_won_cnt"]       += 1
-                weekly[wk]["kom_chks"].append(r["OPP"])
             else:
                 weekly[wk]["won_cnt"]       += 1
                 weekly[wk]["oom_postupleniya"] += r["OPP"]
@@ -476,12 +475,10 @@ for r in rows:
             fmt_keys = {"ООМ (Очное)": "fmt_oom", "ОМ (Онлайн)": "fmt_om", "СДО": "fmt_sdo", "КОМ": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
                 weekly[wk][fmt_keys[r["FORMAT"]]] += r["OPP"]
-            if r["DC"]:
+            if not r["IS_KOM"] and r["DC"]:
                 d = (r["CL"] - r["DC"]).days if r["CL"] else 0
                 if d >= 0:
                     weekly[wk]["durs"].append(d)
-                    if r["IS_KOM"]:
-                        weekly[wk]["kom_durs"].append(d)
 
     # MQL = is_qual_lead (как в карточке 2), по DATE_CREATE
     if r["DC"] and r["DC"].year == YEAR and is_qual_lead_w(r):
@@ -543,11 +540,7 @@ for r in rows:
 for w, d in weekly.items():
     d["avg_check"]       = d["postupleniya"] / d["won_cnt"] if d["won_cnt"] else 0
     d["median_check"]     = sorted(d["chks"])[len(d["chks"]) // 2] if d["chks"] else 0
-    d["oom_median_check"] = sorted(d["chks"])[len(d["chks"]) // 2] if d["chks"] else 0
-    d["kom_median_check"] = sorted(d["kom_chks"])[len(d["kom_chks"]) // 2] if d["kom_chks"] else 0
     d["avg_dur"]         = sum(d["durs"])        / len(d["durs"])        if d["durs"]        else 0
-    d["oom_avg_dur"]      = sum(d["durs"])        / len(d["durs"])        if d["durs"]        else 0
-    d["kom_avg_dur"]      = sum(d["kom_durs"])    / len(d["kom_durs"])    if d["kom_durs"]    else 0
     d["avg_presale_dur"] = sum(d["presale_durs"]) / len(d["presale_durs"]) if d["presale_durs"] else 0
     d["conv_lead_mql"]   = d["mql"]    / d["leads"]  * 100 if d["leads"]  else 0
     d["conv_mql_sql"]    = d["sql"]    / d["mql"]    * 100 if d["mql"]    else 0
@@ -556,8 +549,6 @@ for w, d in weekly.items():
     d["conv_invoice_oplata"] = d["oplata"] / d["invoice_cnt"] * 100 if d["invoice_cnt"] else 0
     del d["durs"]
     del d["chks"]
-    del d["kom_chks"]
-    del d["kom_durs"]
     del d["presale_durs"]
 
 # === Stacked bar: этапы воронки по неделям ===
