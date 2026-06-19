@@ -179,6 +179,8 @@ function buildFilteredData(orig, filteredWeeks) {
   out.oom_leads_ytd = sumField('oom_leads');
   out.kom_leads_ytd = orig.kom_leads_ytd || sumField("kom_won_cnt");
   out.qual_lead_ytd = sumField('mql');
+  out.oom_qual_lead_ytd = sumField('oom_mql');
+  out.kom_qual_lead_ytd = sumField('mql') - sumField('oom_mql');
   
   // Медианный чек — взвешенный по количеству оплат в отфильтрованных неделях
   var totPay = sumField('oplata');
