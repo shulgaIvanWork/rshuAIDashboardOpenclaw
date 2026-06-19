@@ -45,3 +45,13 @@
 3. **run_full.py** — добавлены fetch_pay_dates.py и fetch_kom_enrich.py в пайплайн
 4. **fetch_pay_dates.py** — оптимизирован: вместо проверки всех 24k сделок без даты, фильтрует только кандидатов (≥11₽, кат 0/8/19, не WON-копии)
 
+## 12:00+ UTC — Новая схема выгрузки (REST + Export)
+Утверждена Ольгой:
+1. fetch_rest.py — REST API crm.deal.list (основной, все поля корректные)
+2. fetch_export.py — Export API (дополняет по ID, приоритет REST)
+3. fetch_dicts.py
+4. analyze_new.py → agg_new.json → agg.json
+
+Создал fetch_rest.py — 28365 сделок, SEMANTIC: F=14388, S=13224, P=753
+Export API временно не дозагрузился (медленный), но REST даёт 97% данных с корректными полями
+
