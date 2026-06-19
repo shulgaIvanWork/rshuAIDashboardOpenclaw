@@ -178,6 +178,15 @@ function buildFilteredData(orig, filteredWeeks) {
   out.leads_prev = prev.leads || 0;
   out.oom_leads_ytd = sumField('oom_leads');
   out.kom_leads_ytd = orig.kom_leads_ytd || sumField("kom_won_cnt");
+  out.qual_lead_ytd = sumField('mql');
+  
+  // Медианный чек — взвешенный по количеству оплат в отфильтрованных неделях
+  var totPay = sumField('oplata');
+  if (totPay > 0) {
+    ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.median_check || 0) * (w.oplata || 0); }, 0) / totPay;
+    ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.avg_dur || 0) * (w.oplata || 0); }, 0) / totPay;
+  }
+  out.ytd = ytd;
   
   // Форматы — оставляем из оригинала (не перезаписываем, т.к. в неделях нет cnt)
   
