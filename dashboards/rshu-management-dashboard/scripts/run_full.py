@@ -1,12 +1,11 @@
 """
-run_full.py — ПОЛНАЯ ПЕРЕСБОРКА (новая схема)
+run_full.py — ПОЛНАЯ ПЕРЕСБОРКА
 
 Порядок шагов:
     1. fetch_rest.py               — REST API crm.deal.list (основной)
     2. fetch_export.py             — Export API (дополняет по ID)
     3. fetch_dicts.py              — справочники
     4. analyze_new.py              — анализ -> agg_new.json
-    5. build_xlsx.py               — Excel-отчёт
 """
 import subprocess, sys, os, time, shutil
 
@@ -50,12 +49,7 @@ if os.path.exists(src):
     shutil.copy2(src, dst)
     print(f"v  agg_new.json -> agg.json (скопирован)")
 
-# --- Шаг 5: Excel ---
-run("build_xlsx.py")
-
 print("\n" + "=" * 60)
 print("ПОЛНАЯ ВЫГРУЗКА ЗАВЕРШЕНА!")
-import config
 print(f"    agg.json обновлён")
-print(f"    Excel: {config.OUTPUT_DIR}/{config.XLSX_FILE}")
 print("=" * 60)
