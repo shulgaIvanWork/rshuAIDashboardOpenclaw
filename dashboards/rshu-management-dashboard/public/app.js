@@ -5,7 +5,7 @@ function loadArtifacts(){
     var el=document.getElementById('newArtifactsBlock');
     if(!el)return;
     var s=d&&d.summary;
-    if(!s||(!s.returns.cnt&&!s.inProgressPaid.cnt&&!s.wonNoPay.cnt&&!s.negativeDuration.cnt&&!s.otherCatPaid.cnt&&!s.nextYear.cnt&&(!s.formatRule2||!s.formatRule2.cnt))){
+    if(!s||(!s.returns.cnt&&!s.inProgressPaid.cnt&&!s.wonNoPay.cnt&&!s.negativeDuration.cnt&&!s.otherCatPaid.cnt&&!s.nextYear.cnt&&(!s.formatRule2||!s.formatRule2.cnt)&&(!s.oldActive||!s.oldActive.cnt))){
       el.innerHTML='<div style="padding:8px;color:#475569;font-size:12px">Аномалий не обнаружено</div>';return;
     }
     var h='<div style="font-size:12px;background:#F1F3F6;border-radius:8px;padding:12px;margin:8px 0">';
@@ -17,6 +17,7 @@ function loadArtifacts(){
     if(s.otherCatPaid.cnt) h+='<tr><td>📂 Др.категории с оплатой</td><td style="text-align:right">'+s.otherCatPaid.cnt+' шт.</td><td style="text-align:right">'+fmt(s.otherCatPaid.sum)+' ₽</td></tr>';
     if(s.nextYear.cnt) h+='<tr><td>📅 «Следующий год»</td><td style="text-align:right">'+s.nextYear.cnt+' шт.</td><td style="text-align:right">0 ₽</td></tr>';
     if(s.formatRule2.cnt) h+='<tr><td>🏷 Формат без UF_FORMAT</td><td style="text-align:right">'+s.formatRule2.cnt+' шт.</td><td style="text-align:right;color:#FF8A65">'+fmt(s.formatRule2.sum)+' ₽</td></tr>';
+    if(s.oldActive && s.oldActive.cnt) h+='<tr><td>⏳ Старые сделки Sale в работе</td><td style="text-align:right">'+s.oldActive.cnt+' шт.</td><td style="text-align:right;color:#E65100">'+fmt(s.oldActive.sum)+' ₽</td></tr>';
     h+='</table></div>';
     el.innerHTML=h;
   }).catch(function(){});
@@ -567,15 +568,15 @@ async function renderPageMainNew(d) {
     function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev) {
       var cc = cls==='kom'?'c-kom':(cls==='oom'?'c-oom':'c-total');
       var kc = cls==='kom'?'kpi-kom':(cls==='oom'?'kpi-oom':'kpi-total');
-      var wkLabel = wkCur && wkCur.label_dates ? '<span class="kpi-dates"> \u00b7 '+wkCur.label_dates+'</span>' : '';
-      var r = '<div class="kpis"><div class="kpi-header '+cc+'">'+title+wkLabel+'</div>'
+      var weekDates = wkCur && wkCur.label_dates ? wkCur.label_dates : '';
+      var r = '<div class="kpis"><div class="kpi-header '+cc+'">'+title+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Поступления</div><div class="row"><div class="val-big">'+fmt(ytd.postupleniya)+' \u20bd</div><span class="si">('+fmt(ytd.won_relevant_cnt)+' сд.)</span></div></div>'
         + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udccb Лиды всего</div><div class="row"><div class="val-big">'+fmt(leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt)+'</div><span class="si">'+((qualLeads/leadsYtd*100).toFixed(1))+'%</span></div><div class="lbl2">квал. лиды (MQL)</div><div class="val-big '+cc+'">'+fmt(qualLeads)+'</div></div>'
         + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcc8 Конверсия всего лидов</div><div class="val-big">'+fmtPct(leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0)+'%</div><div class="lbl2">Конверсия квал. лидов (MQL)</div><div class="val-big '+cc+'">'+fmtPct(qualLeads>0?(ytd.won_relevant_cnt/qualLeads*100):0)+'%</div></div>'
         + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcb0 Средний чек</div><div class="val-big">'+fmt(ytd.avg_check)+' \u20bd</div><div class="lbl2">Медианный чек</div><div class="val-big '+cc+'">'+fmt(ytd.median_check)+' \u20bd</div></div>'
         + '<div class="kpi '+kc+'"><div class="lbl">\u0426\u0438\u043a\u043b сделки</div><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">\u041d\u0435\u0434\u0435\u043b\u044f: поступления</div><div class="row"><div class="val-big">'+fmt(cur.postupleniya)+' \u20bd</div><span class="si">'+delta(cur.postupleniya, prev.postupleniya)+'</span></div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Неделя: лиды</div><div class="row"><div class="val-big">'+fmt(leadsCur != null ? leadsCur : cur.won_relevant_cnt)+'</div><span class="si">'+(leadsPrev != null ? delta(leadsCur, leadsPrev) : (prev ? delta(cur.won_relevant_cnt, prev.won_relevant_cnt) : ''))+'</span></div><div class="lbl2">квал. лиды (MQL)</div><div class="row"><div class="val-big '+cc+'">'+fmt(mqlCur != null ? mqlCur : (wkCur ? (wkCur.mql || 0) : 0))+'</div><span class="si">'+(mqlPrev != null ? delta(mqlCur||0, mqlPrev||0) : (wkPrev ? delta(wkCur ? (wkCur.mql||0) : 0, wkPrev ? (wkPrev.mql||0) : 0) : ''))+'</span></div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Неделя'+ (weekDates ? '('+weekDates+'):' : ':') +' поступления</div><div class="row"><div class="val-big">'+fmt(cur.postupleniya)+' \u20bd</div><span class="si">'+delta(cur.postupleniya, prev.postupleniya)+'</span></div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Неделя'+ (weekDates ? '('+weekDates+'):' : ':') +' лиды</div><div class="row"><div class="val-big">'+fmt(leadsCur != null ? leadsCur : cur.won_relevant_cnt)+'</div><span class="si">'+(leadsPrev != null ? delta(leadsCur, leadsPrev) : (prev ? delta(cur.won_relevant_cnt, prev.won_relevant_cnt) : ''))+'</span></div><div class="lbl2">квал. лиды (MQL)</div><div class="row"><div class="val-big '+cc+'">'+fmt(mqlCur != null ? mqlCur : (wkCur ? (wkCur.mql || 0) : 0))+'</div><span class="si">'+(mqlPrev != null ? delta(mqlCur||0, mqlPrev||0) : (wkPrev ? delta(wkCur ? (wkCur.mql||0) : 0, wkPrev ? (wkPrev.mql||0) : 0) : ''))+'</span></div></div>'
         + '</div>';
       return r;
     }
