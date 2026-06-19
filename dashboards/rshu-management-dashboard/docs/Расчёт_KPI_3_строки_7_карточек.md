@@ -1,7 +1,7 @@
 # Расчёт KPI — 3 строки × 7 карточек
 
-**Дата:** 16.06.2026
-**Источник:** CRM Export API (Bitrix24) + REST API дозагрузка UF_* полей
+**Дата:** 19.06.2026
+**Источник:** REST API crm.deal.list (основной) + CRM Export API + OLD архив
 **Скрипт:** `scripts/analyze_new.py`
 **Фронт:** `public/index.html`
 
@@ -29,7 +29,7 @@
 
 **ООМ** = все остальные сделки из валидных категорий (0, 8, 19), которые не подходят ни под один из 5 признаков.
 
-**Важно:** Поля UF_CRM_* НЕ возвращаются Export API. Дозагружаются через REST API командой `fetch_kom_enrich.py`.
+**Важно:** REST API возвращает все UF_* поля корректно. Export API не возвращает — используется только как дополнение по ID.
 
 ### 1.2. Валидные категории
 
@@ -76,7 +76,7 @@ MIN_OPP = 11.0  # сделки 0-10 ₽ не учитываются нигде
 
 **Поступления за неделю (карточка 6):** строго по `UF_DATE_PAY_1C.isocalendar()` — неделя определяется по дате оплаты.
 
-**Источник поля:** REST API (`fetch_pay_dates.py`), Export API его не возвращает.
+**Источник поля:** REST API возвращает UF_DATE_PAY_1C напрямую. Дополнительная дозагрузка не требуется.
 
 **Формула:**
 ```python
@@ -229,7 +229,7 @@ avg_check = Math.round(postupleniya / won_relevant_cnt)
 ```
 т.к. postupleniya и won_relevant_cnt могут пересчитываться по отфильтрованным неделям.
 
-**Медиана на фронте** — берётся из agg.json (не пересчитывается).
+**Медиана на фронте** — пересчитывается из понедельных полей при фильтрации по дате.
 
 ---
 
@@ -323,42 +323,46 @@ if r["IS_OOM"]:
 | 🔴 Оплата раньше создания | UF_DATE_PAY_1C < DATE_CREATE |
 | 📂 Другие категории | UF_DATE_PAY_1C в категориях кроме 0, 8, 19 |
 | 🔍 КОМ в PreSale | IS_KOM + IS_PRESALE (не WON) |
+| ⏳ Старые сделки Sale в работе | CAT=0, SEM=P, OPP>0, год <= 2024 |
 
 ---
 
-## 4. Обновление данных
+## 4. Обновление данных (новая схема)
 
 ```bash
 cd /root/.openclaw/workspace/projects/dashboards/rshu-management-dashboard
 
-# 1. Выгрузка сделок через Export API
-python3 scripts/fetch_refresh.py
-
-# 2. Дозагрузка UF_DATE_PAY_1C (REST API)
-python3 scripts/fetch_pay_dates.py
-
-# 3. Дозагрузка UF_* полей для КОМ (REST API)
-python3 scripts/fetch_kom_enrich.py
-
-# 4. Справочники
-python3 scripts/fetch_dicts.py
-
-# 5. Анализ → agg_new.json
-python3 scripts/analyze_new.py
-
-# 6. Копирование в agg.json (сервер читает agg.json)
-cp cache/agg_new.json cache/agg.json
-
-# 7. Перезапуск
-pm2 restart clover-web
-```
-
-Или одной командой:
-```bash
+# Полный пайплайн (одной командой):
 python3 scripts/run_full.py
 ```
 
-**Важно:** `fetch_kom_enrich.py` обязателен — без него КОМ-признаки теряются (Export API их не отдаёт).
+**Пайплайн:**
+1. `fetch_rest.py` — REST API crm.deal.list (основной источник)
+   - Все поля: STAGE_SEMANTIC_ID, UF_*, UF_DATE_PAY_1C — корректные
+   - Фильтр: >=DATE_CREATE 2025-01-01, CAT IN (0,8,19)
+   - Пагинация: next-токен (без лимита offset)
+   - → cache/deals_rest.json
+2. `fetch_export.py` — CRM Export API + OLD архив (дополнение)
+   - Мерж с REST: приоритет REST для полей
+   - OLD архив даёт ~20 сделок, которых нет в REST
+   - → cache/deals_NEW.json
+3. `fetch_dicts.py` — справочники (воронки, стадии, пользователи)
+   - → cache/dicts.json
+4. `analyze_new.py` — анализ
+   - → cache/agg_new.json
+
+**Копирование и перезапуск:**
+```bash
+cp cache/agg_new.json cache/agg.json
+pm2 restart clover-web
+```
+
+**Среднее время выполнения:** ~8-12 минут (REST API ~7-8 мин, Export ~4-5 мин).
+
+**Кэши:**
+- `cache/deals_rest.json` — свежие данные из REST API (~28k сделок)
+- `cache/deals_OLD.json` — полный архив из Export API (~196k записей)
+- `cache/deals_NEW.json` — финальный результат после мержа
 
 ---
 
@@ -415,19 +419,15 @@ python3 scripts/run_full.py
 
 ---
 
-## 9. Скрипты (кратко)
+## 9. Скрипты (новая схема)
 
 | Скрипт | Назначение | Источник |
 |--------|-----------|----------|
-| `fetch_refresh.py` | Выгрузка сделок | Export API |
-| `fetch_pay_dates.py` | Дозагрузка дат оплаты | REST API batch |
-| `fetch_kom_enrich.py` | Дозагрузка UF_* для КОМ | REST API batch |
-| `fetch_dicts.py` | Справочники (категории, стадии, пользователи) | Export API + REST |
-| `fetch_companies_ext_batch.py` | Компании (адреса) | REST API |
-| `fetch_contacts_batch.py` | Контакты | REST API |
-| `fetch_leads.py` | Лиды (crm.lead) | Export API |
+| `fetch_rest.py` | **Основной: выгрузка сделок** | REST API crm.deal.list |
+| `fetch_export.py` | **Дополнительный: дозагрузка по ID** | CRM Export API + OLD |
+| `fetch_dicts.py` | Справочники (категории, стадии, пользователи) | REST API |
 | `analyze_new.py` | **Основной: агрегация всех метрик** | cache/deals_NEW.json |
-| `forecast.py` | Прогноз на месяц | agg.json |
-| `fetch_incremental.py` | Инкрементальная дозагрузка | Export API |
 | `run_full.py` | Полный пайплайн (все шаги) | — |
 | `config.py` | Настройки (MIN_OPP, YEAR, пути) | — |
+
+**(Legacy-скрипты fetch_refresh, fetch_pay_dates, fetch_kom_enrich, fetch_incremental, fetch_companies_ext_batch, fetch_contacts_batch, fetch_leads, forecast, build_xlsx — удалены 19.06.2026)**
