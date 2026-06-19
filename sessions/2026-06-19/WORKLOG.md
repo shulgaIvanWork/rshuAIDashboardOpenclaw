@@ -1,57 +1,44 @@
 # WORKLOG — 19.06.2026
 
-**Участники:** Ольга (telegram)
-**Время:** 08:18 UTC — ...
+**Участники:** Ольга
+**Время:** 08:18 — 14:20 UTC
 
 ---
 
-## 08:18 UTC — Начало сессии
-- Ольга сообщила, что после обновления данных конфликт — недельные карточки КПЭ 6 и 7 некорректны
-- Выяснил: run_full.py падает на fetch_companies_ext_batch.py (ValueError: 'None' company_id)
-- Проблема: COMPANY_ID приходит как None → str(None) = 'None' → int('None') падает
-- Вторая проблема: run_full.py не запускал fetch_pay_dates.py и fetch_kom_enrich.py — данные о КОМ и UF_DATE_PAY_1C не дозагружались
+## 08:18 — Начало: КПЭ 6 и 7 некорректны
+- run_full.py падает на fetch_companies_ext_batch.py: ValueError 'None' company_id
+- run_full.py не включает fetch_pay_dates + fetch_kom_enrich
+- Починил fetch_companies_ext_batch.py (фильтр None) и fetch_contacts_batch.py
+- Починил app.js: addEventListener на null (скрипт в head, DOM не готов)
+- Починил app.js: loadAll() вызывался до DOM → "Загрузка данных…" висела вечно
 
-## 08:44 UTC — Исправления
-- Починил fetch_companies_ext_batch.py: фильтр None/'None'/'0' значений, защита сортировки
-- Починил run_full.py: добавил fetch_pay_dates.py и fetch_kom_enrich.py в пайплайн
-
-## 08:44+ UTC — Запуск обновления
-- fetch_refresh.py ✅ 29145 сделок
-- fetch_dicts.py ✅
-- fetch_pay_dates.py ✅ — оптимизирован (фильтр кандидатов с 24k→2.5k), найдено 29 UF_DATE_PAY_1C
-- fetch_kom_enrich.py ✅ — 5011 сделок обогащено, 1722 определены КОМ
-- fetch_companies_ext_batch.py ⚠️ — починен, но не завершился (таймаут). 3188 компаний кэшировано
-- fetch_contacts_batch.py ⚠️ — такой же баг 'None' починен, не запускался (не критично)
-- fetch_leads.py ⏭️ — пропущен
-- analyze_new.py ✅ — agg_new.json создан
-- pm2 restart clover-web ✅ — сервер перезагружен
-
-## 08:44+ UTC — Ошибка addEventListener
-- `app.js` грузится в `<head>`, а refreshBtn в `<body>` — элемент ещё не создан
-- Починил: обернул в `if (refreshBtn)` проверку
-- Вторая проблема: loadAll() вызывался в `<head>` до создания DOM → contentAreaNew=null → выход без загрузки
-- Починил: обернул loadAll() в `DOMContentLoaded`
-
-## Текущие цифры (после обновления)
-- YTD: 76,747,354 ₽ (881 сд.) — было 76,609,104 ₽ (880 сд.)
-- ООМ: 59,855,969 ₽ (835 сд.) / КОМ: 14,048,133 ₽ (46 сд.) — совпадает
-- Неделя 25 (cur): 614,650 ₽ / 9 сд. — поступления
-- Неделя 24 (prev): 1,480,050 ₽ / 13 сд.
-- Карточка 7: лиды 8/9, MQL 8/9 (все КОМ)
-
-## Что починил
-1. **fetch_companies_ext_batch.py** — фильтр None/'None'/'0' строк в COMPANY_ID
-2. **fetch_contacts_batch.py** — то же самое для CONTACT_ID
-3. **run_full.py** — добавлены fetch_pay_dates.py и fetch_kom_enrich.py в пайплайн
-4. **fetch_pay_dates.py** — оптимизирован: вместо проверки всех 24k сделок без даты, фильтрует только кандидатов (≥11₽, кат 0/8/19, не WON-копии)
-
-## 12:00+ UTC — Новая схема выгрузки (REST + Export)
+## 12:00 — Новая схема: REST + Export
 Утверждена Ольгой:
-1. fetch_rest.py — REST API crm.deal.list (основной, все поля корректные)
-2. fetch_export.py — Export API (дополняет по ID, приоритет REST)
-3. fetch_dicts.py
-4. analyze_new.py → agg_new.json → agg.json
+1. **fetch_rest.py** — REST API crm.deal.list (основной, next-токен, все поля)
+2. **fetch_export.py** — Export API + OLD архив (дополняет по ID)
+3. fetch_dicts.py → analyze_new.py → agg.json
 
-Создал fetch_rest.py — 28365 сделок, SEMANTIC: F=14388, S=13224, P=753
-Export API временно не дозагрузился (медленный), но REST даёт 97% данных с корректными полями
+Результат: 28365 сделок, SEMANTIC: F=14388, S=13224, P=753
+Export + OLD: +20 сделок к REST
 
+## 13:56 — Пересчёт при фильтрации по дате
+- kom_leads_ytd был статичным (orig) → пересчитывается из weeks
+- median_check и avg_close_days_won для ООМ/КОМ не пересчитывались → починил
+
+## 14:15 — Чистка скриптов
+Удалены 9 legacy файлов:
+- fetch_refresh, fetch_pay_dates, fetch_kom_enrich, fetch_incremental
+- fetch_companies_ext_batch, fetch_contacts_batch, fetch_leads
+- fetch_forecast, build_xlsx
+
+Осталось 6: config, fetch_rest, fetch_export, fetch_dicts, analyze_new, run_full
+
+## Итоговый пайплайн
+run_full.py → fetch_rest → fetch_export → fetch_dicts → analyze_new → agg.json
+
+## Итоговые цифры на дашборде (REST)
+- YTD: 75,460,232 ₽ / 889 сд.
+- ООМ: 62,722,099 ₽ / 845 сд.
+- КОМ: 12,738,133 ₽ / 44 сд.
+- Неделя 25: поступления 1,768,278 ₽, лиды 153 (ООМ 137 + КОМ 16)
+- Сделка #240316 (2024, в работе, 42,500₽) — добавлена в артефакты

@@ -74,6 +74,8 @@ all_ids = sorted(numeric_ids, key=int)
 **Также важно:**
 - `run_full.py` ДОЛЖЕН включать `fetch_pay_dates.py` и `fetch_kom_enrich.py` — без них данные КОМ и UF_DATE_PAY_1C не дозагружаются
 - `fetch_pay_dates.py` оптимизирован: фильтрует кандидатов (OPP≥11, кат 0/8/19, не WON-копии) вместо всех 24k сделок без даты
+- `run_full.py` включает fetch_rest, fetch_export, fetch_dicts, analyze_new (без enrich-скриптов)
+- Export API медленный и нестабильный — основной источник REST API crm.deal.list
 
 ## 🚫 Правило: не додумывать, только прямые указания
 
