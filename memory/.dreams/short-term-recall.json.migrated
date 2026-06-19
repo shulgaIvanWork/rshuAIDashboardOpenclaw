@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-11T01:52:57.508Z",
+  "updatedAt": "2026-06-17T07:07:28.368Z",
   "entries": {
     "memory:memory/2026-05-22.md:1:5": {
       "key": "memory:memory/2026-05-22.md:1:5",
@@ -278,20 +278,21 @@
       "endLine": 5,
       "source": "memory",
       "snippet": "## 2026-05-29 ### Cron: process-inbox (17:16 UTC) - Проверен inbox — необработанных задач нет.",
-      "recallCount": 6,
+      "recallCount": 7,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 4.226931807981691,
+      "totalScore": 5.226931807981691,
       "maxScore": 1,
       "firstRecalledAt": "2026-05-30T00:16:27.542Z",
-      "lastRecalledAt": "2026-06-10T00:34:30.010Z",
+      "lastRecalledAt": "2026-06-13T15:13:33.911Z",
       "queryHashes": [
         "e5b4af8b51a1",
         "0e3ea201b8aa",
         "1d91b3c41916",
         "f52205d2635b",
         "5e72b863e33a",
-        "0bbf58d78029"
+        "0bbf58d78029",
+        "fe27cba9bd4a"
       ],
       "recallDays": [
         "2026-05-30",
@@ -299,7 +300,8 @@
         "2026-06-02",
         "2026-06-04",
         "2026-06-07",
-        "2026-06-10"
+        "2026-06-10",
+        "2026-06-13"
       ],
       "conceptTags": [
         "process-inbox",
@@ -533,25 +535,28 @@
       "endLine": 38,
       "source": "memory",
       "snippet": "# 2026-06-06 ## Cron: Process Inbox (04:55 UTC) - Проверен inbox: `olga-test-dashboard.json` уже processed (true) - Других *.json задач нет - Ничего не обрабатывалось # 2026-06-06 ## Cron: Process Inbox (04:55 UTC) - Проверен inbox: `olga-test-dashboard.json` уже processed (true) - Других *.json задач нет - Ничего не обрабатывалось ## Основная сессия: работа с Ольгой над управленческим дашбордом (10:00-15:00 UTC) ### 🆕 CRM Export API - Новый эндпоинт от ИТ: `https://24.uprav.ru/web_services/crm/export.php` - Secret key: `14b0fc053c141e47a5974b3859f5753f` - Методы: getDeals, getFormats, getDirections, getUserFieldsCrm - Особенности: безопасный SELECT (без `*` и `UF_*`), пагинация offset",
-      "recallCount": 6,
+      "recallCount": 8,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 6,
+      "totalScore": 8,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T07:27:07.520Z",
-      "lastRecalledAt": "2026-06-11T01:52:57.508Z",
+      "lastRecalledAt": "2026-06-15T07:22:12.388Z",
       "queryHashes": [
         "59b0b3035eda",
         "0ef51afb9a09",
         "a876a47e71f3",
         "e59235a58bb7",
         "868ed6c04932",
-        "6cba842c75f2"
+        "6cba842c75f2",
+        "db1418049833",
+        "d291fc3877b0"
       ],
       "recallDays": [
         "2026-06-08",
         "2026-06-10",
-        "2026-06-11"
+        "2026-06-11",
+        "2026-06-15"
       ],
       "conceptTags": [
         "olga-test-dashboard.json",
@@ -571,13 +576,13 @@
       "endLine": 73,
       "source": "memory",
       "snippet": "- Главная страница Клевера: http://94.183.233.92:3000/ ### 📋 Дашборды на порту 3000 1. **Управленческий** — `/drop-dashboard/` 2. **Тестовый** (прогноз) — `/test-dashboard/` 3. **RSHU** — `/rshu-dashboard/` 4. **КОМ** — `/kom-dashboard/` 5. **Сквозная аналитика** — http://94.183.233.92:3004/ (отдельный порт, с auth) ### 📝 Инструкция к управленческому дашборду Файл: `projects/drop-dashboard/ИНСТРУКЦИЯ_управленческий_дашборд.md` Содержит утверждённую логику по 14 блокам (1-11 утверждены, 12-15 по старой логике) ### 🔑 Новая бизнес-логика (утверждено с Ольгой) **Поступления (правило):** - Только `UF_DATE_PAY_1C` (дата оплаты из 1С) + WON + сумма > 0 - Возвраты: UF_DATE_PAY_1C + LOSE + >0",
-      "recallCount": 7,
+      "recallCount": 8,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 7,
+      "totalScore": 8,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T07:27:07.520Z",
-      "lastRecalledAt": "2026-06-09T15:00:21.518Z",
+      "lastRecalledAt": "2026-06-15T06:31:52.698Z",
       "queryHashes": [
         "59b0b3035eda",
         "0ef51afb9a09",
@@ -585,11 +590,13 @@
         "e59235a58bb7",
         "99e6a7fe90ad",
         "fbb97184b3f8",
-        "8faa5d6875a4"
+        "8faa5d6875a4",
+        "db1418049833"
       ],
       "recallDays": [
         "2026-06-08",
-        "2026-06-09"
+        "2026-06-09",
+        "2026-06-15"
       ],
       "conceptTags": [
         "94.183.233.92",
@@ -609,20 +616,22 @@
       "endLine": 51,
       "source": "memory",
       "snippet": "- ID 26192: Татьяна Фролова - ID 27015: Сергей Иванушкин - ID 27158: Андрей Ермолов - ID 27163: Денис Дубаневич - ID 20588: Гарри Лучин - ID 26161: Ольга Пайтерова - ID 26343: Александр Замулко - ID 515: Дарья Рукина ### Проблемы REST API (из TZ_FOR_IT.md) 1. UF_FORMAT — только ID, текстовые названия не получить (инфоблок 149) 2. Поле КОМ — не найдено в REST API 3. UF_CRM_1744273716729 (Направление обучения) — пусто у 70% 4. Фильтрация по UF* — работает только на новом вебхуке 516 ### Созданные/обновлённые файлы - `projects/test-dashboard/DASHBOARD_INSTRUCTION.md` — полная документация дашборда - `projects/test-dashboard/data/export_analysis.json` — анализ по месяцам - `projects/test-dashb",
-      "recallCount": 3,
+      "recallCount": 4,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 3,
+      "totalScore": 4,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T07:49:11.873Z",
-      "lastRecalledAt": "2026-06-08T11:04:02.401Z",
+      "lastRecalledAt": "2026-06-15T06:31:52.698Z",
       "queryHashes": [
         "0ef51afb9a09",
         "a876a47e71f3",
-        "e59235a58bb7"
+        "e59235a58bb7",
+        "db1418049833"
       ],
       "recallDays": [
-        "2026-06-08"
+        "2026-06-08",
+        "2026-06-15"
       ],
       "conceptTags": [
         "tz-for-it.md",
@@ -642,20 +651,24 @@
       "endLine": 123,
       "source": "memory",
       "snippet": "- Мария Кулевцова(ID=27119) — исключить (ОЗК) - Афанасьев Дмитрий(ID=21286) — запланировано для sales-дашборда **Поля CRM для дат:** - `UF_DATE_PAY_1C` — дата оплаты из 1С - `UF_CRM_1753272713011` — дата счёт отправлен - `UF_CRM_1475610135` — номер счета - `UF_CRM_1683882427069` — галочка КОМ - `UF_CRM_1498466811` — направление (enum) - `UF_CRM_1765896709800` — тип обучения (enum) ### ⚠️ Технические проблемы **Export API:** offset ≤ 5000. Для полной выгрузки нужна помесячная/понедельная разбивка. **Старый REST API:** глобальный offset, не работает с категорийными фильтрами. **Итог:** данные для 2025-2026 по 3 воронкам взяты из существующего кэша (фильтрация, без перезагрузки). ### 📁 Фай",
-      "recallCount": 3,
+      "recallCount": 5,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 3,
+      "totalScore": 5,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T07:49:11.873Z",
-      "lastRecalledAt": "2026-06-08T14:24:25.930Z",
+      "lastRecalledAt": "2026-06-17T07:07:28.368Z",
       "queryHashes": [
         "0ef51afb9a09",
         "e59235a58bb7",
-        "99e6a7fe90ad"
+        "99e6a7fe90ad",
+        "9506283a19d2",
+        "58c4c89ffb82"
       ],
       "recallDays": [
-        "2026-06-08"
+        "2026-06-08",
+        "2026-06-16",
+        "2026-06-17"
       ],
       "conceptTags": [
         "sales-дашборда",
@@ -675,24 +688,27 @@
       "endLine": 39,
       "source": "memory",
       "snippet": "- Теперь: `createdInMonth` (только созданные в месяце) + `UF_CRM_1474975772` (согл.дата оплаты) 2. **Добавлены новые дельты в `calcMonthNew()`:** - `dealCycleDelta` — дельта цикла сделки к предыдущему месяцу - `createdCntDelta` — дельта кол-ва созданных - `createdSumDelta` — дельта суммы созданных - `invCntDelta` — дельта кол-ва выставленных счетов (через local-переменную `currentInvCnt`) - `paidFromCreatedCntDelta` — дельта кол-ва оплаченных из созданных ### Ошибка признана Я сказал Ольге «средний чек 76 342 ₽ (↓25%)» — **данные неверны**. - Факт май: 80 045 ₽ (139 оплат, 11 126 250 ₽) - Факт апрель: 56 920 ₽ (328 оплат, 18 669 698 ₽) - Рост: +40.6% ### TODO на утро 03.0",
-      "recallCount": 6,
+      "recallCount": 8,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 5.802800350702142,
+      "totalScore": 7.802800350702142,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T07:49:11.873Z",
-      "lastRecalledAt": "2026-06-09T17:13:37.892Z",
+      "lastRecalledAt": "2026-06-15T06:31:52.698Z",
       "queryHashes": [
         "0ef51afb9a09",
         "a876a47e71f3",
         "e59235a58bb7",
         "8faa5d6875a4",
         "32533f70ecef",
-        "bdcfbb9f3834"
+        "bdcfbb9f3834",
+        "a87bec6d165f",
+        "db1418049833"
       ],
       "recallDays": [
         "2026-06-08",
-        "2026-06-09"
+        "2026-06-09",
+        "2026-06-15"
       ],
       "conceptTags": [
         "uf-crm-1474975772",
@@ -712,24 +728,29 @@
       "endLine": 26,
       "source": "memory",
       "snippet": "## 2026-06-02 — Вечерняя работа с Ольгой по rshu-dashboard (вкладка Май итоги) ### Контекст Ольга проверяла rshu-dashboard (вкладка «Май (итоги)», endpoint `/api/month-report?year=2026&month=5`). Нашла несколько расхождений между моими текстовыми описаниями и тем, что на дашборде. ### Найденные проблемы и исправления **HTML-правки в `/projects/rshu-dashboard/public/index.html`:** 1. ❌ **Удалён блок «Конверсия (потенциал)»** — верхний ряд KPI, 4-й блок. Ольга сказала что конверсия неверна. 2. 📄 **«Выставлено счетов» → «Выставлено счетов в периоде»** — исправлено название 3. ↔️ **Добавлены дельты** на блоки без сравнения: - Цикл сделки: `data.dealCycleDelta` (к апрелю) - Выставлено с",
-      "recallCount": 6,
+      "recallCount": 9,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 6,
+      "totalScore": 9,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T10:55:53.388Z",
-      "lastRecalledAt": "2026-06-09T17:13:37.892Z",
+      "lastRecalledAt": "2026-06-16T10:12:19.340Z",
       "queryHashes": [
         "a876a47e71f3",
         "e59235a58bb7",
         "99e6a7fe90ad",
         "8faa5d6875a4",
         "32533f70ecef",
-        "bdcfbb9f3834"
+        "bdcfbb9f3834",
+        "a87bec6d165f",
+        "db1418049833",
+        "9506283a19d2"
       ],
       "recallDays": [
         "2026-06-08",
-        "2026-06-09"
+        "2026-06-09",
+        "2026-06-15",
+        "2026-06-16"
       ],
       "conceptTags": [
         "rshu-dashboard",
@@ -820,22 +841,26 @@
       "endLine": 4,
       "source": "memory",
       "snippet": "## 2026-06-05 22:43 UTC — Cron: process-inbox Проверен inbox: `/root/.openclaw/workspace/inbox/olga-test-dashboard.json` уже обработан (processed: true). Других необработанных задач нет.",
-      "recallCount": 3,
+      "recallCount": 5,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 3,
+      "totalScore": 5,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T11:04:02.401Z",
-      "lastRecalledAt": "2026-06-11T01:52:57.508Z",
+      "lastRecalledAt": "2026-06-14T20:26:02.655Z",
       "queryHashes": [
         "e59235a58bb7",
         "0bbf58d78029",
-        "6cba842c75f2"
+        "6cba842c75f2",
+        "fe27cba9bd4a",
+        "e2cf071e8e70"
       ],
       "recallDays": [
         "2026-06-08",
         "2026-06-10",
-        "2026-06-11"
+        "2026-06-11",
+        "2026-06-13",
+        "2026-06-14"
       ],
       "conceptTags": [
         "process-inbox",
@@ -855,24 +880,28 @@
       "endLine": 33,
       "source": "memory",
       "snippet": "# 2026-06-08 — Большая сессия с Ольгой ## Контекст Ольга писала в Telegram. Работали с 11:00 до ~13:00 МСК. ## Задачи и решения ### 1. Восстановление test-dashboard - Ольга сообщила что ВСЕ дашборды перепутаны - test-dashboard был пуст (показывал прогноз на май, неактуальный) - **Сделано:** восстановил server.js (API: Метрика, Мотивация, Рейтинг продуктов, Экспорт-анализ) - **Сделано:** восстановил HTML из бекапа от 04.06 — 5 вкладок + добавил ⑥ Рейтинг продуктов - **Сделано:** добавил вкладку \"💡 Прогноз (разработка)\" на первое место — туда скопировал прогноз из drop-dashboard - По просьбе Ольги — убрал Roistat из загрузки (не трогать) ### 2. Вкладка \"Новая логика (06.06.26)\" в drop-das",
-      "recallCount": 5,
+      "recallCount": 7,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 5,
+      "totalScore": 7,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T14:24:25.930Z",
-      "lastRecalledAt": "2026-06-10T06:36:48.603Z",
+      "lastRecalledAt": "2026-06-15T07:22:12.388Z",
       "queryHashes": [
         "99e6a7fe90ad",
         "8faa5d6875a4",
         "32533f70ecef",
         "bdcfbb9f3834",
-        "868ed6c04932"
+        "868ed6c04932",
+        "9ac14b96f801",
+        "d291fc3877b0"
       ],
       "recallDays": [
         "2026-06-08",
         "2026-06-09",
-        "2026-06-10"
+        "2026-06-10",
+        "2026-06-11",
+        "2026-06-15"
       ],
       "conceptTags": [
         "test-dashboard",
@@ -892,18 +921,22 @@
       "endLine": 84,
       "source": "memory",
       "snippet": "- **Путь:** /projects/drop-dashboard/ — управленческий дашборд (старый + новая логика) - **API новая логика:** /drop-dashboard/api/data/new → agg_new.json - **API старая логика:** /drop-dashboard/api/data → agg.json - **Скрипты:** analyze_new.py, fetch_companies_ext_batch.py - **Формат дат Export API:** ДД.ММ.ГГГГ (точка, а не дефис) ## Текущее состояние на конец сессии - Главная вкладка — ✅ работает (72M₽) - Новая логика — ✅ работает (70.7M₽, все блоки) - Тестовый дашборд — ✅ 7 вкладок - Компании — ❌ не отображаются - Roistat — не трогать",
-      "recallCount": 1,
+      "recallCount": 3,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 3,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T14:24:25.930Z",
-      "lastRecalledAt": "2026-06-08T14:24:25.930Z",
+      "lastRecalledAt": "2026-06-17T07:07:28.368Z",
       "queryHashes": [
-        "99e6a7fe90ad"
+        "99e6a7fe90ad",
+        "db1418049833",
+        "58c4c89ffb82"
       ],
       "recallDays": [
-        "2026-06-08"
+        "2026-06-08",
+        "2026-06-15",
+        "2026-06-17"
       ],
       "conceptTags": [
         "projects/drop-dashboard",
@@ -923,18 +956,20 @@
       "endLine": 78,
       "source": "memory",
       "snippet": "- 💡 **ВАЖНО:** Не запускать merge.py — он портит данные. Использовать прямой фильтр из deals_all.json ### 5. Правила работы с Ольгой (обновление) - \"по шагам делай что прошу\" — не додумывать, делать только что просят - Не убирать то что не просили убрать - Не задевать основную вкладку Главная — она отдельно фиксирована - Отвечать на конкретные вопросы, не додумывать - Если Ольга говорит \"стоп\" — остановиться - Формат ответов: кратко, по делу, с результатом ### 6. Выгрузка компаний - Скрипт `fetch_companies_ext.py` работал очень медленно - Использовал параллельный batch через `fetch_companies_ext_batch.py` — выгрузил 40063 компании за ~5 мин - Проблема: company_contact.json (маппинг сделка",
-      "recallCount": 1,
+      "recallCount": 2,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 2,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T14:24:25.930Z",
-      "lastRecalledAt": "2026-06-08T14:24:25.930Z",
+      "lastRecalledAt": "2026-06-17T07:07:28.368Z",
       "queryHashes": [
-        "99e6a7fe90ad"
+        "99e6a7fe90ad",
+        "58c4c89ffb82"
       ],
       "recallDays": [
-        "2026-06-08"
+        "2026-06-08",
+        "2026-06-17"
       ],
       "conceptTags": [
         "merge.py",
@@ -954,20 +989,22 @@
       "endLine": 52,
       "source": "memory",
       "snippet": "- **Сделано:** MBA / MMBA (4 подтипа, bar + таблица) - **Сделано:** ТОП-20 продуктов - **Сделано:** Детализация по неделям - **Сделано:** Менеджеры - **Сделано:** created_by_category (созданные сделки по категориям) ### 3. Данные - **deals_2026.json:** восстановлен из deals_all.json (28125 сделок, категории 0/8/19, 2024-2026) - **agg_new.json:** пересоздан — 70.7M₽, 833 оплаченные, MBA/MMBA - **agg.json:** пересоздан — 72M₽ (немного больше, старая логика) - **companies.json:** выгружены 40063 компании - **company_contact.json:** ~131k записей - **UF_DATE_PAY_1C:** работает (833 WON+PAY) ### 4. Проблемы/ошибки - **Критично:** тестировал curl с паролем `***` вместо реального — терял кучу вре",
-      "recallCount": 2,
+      "recallCount": 3,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 2,
+      "totalScore": 3,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-08T14:24:25.930Z",
-      "lastRecalledAt": "2026-06-09T17:13:37.892Z",
+      "lastRecalledAt": "2026-06-15T06:31:52.690Z",
       "queryHashes": [
         "99e6a7fe90ad",
-        "bdcfbb9f3834"
+        "bdcfbb9f3834",
+        "a87bec6d165f"
       ],
       "recallDays": [
         "2026-06-08",
-        "2026-06-09"
+        "2026-06-09",
+        "2026-06-15"
       ],
       "conceptTags": [
         "топ-20",
@@ -1018,18 +1055,22 @@
       "endLine": 7,
       "source": "memory",
       "snippet": "## 2026-05-31 ### 12:43 UTC — Cron inbox check - Выполнен плановый process-inbox - В `/inbox/` нет необработанных `*.json` (только `_inbox.jsonl`, `_alerts.log`) - Ничего не обработано",
-      "recallCount": 1,
+      "recallCount": 3,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 3,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-10T00:34:30.010Z",
-      "lastRecalledAt": "2026-06-10T00:34:30.010Z",
+      "lastRecalledAt": "2026-06-14T20:26:02.655Z",
       "queryHashes": [
-        "0bbf58d78029"
+        "0bbf58d78029",
+        "fe27cba9bd4a",
+        "e2cf071e8e70"
       ],
       "recallDays": [
-        "2026-06-10"
+        "2026-06-10",
+        "2026-06-13",
+        "2026-06-14"
       ],
       "conceptTags": [
         "process-inbox",
@@ -1049,18 +1090,22 @@
       "endLine": 6,
       "source": "memory",
       "snippet": "## 2026-06-01 ### Cron: process-inbox (03:04 UTC) - Проверка inbox: пусто, нет *.json файлов для обработки. 2026-06-01 16:43 UTC — cron process-inbox: inbox пуст, задач нет",
-      "recallCount": 1,
+      "recallCount": 3,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 3,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-10T00:34:30.010Z",
-      "lastRecalledAt": "2026-06-10T00:34:30.010Z",
+      "lastRecalledAt": "2026-06-14T20:26:02.655Z",
       "queryHashes": [
-        "0bbf58d78029"
+        "0bbf58d78029",
+        "fe27cba9bd4a",
+        "e2cf071e8e70"
       ],
       "recallDays": [
-        "2026-06-10"
+        "2026-06-10",
+        "2026-06-13",
+        "2026-06-14"
       ],
       "conceptTags": [
         "process-inbox",
@@ -1080,18 +1125,22 @@
       "endLine": 5,
       "source": "memory",
       "snippet": "# 2026-05-30 ## Cron: process-inbox (18:13 MSK) - Inbox пуст — ни одного *.json файла (кроме _inbox.jsonl, _alerts.log). Нечего обрабатывать.",
-      "recallCount": 1,
+      "recallCount": 3,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 3,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-10T00:34:30.010Z",
-      "lastRecalledAt": "2026-06-10T00:34:30.010Z",
+      "lastRecalledAt": "2026-06-14T20:26:02.655Z",
       "queryHashes": [
-        "0bbf58d78029"
+        "0bbf58d78029",
+        "fe27cba9bd4a",
+        "e2cf071e8e70"
       ],
       "recallDays": [
-        "2026-06-10"
+        "2026-06-10",
+        "2026-06-13",
+        "2026-06-14"
       ],
       "conceptTags": [
         "process-inbox",
@@ -1111,18 +1160,23 @@
       "endLine": 38,
       "source": "memory",
       "snippet": "# SESSION.md — Журнал текущей сессии **Сессия:** 09.06.2026, вечер **Канал:** Telegram, Ольга --- ## ⏱ 17:04 — Ольга: что для тебя значит новая сессия? - Объяснил что новая сессия = чистый лист, память только в файлах - Ольга: «жуть... не стала бы нью использовать сегодня тогда» ## ⏱ 17:06 — Ольга: ты не отвечал очень долго - Признал, обещал соображать быстрее - Ольга: «если бы ты делал задачу на фоне, а мне писал - я бы успокоилась» - ✅ Запомнил: при долгих задачах писать промежуточные статусы, не молчать ## ⏱ 17:07 — Ольга: дашборд недоступен, перезапусти - ✅ PM2: запущен `clover-web` (был остановлен) - ✅ curl проверка: 302 (редирект на логин — жив) ## ⏱ 17:08 — Ольга: читай (прислал",
-      "recallCount": 1,
+      "recallCount": 4,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 4,
       "maxScore": 1,
       "firstRecalledAt": "2026-06-10T06:36:48.603Z",
-      "lastRecalledAt": "2026-06-10T06:36:48.603Z",
+      "lastRecalledAt": "2026-06-16T10:12:19.340Z",
       "queryHashes": [
-        "868ed6c04932"
+        "868ed6c04932",
+        "7f3f4286ae39",
+        "d291fc3877b0",
+        "9506283a19d2"
       ],
       "recallDays": [
-        "2026-06-10"
+        "2026-06-10",
+        "2026-06-15",
+        "2026-06-16"
       ],
       "conceptTags": [
         "session.md",
@@ -1164,6 +1218,163 @@
         "inbox",
         "utc",
         "checked"
+      ]
+    },
+    "memory:memory/2026-06-11.md:1:6": {
+      "key": "memory:memory/2026-06-11.md:1:6",
+      "path": "memory/2026-06-11.md",
+      "startLine": 1,
+      "endLine": 6,
+      "source": "memory",
+      "snippet": "## 2026-06-11 ### Cron: process-inbox (09:55 UTC) - Inbox check: единственный файл olga-test-dashboard.json уже обработан (processed: true) - Других задач в inbox нет",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-06-13T15:13:33.911Z",
+      "lastRecalledAt": "2026-06-14T20:26:02.655Z",
+      "queryHashes": [
+        "fe27cba9bd4a",
+        "e2cf071e8e70"
+      ],
+      "recallDays": [
+        "2026-06-13",
+        "2026-06-14"
+      ],
+      "conceptTags": [
+        "process-inbox",
+        "olga-test-dashboard.json",
+        "cron",
+        "process",
+        "inbox",
+        "utc",
+        "check",
+        "единственный"
+      ]
+    },
+    "memory:memory/2026-06-09.md:64:107": {
+      "key": "memory:memory/2026-06-09.md:64:107",
+      "path": "memory/2026-06-09.md",
+      "startLine": 64,
+      "endLine": 107,
+      "source": "memory",
+      "snippet": "- Добавил блок на дашборд: возвраты 2.1M, P+оплата 2.88M, WON без даты 25.5M ### Шаг 2: Ключевые выводы ✅ - Вернул блок 3.15 (сетка 2×2: год/неделя/лидеры/рекомендации) - Светофор по поступлениям, узкое место воронки ### Шаг 3: KPI — подписи недель ✅ - Добавлены под каждым рядом: «ОБЩАЯ (ООМ + КОМ) · W23 (01.06—07.06)» ### Шаг 4: KPI — карточка Лиды ✅ - Три строки: «Все лиды 4 516 / Квал. лиды (MQL) 2 984 / конв. 66.1%» - Исключены WON-копии в PreSale/КОМ - MQL = Sale (не-NEW/Аларм/Взят/Консульт, вкл. WON) + КОМ (не-WON) ### Шаг 5: KPI — Поступления ✅ - MIN_OPP = 11 ₽ - Исключены категории кроме 0|8|19 (убрали 1.8M из Отказов) - ИТОГ = ООМ + КОМ = 74 927 954 ₽ / 861 сд. ### Технические",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-06-15T06:31:52.690Z",
+      "lastRecalledAt": "2026-06-15T06:31:52.690Z",
+      "queryHashes": [
+        "a87bec6d165f"
+      ],
+      "recallDays": [
+        "2026-06-15"
+      ],
+      "conceptTags": [
+        "2.1m",
+        "2.88m",
+        "25.5m",
+        "3.15",
+        "год/неделя/лидеры/рекомендации",
+        "01.06",
+        "07.06",
+        "66.1"
+      ]
+    },
+    "memory:memory/2026-06-09.md:209:234": {
+      "key": "memory:memory/2026-06-09.md:209:234",
+      "path": "memory/2026-06-09.md",
+      "startLine": 209,
+      "endLine": 234,
+      "source": "memory",
+      "snippet": "- Стадии ДО MQL: NEW, Аларм(UC_1YW3V2), Взят(UC_STZB49), Консульт(UC_838R2R) ### Графики - Поступления по неделям: 🟩рост/🟥падение + пунктир (среднее) + линия (тренд 4 нед) + подписи - Воронка stacked: серый→голубой→синий→фиолетовый→зелёный - Конверсии линии: цвета повторяют воронку - Даты на оси X: 01.06—07.06 вместо Неделя23 - 3 круга (Форматы/B2B/WONvsLOSE) в один ряд + таблицы под каждым - Цвета: ООМ градации синего, КОМ фиолетовый, стадии зелёный/красный - WON/Выиграно, LOSE/Проиграно — переведено на русский ### Баг-фикс - Найдена и исправлена пропущенная `}` в конфиге Format chart (JS не балансировался) - Всего рестартов сервера: ~47 раз ### Финальные данные - Поступления: 74 927 9",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-06-15T06:31:56.890Z",
+      "lastRecalledAt": "2026-06-15T06:31:56.890Z",
+      "queryHashes": [
+        "7f3f4286ae39"
+      ],
+      "recallDays": [
+        "2026-06-15"
+      ],
+      "conceptTags": [
+        "uc-1yw3v2",
+        "uc-stzb49",
+        "uc-838r2r",
+        "01.06",
+        "07.06",
+        "форматы/b2b/wonvslose",
+        "зелёный/красный",
+        "won/выиграно"
+      ]
+    },
+    "memory:memory/2026-06-09.md:32:72": {
+      "key": "memory:memory/2026-06-09.md:32:72",
+      "path": "memory/2026-06-09.md",
+      "startLine": 32,
+      "endLine": 72,
+      "source": "memory",
+      "snippet": "- Топ-20 компаний — нет цикла лояльности, шкалы форматов - Менеджеры — нет исключений (Автооплаты, БОТ, Кулевцова, Афанасьев) - Недельная таблица — 8 колонок вместо 12 - Нет подписей недель под KPI, дельты на лидах - Нет артефактов (возвраты, P с оплатой, WON без даты) ## ⏱ 17:10 — Ольга: мы не двигаемся 3 дня, нужна система - ✅ Предложил систему: SESSION.md — журнал каждого шага - Правила: 1. Получил задачу → записал → ответил 2. Начал делать → пишу «начал, жди» или промежуточный результат 3. Каждую правку — запись (что, где, почему) 4. Закончил → итог 5. При завершении сессии → SESSION.md → memory/YYYY-MM-DD.md + MEMORY.md ## ⏱ 17:12 — Ольга: запиши всю переписку с 6.",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-06-15T06:31:56.890Z",
+      "lastRecalledAt": "2026-06-15T06:31:56.890Z",
+      "queryHashes": [
+        "7f3f4286ae39"
+      ],
+      "recallDays": [
+        "2026-06-15"
+      ],
+      "conceptTags": [
+        "топ-20",
+        "session.md",
+        "memory/yyyy-mm-dd.md",
+        "memory.md",
+        "топ",
+        "компаний",
+        "нет",
+        "цикла"
+      ]
+    },
+    "memory:memory/2026-06-15.md:55:67": {
+      "key": "memory:memory/2026-06-15.md:55:67",
+      "path": "memory/2026-06-15.md",
+      "startLine": 55,
+      "endLine": 67,
+      "source": "memory",
+      "snippet": "**КОМ:** 5 признаков — категория 19, галочка UF_CRM_1683882427069=Y, формат UF_FORMAT=19042498, направление UF_CRM_1498466811=1906, тип обучения UF_CRM_1765896709800=34765. ### Чего не сделано (на будущее) - ❌ Полная догрузка UF_* для КОМ (загружено 12.5k/29k, нужно догрузить остальные 16.5k) - ❌ PreSale лиды за W24 — REST API фильтры не работают, нужно разбираться - ❌ Тип обучения (3.5.3) - ❌ Шкала форматов в продуктах - ❌ Цикл лояльности компаний ### Найденные бэкапы - `projects/dashboards/drop-dashboard/cache/deals_OLD.json` — 196k сделок, 30.5k с UF_DATE_PAY_1C - `projects/dashboards/drop-dashboard/cache/deals_all.json` — 293k сделок (все категории)",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-06-17T07:07:28.368Z",
+      "lastRecalledAt": "2026-06-17T07:07:28.368Z",
+      "queryHashes": [
+        "58c4c89ffb82"
+      ],
+      "recallDays": [
+        "2026-06-17"
+      ],
+      "conceptTags": [
+        "uf-crm-1683882427069",
+        "uf-format",
+        "uf-crm-1498466811",
+        "uf-crm-1765896709800",
+        "12.5k/29k",
+        "16.5k",
+        "3.5.3",
+        "30.5k"
       ]
     }
   }
