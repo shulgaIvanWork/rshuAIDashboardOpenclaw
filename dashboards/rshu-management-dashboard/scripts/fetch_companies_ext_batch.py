@@ -28,9 +28,12 @@ cc = json.load(open(config.CC_JSON, encoding="utf-8"))
 company_ids = set()
 for d in deals:
     ccinfo = cc.get(d["ID"], {})
-    coid = str(ccinfo.get("COMPANY_ID", d.get("COMPANY_ID", "0")))
-    if coid != "0":
-        company_ids.add(coid)
+    raw = ccinfo.get("COMPANY_ID", d.get("COMPANY_ID", "0"))
+    # Пропускаем None, 'None', '0', и пустые строки
+    if raw is None or str(raw).strip() in ("", "0", "None"):
+        continue
+    coid = str(raw).strip()
+    company_ids.add(coid)
 
 print(f"Компаний: {len(company_ids)}")
 
@@ -55,7 +58,12 @@ if not need_fetch:
     sys.exit(0)
 
 result = dict(existing)
-all_ids = sorted(need_fetch, key=int)
+# Безопасная сортировка — пропускаем нечисловые ID
+numeric_ids = [x for x in need_fetch if x.isdigit()]
+non_numeric = [x for x in need_fetch if not x.isdigit()]
+if non_numeric:
+    print(f"  Пропущено нечисловых COMPANY_ID: {non_numeric}")
+all_ids = sorted(numeric_ids, key=int)
 BATCH_SIZE = 50
 total_batches = (len(all_ids) + BATCH_SIZE - 1) // BATCH_SIZE
 

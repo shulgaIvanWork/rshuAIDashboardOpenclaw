@@ -79,8 +79,30 @@ def main():
         print('✅ Все сделки уже имеют UF_DATE_PAY_1C')
         return 0
 
-    # Берём ID сделок без UF_DATE_PAY_1C
-    ids = [d['ID'] for d in missing]
+    # Фильтр: только сделки, которые потенциально могут иметь UF_DATE_PAY_1C
+    # (не нулевые, валидные категории, не WON-копии)
+    def could_have_pay(d):
+        opp = float(d.get('OPPORTUNITY', 0) or 0)
+        if opp < 11:
+            return False
+        cat = str(d.get('CATEGORY_ID', ''))
+        if cat not in ('0', '8', '19'):
+            return False
+        # WON в кат 8 или 19 — копии, у них нет даты оплаты
+        sem = d.get('STAGE_SEMANTIC_ID', '')
+        if sem == 'S' and cat in ('8', '19'):
+            return False
+        return True
+    
+    candidates = [d for d in missing if could_have_pay(d)]
+    print(f' ⏳ Из них кандидатов (не нулевые, валидные категории): {len(candidates)}')
+
+    if not candidates:
+        print('✅ Нет кандидатов для дозагрузки')
+        return 0
+    
+    # Берём ID кандидатов
+    ids = [d['ID'] for d in candidates]
     print(f'\n🚀 Запрашиваем UF_DATE_PAY_1C для {len(ids)} сделок...')
 
     pay_dates = batch_get_deals(ids)

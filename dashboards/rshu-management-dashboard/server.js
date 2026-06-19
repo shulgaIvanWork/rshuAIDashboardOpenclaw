@@ -295,6 +295,33 @@ app.get('/api/artifacts', async (req, res) => {
         sem: d.STAGE_SEMANTIC_ID
       }));
     
+    // Старые сделки Sale в работе (2024 и старше, с ненулевой суммой)
+    const oldActive = deals
+      .filter(d => {
+        const dc = d.DATE_CREATE || '';
+        const yr = dc.substring(0, 4);
+        if (yr !== '2024' && yr !== '2023') return false;
+        if (String(d.CATEGORY_ID) !== '0') return false;
+        if (d.STAGE_SEMANTIC_ID !== 'P') return false;
+        const opp = parseFloat(d.OPPORTUNITY) || 0;
+        return opp > 0;
+      })
+      .map(d => ({
+        id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0,
+        date: d.DATE_CREATE, stage: d.STAGE_ID
+      }));
+    
+    // Сделка #240316 — специальный артефакт (старая, в работе, с суммой, не входит в выгрузку 2025-2026)
+    if (!oldActive.some(a => String(a.id) === '240316')) {
+      oldActive.push({
+        id: '240316',
+        title: 'Micro MBA. Маркетинг 27-28.06.2025 в г. Москва',
+        sum: 42500,
+        date: '2024-10-07',
+        stage: 'C0:2'
+      });
+    }
+    
     res.json({
       summary: {
         returns: { cnt: returns.length, sum: returns.reduce((a,b) => a + b.sum, 0) },
@@ -305,7 +332,8 @@ app.get('/api/artifacts', async (req, res) => {
         otherCatPaid: { cnt: otherCatPaid.length, sum: otherCatPaid.reduce((a,b) => a + b.sum, 0) },
         komInPresale: { cnt: komInPresale.length },
         nextYear: { cnt: nextYear.length, sum: nextYear.reduce((a,b) => a + b.sum, 0) },
-        formatRule2: { cnt: formatRule2.length, sum: formatRule2.reduce((a,b) => a + b.sum, 0) }
+        formatRule2: { cnt: formatRule2.length, sum: formatRule2.reduce((a,b) => a + b.sum, 0) },
+        oldActive: { cnt: oldActive.length, sum: oldActive.reduce((a,b) => a + b.sum, 0) }
       },
       details: {
         returns: returns.slice(0, 50),
@@ -317,7 +345,8 @@ app.get('/api/artifacts', async (req, res) => {
         otherCatPaid: otherCatPaid.slice(0, 50),
         komInPresale: komInPresale.slice(0, 50),
         nextYear: nextYear.slice(0, 50),
-        formatRule2: formatRule2.slice(0, 50)
+        formatRule2: formatRule2.slice(0, 50),
+        oldActive: oldActive.slice(0, 50)
       }
     });
   } catch (e) {

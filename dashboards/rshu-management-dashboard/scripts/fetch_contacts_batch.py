@@ -30,9 +30,12 @@ cc = json.load(open(config.CC_JSON, encoding="utf-8"))
 contact_ids = set()
 for d in deals:
     ccinfo = cc.get(d["ID"], {})
-    cid = str(ccinfo.get("CONTACT_ID", d.get("CONTACT_ID", "0")))
-    if cid != "0":
-        contact_ids.add(cid)
+    raw = ccinfo.get("CONTACT_ID", d.get("CONTACT_ID", "0"))
+    # Пропускаем None, 'None', '0', и пустые строки
+    if raw is None or str(raw).strip() in ("", "0", "None"):
+        continue
+    cid = str(raw).strip()
+    contact_ids.add(cid)
 
 print(f"Нужно контактов: {len(contact_ids)}")
 
@@ -60,7 +63,12 @@ if not need_fetch:
     sys.exit(0)
 
 result = dict(existing)
-all_ids = sorted(need_fetch, key=int)
+# Безопасная сортировка — пропускаем нечисловые ID
+numeric_ids = [x for x in need_fetch if x.isdigit()]
+non_numeric = [x for x in need_fetch if not x.isdigit()]
+if non_numeric:
+    print(f"  Пропущено нечисловых CONTACT_ID: {non_numeric}")
+all_ids = sorted(numeric_ids, key=int)
 
 BATCH_SIZE = 50
 total_batches = (len(all_ids) + BATCH_SIZE - 1) // BATCH_SIZE
