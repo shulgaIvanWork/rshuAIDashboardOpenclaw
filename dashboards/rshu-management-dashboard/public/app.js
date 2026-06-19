@@ -571,8 +571,8 @@ async function renderPageMainNew(d) {
       var r = '<div class="kpis"><div class="kpi-header '+cc+'">'+title+wkLabel+'</div>'
         + kpi('Поступления',fmt(ytd.postupleniya)+' \u20bd',fmt(ytd.won_relevant_cnt)+' сд.',cls)
         + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udccb Лиды всего</div><div class="val-big">'+fmt(leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt)+'</div><div class="sub-right f12">конв. '+((qualLeads/leadsYtd*100).toFixed(1))+'%</div><div class="lbl2">квал. лиды (MQL)</div><div class="val-big '+cc+'">'+fmt(qualLeads)+'</div><div class="sub-right">с начала года</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcc8 Конверсия</div><div class="val-big">'+fmtPct(leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0)+'% всех лидов</div><div class="val-big '+cc+'">'+fmtPct(qualLeads>0?(ytd.won_relevant_cnt/qualLeads*100):0)+'% квал. лидов (MQL)</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcb0 Средний чек</div><div class="val-big">'+fmt(ytd.avg_check)+' \u20bd</div><div class="sub-right">средний</div><div class="val-big '+cc+'">'+fmt(ytd.median_check)+' \u20bd</div><div class="sub-right">медиана</div><div class="minmax">мин '+fmt(ytd.min_check)+' \u00b7 макс '+fmt(ytd.max_check)+'</div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcc8 Конверсия</div><div class="row"><div class="val-big">'+fmtPct(leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0)+'%</div><span class="si">всех лидов</span></div><div class="row"><div class="val-big '+cc+'">'+fmtPct(qualLeads>0?(ytd.won_relevant_cnt/qualLeads*100):0)+'%</div><span class="si">квал. лидов (MQL)</span></div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcb0 Средний чек</div><div class="row"><div class="val-big">'+fmt(ytd.avg_check)+' \u20bd</div><span class="si">средний</span></div><div class="row"><div class="val-big '+cc+'">'+fmt(ytd.median_check)+' \u20bd</div><span class="si">медиана</span></div><div class="minmax">мин '+fmt(ytd.min_check)+' \u00b7 макс '+fmt(ytd.max_check)+'</div></div>'
         + kpi('\u0426\u0438\u043a\u043b сделки',(ytd.avg_close_days_won||0).toFixed(1)+' дн.','с начала года',cls)
         + kpi('\u041d\u0435\u0434\u0435\u043b\u044f: поступления',fmt(cur.postupleniya)+' \u20bd'+delta(cur.postupleniya, prev.postupleniya),'',cls)
         + '<div class="kpi '+kc+'"><div class="lbl">Неделя: лиды</div><div class="val-big">'+fmt(leadsCur != null ? leadsCur : cur.won_relevant_cnt)+' '+(leadsPrev != null ? delta(leadsCur, leadsPrev) : (prev ? delta(cur.won_relevant_cnt, prev.won_relevant_cnt) : ''))+'</div><div class="lbl2">квал. лиды (MQL)</div><div class="val-big '+cc+'">'+fmt(mqlCur != null ? mqlCur : (wkCur ? (wkCur.mql || 0) : 0))+' '+(mqlPrev != null ? delta(mqlCur||0, mqlPrev||0) : (wkPrev ? delta(wkCur ? (wkCur.mql||0) : 0, wkPrev ? (wkPrev.mql||0) : 0) : ''))+'</div></div>'
@@ -613,7 +613,7 @@ async function renderPageMainNew(d) {
     // Поступления + Форматы
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>Поступления по неделям</h2><div class="chartbox"><canvas id="newChPos"></canvas></div></div>';
-    html += '<div class="card"><h2>Форматы</h2><div class="chartbox"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
+    html += '<div class="card"><h2>Форматы</h2><div class="chartbox-sm"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
     html += '</div>';
     // Стеки воронок — на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:16px"><h2>Воронка (созданные) <span id="stack2_total" style="font-size:13px;color:#475569;font-weight:400"></span></h2><div class="chartbox"><canvas id="newChFunnel2"></canvas></div></div>';
