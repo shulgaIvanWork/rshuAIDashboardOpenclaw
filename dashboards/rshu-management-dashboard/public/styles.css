@@ -17,14 +17,14 @@
     .kpi .lbl { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; }
     .kpi .val { font-size: 18px; font-weight: 700; margin: 4px 0 2px; color: #0F172A; }
     .kpi .sub { font-size: 12px; color: #475569; margin: 0; }
-    .kpi .val-big { font-size: 22px; font-weight: 700; margin: 4px 0 2px; }
-    .kpi .sub-right { text-align: right; font-size: 12px; color: #475569; }
+    .kpi .val-big { font-size: 22px; font-weight: 700; margin: 4px 0; }
+    .kpi .sub-right { text-align: right; font-size: 12px; color: #475569; margin: 4px 0; }
     .kpi .si { font-size: 12px; color: #475569; margin-left: 4px; font-weight: 400; }
-    .kpi .sub-sm { font-size: 11px; color: #475569; font-weight: 400; }
+    .kpi .sub-sm { font-size: 11px; color: #475569; font-weight: 400; margin: 4px 0; }
     .kpi .row { display: flex; align-items: baseline; gap: 4px; }
-    .kpi .lbl2 { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin-top: 6px; }
+    .kpi .lbl2 { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin: 4px 0; }
     .kpi .f12 { font-size: 12px; font-weight: 600; }
-    .kpi .minmax { text-align: right; font-size: 11px; color: #475569; margin-top: 2px; }
+    .kpi .minmax { text-align: right; font-size: 11px; color: #475569; margin: 4px 0; }
 
     .kpi-total { border-top-color: #1f2a44 !important; }
     .kpi-oom { border-top-color: #00bcd4 !important; }
