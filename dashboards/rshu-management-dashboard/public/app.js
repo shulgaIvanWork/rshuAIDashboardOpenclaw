@@ -188,6 +188,18 @@ function buildFilteredData(orig, filteredWeeks) {
     ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.median_check || 0) * (w.oplata || 0); }, 0) / totPay;
     ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.avg_dur || 0) * (w.oplata || 0); }, 0) / totPay;
   }
+  // ООМ: пересчёт из понедельных полей
+  var oomPay = sumField('oom_won_cnt');
+  if (oomPay > 0) {
+    oom_ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.oom_median_check || 0) * (w.oom_won_cnt || 0); }, 0) / oomPay;
+    oom_ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.oom_avg_dur || 0) * (w.oom_won_cnt || 0); }, 0) / oomPay;
+  }
+  // КОМ: пересчёт из понедельных полей
+  var komPay = sumField('kom_won_cnt');
+  if (komPay > 0) {
+    kom_ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.kom_median_check || 0) * (w.kom_won_cnt || 0); }, 0) / komPay;
+    kom_ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.kom_avg_dur || 0) * (w.kom_won_cnt || 0); }, 0) / komPay;
+  }
   out.ytd = ytd;
   
   // Форматы — оставляем из оригинала (не перезаписываем, т.к. в неделях нет cnt)
