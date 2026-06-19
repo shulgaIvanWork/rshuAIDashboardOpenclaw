@@ -11,9 +11,7 @@
     .loading-bar .fill { height: 100%; width: 0%; background: #093EB4; transition: width .5s; }
 
     .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
-    .kpi { background: #fff; border-radius: 8px; padding: 10px; border-top: 3px solid #093EB4; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    .kpi.kom { border-top-color: #7A2E2E; }
-    .kpi.oom { border-top-color: #3079D2; }
+    .kpi { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
     .kpi .lbl { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; }
     .kpi .val { font-size: 18px; font-weight: 700; margin: 4px 0 2px; color: #0F172A; }
     .kpi .sub { font-size: 12px; color: #475569; margin: 0; }
@@ -26,9 +24,9 @@
     .kpi .f12 { font-size: 12px; font-weight: 600; }
     .kpi .minmax { text-align: right; font-size: 11px; color: #475569; margin: 4px 0; }
 
-    .kpi-total { border-top-color: #1f2a44 !important; }
-    .kpi-oom { border-top-color: #00bcd4 !important; }
-    .kpi-kom { border-top-color: #9C27B0 !important; }
+    .kpi-total { background-color: rgba(31, 42, 68, 0.04) !important; }
+    .kpi-oom { background-color: rgba(0, 188, 212, 0.06) !important; }
+    .kpi-kom { background-color: rgba(156, 39, 176, 0.06) !important; }
     .c-total { color: #1f2a44 !important; }
     .c-oom { color: #00bcd4 !important; }
     .c-kom { color: #9C27B0 !important; }
