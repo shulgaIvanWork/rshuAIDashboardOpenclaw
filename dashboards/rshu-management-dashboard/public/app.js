@@ -653,8 +653,8 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Поступления по типу обучения</h2><div class="chartbox-sm"><canvas id="newChEdu"></canvas></div><div id="newEduTable" style="margin-top:8px"></div></div>';
     html += '</div>';
     // Стеки воронок — на всю ширину, друг под другом
-    html += '<div class="card" style="margin-top:16px"><h2>Воронка (созданные) <span id="stack2_total" style="font-size:13px;color:#475569;font-weight:400"></span></h2><div style="height:700px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
-    html += '<div class="card"><h2>Воронка (активные)</h2><div style="height:700px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
+    html += '<div class="card" style="margin-top:16px"><h2>Воронка (созданные) <span id="stack2_total" style="font-size:13px;color:#475569;font-weight:400"></span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
+    html += '<div class="card"><h2>Воронка (активные)</h2><div style="height:600px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
     // Конверсии
     
     // Ряд 1: B2B/B2C + Источники
