@@ -949,7 +949,14 @@ def reg_is_sql(r):
     return r["SEM"] == "P" and r["OPP"] >= MIN_OPP and not r.get("INV_DT") and not r.get("PAY_DT")
 
 def reg_is_invoice(r):
-    return r.get("INV_DT") and not r.get("PAY_DT") and r["SEM"] != "F"
+    """Есть дата счёта или оплачена без счёта (правило: дата счёта = дата оплаты)."""
+    if r["SEM"] == "F":
+        return False
+    if r.get("INV_DT"):
+        return True
+    if reg_is_paid(r):
+        return True  # без даты счёта, но оплачена — считаем счёт = дата оплаты
+    return False
 
 def reg_is_paid(r):
     return r.get("PAY_DT") and r["OPP"] >= MIN_OPP
@@ -962,7 +969,11 @@ def calc_reg_funnel(subset):
     paid_sum = 0.0
     paid_durs = []
     for r in subset:
-        if reg_is_paid(r):
+        if reg_is_lose(r):
+            lose += 1
+        elif reg_is_invoice(r):
+            inv += 1
+        elif reg_is_paid(r):
             paid += 1
             paid_sum += r["OPP"]
             pd = get_pay_date(r)
@@ -971,10 +982,6 @@ def calc_reg_funnel(subset):
                 days = (pd - dc).days
                 if days >= 0:
                     paid_durs.append(days)
-        elif reg_is_lose(r):
-            lose += 1
-        elif reg_is_invoice(r):
-            inv += 1
         elif reg_is_sql(r):
             sql += 1
         else:
@@ -983,16 +990,45 @@ def calc_reg_funnel(subset):
     sql_sum = sum(r["OPP"] for r in subset if reg_is_sql(r))
     inv_sum = sum(r["OPP"] for r in subset if reg_is_invoice(r))
     lose_sum = sum(r["OPP"] for r in subset if reg_is_lose(r))
+    total_paid = sum(1 for r in subset if reg_is_paid(r))
+    total_paid_sum = sum(r["OPP"] for r in subset if reg_is_paid(r))
+    total_paid_durs = []
+    total_inv_durs = []
+    real_inv_cnt = 0
+    real_inv_sum = 0.0
+    for r in subset:
+        # Если нет даты счёта, но есть оплата → дата счёта = дата оплаты
+        inv_eff = r.get("INV_DT") if r.get("INV_DT") else (get_pay_date(r) if reg_is_paid(r) else None)
+        if inv_eff and r["DC"] and r["SEM"] != "F":
+            dc = r["DC"].date() if hasattr(r["DC"], 'date') else r["DC"]
+            inv_dt = inv_eff.date() if hasattr(inv_eff, 'date') else inv_eff
+            days = (inv_dt - dc).days
+            if days >= 0:
+                total_inv_durs.append(days)
+        if r.get("INV_DT") and r["SEM"] != "F" and not reg_is_paid(r):
+            real_inv_cnt += 1
+            real_inv_sum += r["OPP"]
+        if reg_is_paid(r):
+            pd = get_pay_date(r)
+            if pd and r["DC"]:
+                dc = r["DC"].date() if hasattr(r["DC"], 'date') else r["DC"]
+                days = (pd - dc).days
+                if days >= 0:
+                    total_paid_durs.append(days)
     return {
         "total": total, "sql": sql, "sql_sum": round(sql_sum),
         "invoice": inv, "inv_sum": round(inv_sum),
         "paid": paid, "paid_sum": round(paid_sum),
+        "total_paid": total_paid, "total_paid_sum": round(total_paid_sum),
         "lose": lose, "lose_sum": round(lose_sum),
         "other": other,
-        "avg_check": round(paid_sum / paid) if paid else 0,
-        "avg_dur": round(sum(paid_durs) / len(paid_durs), 1) if paid_durs else 0,
-        "conv": round(paid / total * 100, 1) if total else 0,
+        "avg_check": round(total_paid_sum / total_paid) if total_paid else 0,
+        "avg_dur": round(sum(total_paid_durs) / len(total_paid_durs), 1) if total_paid_durs else 0,
+        "avg_inv_dur": round(sum(total_inv_durs) / len(total_inv_durs), 1) if total_inv_durs else 0,
+        "conv": round(total_paid / total * 100, 1) if total else 0,
         "lose_pct": round(lose / total * 100, 1) if total else 0,
+        "real_inv_cnt": real_inv_cnt, "real_inv_sum": round(real_inv_sum),
+        "inv_conv": round(inv / total * 100, 1) if total else 0,
     }
 
 # Все строки из регистрации

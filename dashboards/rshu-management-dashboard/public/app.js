@@ -5,7 +5,7 @@ function loadArtifacts(){
     var el=document.getElementById('newArtifactsBlock');
     if(!el)return;
     var s=d&&d.summary;
-    if(!s||(!s.returns.cnt&&!s.inProgressPaid.cnt&&!s.wonNoPay.cnt&&!s.negativeDuration.cnt&&!s.otherCatPaid.cnt&&!s.nextYear.cnt&&(!s.formatRule2||!s.formatRule2.cnt)&&(!s.oldActive||!s.oldActive.cnt)&&(!s.mmbaDeals||!s.mmbaDeals.cnt)&&(!s.noTypeEdu||!s.noTypeEdu.cnt))){
+    if(!s||(!s.returns.cnt&&!s.inProgressPaid.cnt&&!s.wonNoPay.cnt&&!s.negativeDuration.cnt&&!s.otherCatPaid.cnt&&!s.nextYear.cnt&&(!s.formatRule2||!s.formatRule2.cnt)&&(!s.oldActive||!s.oldActive.cnt)&&(!s.mmbaDeals||!s.mmbaDeals.cnt)&&(!s.noTypeEdu||!s.noTypeEdu.cnt)&&(!s.autopayDeals||!s.autopayDeals.cnt))){
       el.innerHTML='<div style="padding:8px;color:#475569;font-size:12px">Аномалий не обнаружено</div>';return;
     }
     var h='<div style="font-size:12px;background:#F1F3F6;border-radius:8px;padding:12px;margin:8px 0">';
@@ -20,6 +20,7 @@ function loadArtifacts(){
     if(s.oldActive && s.oldActive.cnt) h+='<tr><td>⏳ Старые сделки Sale в работе</td><td style="text-align:right">'+s.oldActive.cnt+' шт.</td><td style="text-align:right;color:#E65100">'+fmt(s.oldActive.sum)+' ₽</td></tr>';
     if(s.mmbaDeals && s.mmbaDeals.cnt) h+='<tr><td>📋 MMBA→СДО (Личная эффективность)</td><td style="text-align:right">'+s.mmbaDeals.cnt+' шт.</td><td style="text-align:right;color:#9C27B0">'+fmt(s.mmbaDeals.sum)+' ₽</td></tr>';
     if(s.noTypeEdu && s.noTypeEdu.cnt) h+='<tr><td>📝 Без типа обучения</td><td style="text-align:right">'+s.noTypeEdu.cnt+' шт.</td><td style="text-align:right;color:#00bcd4">'+fmt(s.noTypeEdu.sum)+' ₽</td></tr>';
+    if(s.autopayDeals && s.autopayDeals.cnt) h+='<tr><td>🔄 Автооплаты (без даты счёта)</td><td style="text-align:right">'+s.autopayDeals.cnt+' шт.</td><td style="text-align:right;color:#3079D2">'+fmt(s.autopayDeals.sum)+' ₽</td></tr>';
     h+='</table></div>';
     el.innerHTML=h;
   }).catch(function(){});
@@ -358,7 +359,7 @@ function renderPage(data) {
       <div class="sub" style="margin:-8px 0 14px">🟠 Входящий трафик · 🔵 Внутренняя база · первая строка — итог</div>
       <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
         <thead><tr>
-          <th class="sort" data-col="0">#</th><th class="sort" data-col="1">Тип</th><th class="sort" data-col="2">Источник</th><th class="sort" data-col="3">📥 Всего</th><th class="sort" data-col="4">✅ Оплачено</th><th class="sort" data-col="5">💰 Поступления, ₽</th><th class="sort" data-col="6">💵 Ср.чек</th><th class="sort" data-col="7">⏱ Цикл,дн</th><th class="sort" data-col="8">📊 Конв.%</th><th class="sort" data-col="9">🔄 В работе</th><th class="sort" data-col="10">❌ Отказы</th>
+          <th class="sort" data-col="0">#</th><th class="sort" data-col="1">Тип</th><th class="sort" data-col="2">Источник</th><th class="sort" data-col="3">📥 Всего</th><th class="sort" data-col="4">✅ Оплачено</th><th class="sort" data-col="5">💰 Поступления в периоде, ₽</th><th class="sort" data-col="6">💵 Ср.чек</th><th class="sort" data-col="7">⏱ Цикл,дн</th><th class="sort" data-col="8">📊 Конв.%</th><th class="sort" data-col="9">🔄 В работе</th><th class="sort" data-col="10">❌ Отказы</th>
         </tr></thead>
         <tbody>${srcTop.map((s, i) => {
           const isTotal = i === 0;
@@ -389,7 +390,7 @@ function renderPage(data) {
     <div class="card"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#475569;font-weight:400">без КОМ · по доле в поступлениях</span></h2>
       <div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div>
       <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">📥 Всего</th><th class="sort" data-col="3">✅ Оплачено</th><th class="sort" data-col="4">💰 Поступления, ₽</th><th class="sort" data-col="5">💵 Ср.чек, ₽</th><th class="sort" data-col="6">⏱ Цикл,дн</th><th class="sort" data-col="7">📊 Конв.%</th><th class="sort" data-col="8">📈 Доля</th></tr></thead>
+        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">📥 Всего</th><th class="sort" data-col="3">✅ Оплачено</th><th class="sort" data-col="4">💰 Поступления в периоде, ₽</th><th class="sort" data-col="5">💵 Ср.чек, ₽</th><th class="sort" data-col="6">⏱ Цикл,дн</th><th class="sort" data-col="7">📊 Конв.%</th><th class="sort" data-col="8">📈 Доля</th></tr></thead>
         <tbody>${(data.top_products || []).map((p, i) => {
           const isRem = (p.name || '').includes('Остальные');
           var conv = p.sql > 0 ? (p.deals / p.sql * 100) : 0;
@@ -411,7 +412,7 @@ function renderPage(data) {
     <!-- Top companies -->
     <div class="card"><h2>ТОП-20 компаний по поступлениям</h2>
       <div class="scroll-x" style="max-height:400px;overflow:auto"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📅 Последняя покупка</th></tr></thead>
+        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления в периоде, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📅 Последняя покупка</th></tr></thead>
         <tbody>${(data.top_companies || []).map((c, i) =>
           `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${c.name || '—'}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${c.last_date || '—'}</td></tr>`
         ).join('')}</tbody>
@@ -443,7 +444,7 @@ function renderPage(data) {
     <div class="card"><h2>Детализация по неделям</h2>
       <div style="max-height:520px;overflow:auto"><table class="sortable">
         <thead><tr>
-          <th class="sort" data-col="0">Неделя</th><th class="sort" data-col="1">📥 Лиды</th><th class="sort" data-col="2">🔍 MQL</th><th class="sort" data-col="3">🎯 SQL</th><th class="sort" data-col="4">📄 Счёт</th><th class="sort" data-col="5">✅ Оплачено</th><th class="sort" data-col="6">💰 Поступления, ₽</th><th class="sort" data-col="7">💵 Ср.чек, ₽</th><th class="sort" data-col="8">⏱ Цикл,дн</th><th class="sort" data-col="9">📊 Лиды→MQL</th><th class="sort" data-col="10">📊 MQL→SQL</th><th class="sort" data-col="11">📊 SQL→Счёт</th><th class="sort" data-col="12">📊 Счёт→Оплата</th>
+          <th class="sort" data-col="0">Неделя</th><th class="sort" data-col="1">📥 Лиды</th><th class="sort" data-col="2">🔍 MQL</th><th class="sort" data-col="3">🎯 SQL</th><th class="sort" data-col="4">📄 Счёт</th><th class="sort" data-col="5">✅ Оплачено</th><th class="sort" data-col="6">💰 Поступления в периоде, ₽</th><th class="sort" data-col="7">💵 Ср.чек, ₽</th><th class="sort" data-col="8">⏱ Цикл,дн</th><th class="sort" data-col="9">📊 Лиды→MQL</th><th class="sort" data-col="10">📊 MQL→SQL</th><th class="sort" data-col="11">📊 SQL→Счёт</th><th class="sort" data-col="12">📊 Счёт→Оплата</th>
         </tr></thead>
         <tbody>${(() => {
           const total = weeks.reduce((a, w) => {
@@ -702,6 +703,7 @@ async function renderPageMainNew(d) {
       +'</table>';
         // Tables section — MBA (Тип покупателя — под графиком B2B/B2C, без дублирования)
     html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
+    html += '<div class="card" style="margin-top:8px"><h2 style="font-size:15px">📥 Динамика по источнику «Регистрация» <span style="color:#C62828;font-size:11px;font-weight:400">(в разработке)</span></h2><div class="kpis" id="newRegKpis"></div></div>';
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
@@ -781,24 +783,18 @@ async function renderPageMainNew(d) {
     var mbaTotal = mbaData.reduce(function(s,m){return s+(m.sum||0);},0);
     var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' \u20bd</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' \u20bd</td><td>'+(mbaTotal>0?(m.sum/mbaTotal*100).toFixed(1):'0.0')+'%</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
     el = document.getElementById('newMbaTable'); if(el) el.innerHTML = mbaStr;
-    // Регистрации: scorecard
+    // Регистрации: KPI
     var reg = d.reg_ytd||{};
-    var convSql = reg.total > 0 ? (reg.sql/reg.total*100).toFixed(1) : '0.0';
-    var convInv = reg.total > 0 ? (reg.invoice/reg.total*100).toFixed(1) : '0.0';
-    var regStr = '<div style="font-size:13px;line-height:1.8">';
-    regStr += '<div style="margin-bottom:6px;font-size:14px;font-weight:700;color:#1f2a44">📥 Всего поступило в периоде:</div>';
-    regStr += '<div style="margin-bottom:10px;font-size:17px;font-weight:700;color:#1f2a44">'+fmt(reg.paid_sum)+' ₽ <span style="font-weight:400;font-size:13px;color:#475569">('+reg.paid+' сд.)</span></div>';
-    regStr += '<div><b>🔍 Потенциал в SQL:</b> '+fmt(reg.sql_sum)+' ₽ ('+reg.sql+' сд.)</div>';
-    regStr += '<div style="margin:2px 0 8px 22px;color:#475569;font-size:12px">Конверсия в SQL %: '+convSql+'%</div>';
-    regStr += '<div><b>📄 Счёт отправлен:</b> '+fmt(reg.inv_sum)+' ₽ ('+reg.invoice+' сд.)</div>';
-    regStr += '<div style="margin:2px 0 8px 22px;color:#475569;font-size:12px">Конверсия в счёт %: '+convInv+'%</div>';
-    regStr += '<div><b>✅ Оплачены:</b> '+fmt(reg.paid_sum)+' ₽ ('+reg.paid+' сд.)</div>';
-    regStr += '<div style="margin:2px 0 8px 22px;color:#475569;font-size:12px">Конверсия в оплату %: '+reg.conv+'%</div>';
-    regStr += '<div><b>🔴 Отказы:</b> '+fmt(reg.lose_sum)+' ₽ ('+reg.lose+' сд.)</div>';
-    regStr += '<div style="margin:2px 0 8px 22px;color:#475569;font-size:12px">Доля, % отказов: '+reg.lose_pct+'%</div>';
-    regStr += '<div style="margin-top:8px;display:flex;gap:20px"><div><span style="color:#475569;font-size:12px">💰 Средний чек:</span> <b>'+fmt(reg.avg_check)+' ₽</b></div><div><span style="color:#475569;font-size:12px">⏱ Цикл сделки:</span> <b>'+reg.avg_dur+' дн.</b></div></div>';
-    regStr += '</div>';
-    var regEl = document.getElementById('newRegTable'); if(regEl) regEl.innerHTML = regStr;
+    var regConvSql = reg.total > 0 ? (reg.sql/reg.total*100).toFixed(1) : '0.0';
+    var regConvInv = reg.total > 0 ? (reg.invoice/reg.total*100).toFixed(1) : '0.0';
+    var regKpis = '<div class="kpi"><div class="lbl">💰 Поступления в периоде</div><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><div class="sub">'+reg.total_paid+' сд.</div></div>';
+    regKpis += '<div class="kpi"><div class="lbl">🔍 Потенциал в SQL</div><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><div class="sub">'+reg.sql+' сд.</div></div>';
+    regKpis += '<div class="kpi"><div class="lbl">📄 Счёт отправлен</div><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><div class="sub">'+reg.real_inv_cnt+' сд.</div></div>';
+    regKpis += '<div class="kpi"><div class="lbl">✅ Конверсия в оплату</div><div class="val-big">'+reg.conv+'%</div><div class="sub">Конверсия в счёт: '+reg.inv_conv+'%</div></div>';
+    regKpis += '<div class="kpi"><div class="lbl">🔴 Доля отказов</div><div class="val-big">'+reg.lose_pct+'%</div><div class="sub">'+reg.lose+' из '+reg.total+' сд.</div></div>';
+    regKpis += '<div class="kpi"><div class="lbl">💰 Средний чек</div><div class="val-big">'+fmt(reg.avg_check)+' ₽</div><div class="sub">&nbsp;</div></div>';
+    regKpis += '<div class="kpi"><div class="lbl">⏱ Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.</div><div class="sub">Цикл в счет: '+reg.avg_inv_dur+' дн.</div></div>';
+    var regEl = document.getElementById('newRegKpis'); if(regEl) regEl.innerHTML = regKpis;
 
 
 

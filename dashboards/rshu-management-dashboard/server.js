@@ -319,6 +319,23 @@ app.get('/api/artifacts', async (req, res) => {
         cat: d.CATEGORY_ID, pay: d.UF_DATE_PAY_1C
       }));
     
+    // Сделки из регистрации, оплаченные без даты счёта (правило: дата счёта = дате оплаты)
+    const autopayDeals = deals
+      .filter(d => {
+        if (String(d.UF_CRM_1765896709800 || '') === '34765') return false; // КОМ — не автооплата
+        if (!d.UF_DATE_PAY_1C) return false;
+        if (String(d.UF_CRM_1753272713011 || '')) return false; // есть дата счёта
+        if (String(d.SOURCE_ID || '') !== '79641902890') return false; // только регистрации
+        const opp = parseFloat(d.OPPORTUNITY) || 0;
+        if (opp < 11) return false;
+        if (!['0','8','19'].includes(String(d.CATEGORY_ID))) return false;
+        return true;
+      })
+      .map(d => ({
+        id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0,
+        pay: d.UF_DATE_PAY_1C
+      }));
+    
     // Сделки без типа обучения (UF_CRM_1765896709800 пустое)
     const noTypeEdu = deals
       .filter(d => {
@@ -361,7 +378,8 @@ app.get('/api/artifacts', async (req, res) => {
         formatRule2: { cnt: formatRule2.length, sum: formatRule2.reduce((a,b) => a + b.sum, 0) },
         oldActive: { cnt: oldActive.length, sum: oldActive.reduce((a,b) => a + b.sum, 0) },
         mmbaDeals: { cnt: mmbaDeals.length, sum: mmbaDeals.reduce((a,b) => a + b.sum, 0) },
-        noTypeEdu: { cnt: noTypeEdu.length, sum: noTypeEdu.reduce((a,b) => a + b.sum, 0) }
+        noTypeEdu: { cnt: noTypeEdu.length, sum: noTypeEdu.reduce((a,b) => a + b.sum, 0) },
+        autopayDeals: { cnt: autopayDeals.length, sum: autopayDeals.reduce((a,b) => a + b.sum, 0) }
       },
       details: {
         returns: returns.slice(0, 50),
@@ -376,7 +394,8 @@ app.get('/api/artifacts', async (req, res) => {
         formatRule2: formatRule2.slice(0, 50),
         oldActive: oldActive.slice(0, 50),
         mmbaDeals: mmbaDeals.slice(0, 50),
-        noTypeEdu: noTypeEdu.slice(0, 50)
+        noTypeEdu: noTypeEdu.slice(0, 50),
+        autopayDeals: autopayDeals.slice(0, 50)
       }
     });
   } catch (e) {
