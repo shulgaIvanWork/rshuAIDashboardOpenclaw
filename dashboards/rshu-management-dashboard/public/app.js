@@ -699,7 +699,7 @@ async function renderPageMainNew(d) {
       +'<tr><td></td><td><span class="dot" style="background:#00bcd4"></span> Маркетинговые сделки</td><td>'+srcMktCur.cnt+'</td><td>'+fmt(srcMktCur.sum)+'</td><td>'+fmt(avgMktCur)+'</td><td>'+(srcMktCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
       +'</table>';
         // Tables section — MBA (Тип покупателя — под графиком B2B/B2C, без дублирования)
-    html += '<div class="card" style="margin-top:8px"><h3>MBA</h3><div id="newMbaTable"></div></div>';
+    html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
@@ -774,7 +774,8 @@ async function renderPageMainNew(d) {
     if (el2) el2.innerHTML = fmtStr;
 
     var mbaData = d.mba_rating||[];
-    var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' \u20bd</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' \u20bd</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
+    var mbaTotal = mbaData.reduce(function(s,m){return s+(m.sum||0);},0);
+    var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' \u20bd</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' \u20bd</td><td>'+(mbaTotal>0?(m.sum/mbaTotal*100).toFixed(1):'0.0')+'%</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
     el = document.getElementById('newMbaTable'); if(el) el.innerHTML = mbaStr;
 
 

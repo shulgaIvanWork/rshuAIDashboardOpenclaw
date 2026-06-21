@@ -1079,13 +1079,13 @@ def detect_mba_type(title):
         return 'MBA. Эксперт'
     # Mini MBA со специализацией: "Mini MBA: Направление" (с двоеточием)
     if 'mini mba:' in t or 'мини mba:' in t:
-        return 'Mini MBA. Специализация'
-    # Mini MBA. Классический (явно указан)
+        return 'Mini MBA: Специализация'
+    # Mini MBA: Классический (явно указан)
     if 'mini mba. классический' in t or 'классический' in t or 'classic' in t:
-        return 'Mini MBA. Классический'
+        return 'Mini MBA: Классический'
     # Mini MBA без указания классический (просто "Mini MBA ...")
     if 'mini mba' in t or 'мини mba' in t or 'mmba' in t or 'ммва' in t:
-        return 'Mini MBA. Классический'
+        return 'Mini MBA: Классический'
     if 'mba' in t:
         return 'MBA. Лидер'
     return None
