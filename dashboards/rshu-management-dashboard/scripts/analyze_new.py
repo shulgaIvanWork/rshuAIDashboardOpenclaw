@@ -1072,15 +1072,17 @@ MBA_DIRECTION_IDS = {'1917', '35288'}
 def detect_mba_type(title):
     t = (title or '').lower()
     if 'micro' in t or 'микро' in t:
-        return 'Микро (Micro MBA)'
+        return 'Micro MBA'
+    if 'лидер' in t or 'leader' in t:
+        return 'MBA. Лидер'
     if 'эксперт' in t or 'expert' in t:
-        return 'MBA.Эксперт'
+        return 'MBA. Эксперт'
     if 'специализация' in t or 'specialization' in t:
-        return 'MMBA.Специализация'
-    if 'mini' in t or 'классический' in t or 'classic' in t:
-        return 'Mini MBA.Классический'
-    if 'mba' in t or 'mmba' in t:
-        return 'MBA / MMBA'
+        return 'Mini MBA. Специализация'
+    if 'mini' in t or 'классический' in t or 'classic' in t or 'mmba' in t or 'ммва' in t:
+        return 'Mini MBA. Классический'
+    if 'mba' in t:
+        return 'MBA. Лидер'
     return None
 
 def has_mba_in_title(title):
@@ -1099,7 +1101,7 @@ for r in rows:
         if not is_mba and has_mba_in_title(r['TITLE']):
             is_mba = True
         if is_mba:
-            mba_type = detect_mba_type(r['TITLE']) or 'MBA / MMBA'
+            mba_type = detect_mba_type(r['TITLE']) or 'MBA. Лидер'
             mba_rating[mba_type]['cnt'] += 1
             mba_rating[mba_type]['sum'] += r['OPP']
             mba_rating[mba_type]['deals'] += 1
