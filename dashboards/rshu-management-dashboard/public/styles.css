@@ -27,9 +27,11 @@
     .kpi-total { background-color: rgba(31, 42, 68, 0.08) !important; }
     .kpi-oom { background-color: rgba(0, 188, 212, 0.12) !important; }
     .kpi-kom { background-color: rgba(156, 39, 176, 0.12) !important; }
+    .kpi-reg { background-color: rgba(76, 175, 80, 0.12) !important; }
     .c-total { color: #1f2a44 !important; }
     .c-oom { color: #00bcd4 !important; }
     .c-kom { color: #9C27B0 !important; }
+    .c-reg { color: #4CAF50 !important; }
 
     .kpi-header { grid-column: 1 / -1; font-size: 15px; font-weight: 700; margin: 4px 0; }
     .kpi-dates { font-size: 12px; color: #475569; font-weight: 400; }
