@@ -356,7 +356,8 @@ app.get('/api/artifacts', async (req, res) => {
         nextYear: nextYear.slice(0, 50),
         formatRule2: formatRule2.slice(0, 50),
         oldActive: oldActive.slice(0, 50),
-        mmbaDeals: mmbaDeals.slice(0, 50)
+        mmbaDeals: mmbaDeals.slice(0, 50),
+        noTypeEdu: noTypeEdu.slice(0, 50)
       }
     });
   } catch (e) {
