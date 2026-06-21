@@ -233,6 +233,7 @@ for x in deals_raw:
         "IS_OOM":    not is_kom,
         "IS_PRESALE": cat == PRE_SALE_CAT,
         "EDU_TYPE":   str(x.get("UF_CRM_1765896709800", "") or ""),
+        "INV_DT":     parse_dt(x.get("UF_CRM_1753272713011")),
         "IS_INTERNAL_SRC": is_internal_source(x.get("SOURCE_ID", "")),
         "UF_DATE_PAY_1C": x.get("UF_DATE_PAY_1C", ""),
         "UF_CRM_1753272713011": x.get("UF_CRM_1753272713011", ""),  # Дата Счет отправлен
@@ -941,6 +942,66 @@ edu_ytd  = edusplit([r for r in rows if pay_ytd(r)], "YTD")
 edu_prev = edusplit(ws_prev_pay, f"W{prev_w}")
 edu_cur  = edusplit(ws_cur_pay,  f"W{cur_w}")
 
+# === Воронка Регистрации ===
+REG_SRC_ID = '79641902890'
+
+def reg_is_sql(r):
+    return r["SEM"] == "P" and r["OPP"] >= MIN_OPP and not r.get("INV_DT") and not r.get("PAY_DT")
+
+def reg_is_invoice(r):
+    return r.get("INV_DT") and not r.get("PAY_DT") and r["SEM"] != "F"
+
+def reg_is_paid(r):
+    return r.get("PAY_DT") and r["OPP"] >= MIN_OPP
+
+def reg_is_lose(r):
+    return r["SEM"] == "F"
+
+def calc_reg_funnel(subset):
+    sql = inv = paid = lose = other = 0
+    paid_sum = 0.0
+    paid_durs = []
+    for r in subset:
+        if reg_is_paid(r):
+            paid += 1
+            paid_sum += r["OPP"]
+            pd = get_pay_date(r)
+            if pd and r["DC"]:
+                dc = r["DC"].date() if hasattr(r["DC"], 'date') else r["DC"]
+                days = (pd - dc).days
+                if days >= 0:
+                    paid_durs.append(days)
+        elif reg_is_lose(r):
+            lose += 1
+        elif reg_is_invoice(r):
+            inv += 1
+        elif reg_is_sql(r):
+            sql += 1
+        else:
+            other += 1
+    total = len(subset)
+    sql_sum = sum(r["OPP"] for r in subset if reg_is_sql(r))
+    inv_sum = sum(r["OPP"] for r in subset if reg_is_invoice(r))
+    lose_sum = sum(r["OPP"] for r in subset if reg_is_lose(r))
+    return {
+        "total": total, "sql": sql, "sql_sum": round(sql_sum),
+        "invoice": inv, "inv_sum": round(inv_sum),
+        "paid": paid, "paid_sum": round(paid_sum),
+        "lose": lose, "lose_sum": round(lose_sum),
+        "other": other,
+        "avg_check": round(paid_sum / paid) if paid else 0,
+        "avg_dur": round(sum(paid_durs) / len(paid_durs), 1) if paid_durs else 0,
+        "conv": round(paid / total * 100, 1) if total else 0,
+        "lose_pct": round(lose / total * 100, 1) if total else 0,
+    }
+
+# Все строки из регистрации
+reg_rows = [r for r in rows if str(r.get("SRC_ID", "")) == REG_SRC_ID and r["CAT_ID"] in VALID_CATS]
+# YTD: созданные в этом году
+reg_ytd  = calc_reg_funnel([r for r in reg_rows if r["DC"] and r["DC"].year == YEAR])
+# Всего (независимо от года создания)
+reg_all  = calc_reg_funnel(reg_rows)
+
 # === ТОП продуктов (80% выручки) ===
 prod_data = defaultdict(lambda: {
     "sql": 0, "deals": 0, "sum": 0.0, "durs": [],
@@ -1264,6 +1325,7 @@ out = {
     "btype_ytd":   btype_ytd,  "btype_prev": btype_prev,  "btype_cur": btype_cur,
     "fmt_ytd":     fmt_ytd,    "fmt_prev":   fmt_prev,
     "edu_ytd":     edu_ytd,    "edu_prev":   edu_prev,    "edu_cur": edu_cur,
+    "reg_ytd":     reg_ytd,    "reg_all":    reg_all,
     "top_products": top_products,
     "top_companies": top_companies,
     "mgr_top":      mgr_top,   "mgr_prev_top": mgr_prev_top,

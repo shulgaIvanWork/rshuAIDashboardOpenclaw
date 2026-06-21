@@ -781,6 +781,24 @@ async function renderPageMainNew(d) {
     var mbaTotal = mbaData.reduce(function(s,m){return s+(m.sum||0);},0);
     var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' \u20bd</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' \u20bd</td><td>'+(mbaTotal>0?(m.sum/mbaTotal*100).toFixed(1):'0.0')+'%</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
     el = document.getElementById('newMbaTable'); if(el) el.innerHTML = mbaStr;
+    // Регистрации: scorecard
+    var reg = d.reg_ytd||{};
+    var convSql = reg.total > 0 ? (reg.sql/reg.total*100).toFixed(1) : '0.0';
+    var convInv = reg.total > 0 ? (reg.invoice/reg.total*100).toFixed(1) : '0.0';
+    var regStr = '<div style="font-size:13px;line-height:1.8">';
+    regStr += '<div style="margin-bottom:6px;font-size:14px;font-weight:700;color:#1f2a44">📥 Всего поступило в периоде:</div>';
+    regStr += '<div style="margin-bottom:10px;font-size:17px;font-weight:700;color:#1f2a44">'+fmt(reg.paid_sum)+' ₽ <span style="font-weight:400;font-size:13px;color:#475569">('+reg.paid+' сд.)</span></div>';
+    regStr += '<div><b>🔍 Потенциал в SQL:</b> '+fmt(reg.sql_sum)+' ₽ ('+reg.sql+' сд.)</div>';
+    regStr += '<div style="margin:2px 0 8px 22px;color:#475569;font-size:12px">Конверсия в SQL %: '+convSql+'%</div>';
+    regStr += '<div><b>📄 Счёт отправлен:</b> '+fmt(reg.inv_sum)+' ₽ ('+reg.invoice+' сд.)</div>';
+    regStr += '<div style="margin:2px 0 8px 22px;color:#475569;font-size:12px">Конверсия в счёт %: '+convInv+'%</div>';
+    regStr += '<div><b>✅ Оплачены:</b> '+fmt(reg.paid_sum)+' ₽ ('+reg.paid+' сд.)</div>';
+    regStr += '<div style="margin:2px 0 8px 22px;color:#475569;font-size:12px">Конверсия в оплату %: '+reg.conv+'%</div>';
+    regStr += '<div><b>🔴 Отказы:</b> '+fmt(reg.lose_sum)+' ₽ ('+reg.lose+' сд.)</div>';
+    regStr += '<div style="margin:2px 0 8px 22px;color:#475569;font-size:12px">Доля, % отказов: '+reg.lose_pct+'%</div>';
+    regStr += '<div style="margin-top:8px;display:flex;gap:20px"><div><span style="color:#475569;font-size:12px">💰 Средний чек:</span> <b>'+fmt(reg.avg_check)+' ₽</b></div><div><span style="color:#475569;font-size:12px">⏱ Цикл сделки:</span> <b>'+reg.avg_dur+' дн.</b></div></div>';
+    regStr += '</div>';
+    var regEl = document.getElementById('newRegTable'); if(regEl) regEl.innerHTML = regStr;
 
 
 
