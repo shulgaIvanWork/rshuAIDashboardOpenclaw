@@ -297,7 +297,7 @@ function renderPage(data) {
       </div>
 
       <!-- ========== Ряд 2: ООМ ========== -->
-      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#00bcd4">ООМ (Открытое обучение)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
+      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#00bcd4">Открытое обучение (очное, онлайн и видеокурсы)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
       <div class="kpis">
         <div class="kpi oom"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(oom_ytd.postupleniya)} ₽</div><div class="sub">${oom_ytd.won_relevant_cnt} сделок</div></div>
         <div class="kpi oom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.oom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.oom_qual_lead_ytd)}</b> · конв. ${data.oom_qual_lead_ytd && data.oom_leads_ytd ? (data.oom_qual_lead_ytd/data.oom_leads_ytd*100).toFixed(1) : 0}%</div></div>
@@ -309,7 +309,7 @@ function renderPage(data) {
       </div>
 
       <!-- ========== Ряд 3: КОМ ========== -->
-      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#9C27B0">КОМ (Корпоративное обучение)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
+      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#9C27B0">Корпоративное обучение (КОМ)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
       <div class="kpis">
         <div class="kpi kom"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(kom.postupleniya)} ₽</div><div class="sub">${kom.won_relevant_cnt} сделок</div></div>
         <div class="kpi kom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.kom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.kom_qual_lead_ytd)}</b></div></div>
@@ -578,8 +578,8 @@ async function renderPageNewLogic() {
       h+='</div>'; return h;
     }
     var html = rw('Общая (ООМ+КОМ)',data.ytd,data.cur);
-    html += rw('ООМ (Открытое обучение)',data.oom_ytd,data.oom_cur);
-    html += rw('КОМ (Корпоративное обучение)',data.kom_ytd,data.kom_cur,true);
+    html += rw('Открытое обучение (очное, онлайн и видеокурсы)',data.oom_ytd,data.oom_cur);
+    html += rw('Корпоративное обучение (КОМ)',data.kom_ytd,data.kom_cur,true);
     area.innerHTML = html + '<div class="twocol" style="margin-top:16px"><div class="card"><h2>Воронка по неделям</h2><div class="chartbox"><canvas id="ch_funnel_new"></canvas></div></div><div class="card"><h2>Воронка (квал. лиды)</h2><div class="chartbox"><canvas id="ch_funnel_new_qual"></canvas></div></div></div><div class="twocol" style="margin-top:16px"><div class="card"><h2>Конверсии</h2><div class="chartbox"><canvas id="ch_conv_new"></canvas></div></div><div class="card"><h2>Конверсии (квал. лиды)</h2><div class="chartbox"><canvas id="ch_conv_new_qual"></canvas></div></div></div>';
   } catch(e) { area.innerHTML = '<div class=error-state>Ошибка: '+escapeHtml(e.message)+'</div>'; }
 }
@@ -642,9 +642,9 @@ async function renderPageMainNew(d) {
 
     var html = '';
     // KPI sections
-    html += section('ИТОГ (ООМ + КОМ)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0);
-    html += section('ООМ (Открытое обучение)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev);
-    html += section('КОМ (Корпоративное обучение)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev);
+    html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0);
+    html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev);
+    html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev);
 
     // Поступления по неделям (на всю ширину)
     html += '<div class="card" style="margin-top:8px"><h2>Поступления по неделям</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
@@ -654,8 +654,7 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Поступления по типу обучения</h2><div class="chartbox-sm"><canvas id="newChEdu"></canvas></div><div id="newEduTable" style="margin-top:8px"></div></div>';
     html += '</div>';
     // Стеки воронок — на всю ширину, друг под другом
-    html += '<div class="card" style="margin-top:16px"><h2>Воронка (созданные) <span id="stack2_total" style="font-size:13px;color:#475569;font-weight:400"></span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
-    html += '<div class="card"><h2>Воронка (активные)</h2><div style="height:600px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
+    html += '<div class="card" style="margin-top:16px"><h2>Воронка по неделям <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии на той же неделе)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     // Конверсии
     
     // Ряд 1: B2B/B2C + Источники
@@ -799,6 +798,7 @@ async function renderPageMainNew(d) {
 
 
     // Недельная таблица — от последней недели к первой
+    html += '<div class="card"><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учетом переходящего остатка, без учета даты создания)</span> <span style="color:#C62828;font-size:11px;font-weight:400">(в разработке)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
     var weekStr = '<table style="font-size:11px"><tr><th>Неделя</th><th>Лиды</th><th>MQL</th><th>SQL</th><th>Счёт</th><th>Оплачено</th><th>Поступл.</th><th>Ср.чек</th><th>Цикл</th><th>Лиды\u2192MQL</th><th>MQL\u2192SQL</th><th>SQL\u2192Счёт</th><th>Счёт\u2192Оплата</th><th>Лид\u2192Оплата</th></tr>';
     var tL=0,tM=0,tS=0,tO=0,tP0=0;
     // Предварительный расчёт конверсий для всех недель
@@ -827,6 +827,7 @@ async function renderPageMainNew(d) {
     var totConv = tL > 0 ? (tO / tL * 100).toFixed(1) : '0.0';
     weekStr += '<tr style="font-weight:700;border-top:2px solid #333"><td>ИТОГО</td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td></td><td></td><td></td><td></td><td></td><td></td><td>'+totConv+'%</td></tr></table>';
     el = document.getElementById('newWeekTable'); if(el) el.innerHTML = weekStr;
+          if (document.getElementById('newChFunnel')) new Chart(document.getElementById('newChFunnel'), {type:'bar', data:{labels:labels,datasets:[{label:'Отказы неКвал',data:weeks.map(function(w){return w.stack_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4,seg:'rej_nq'},{label:'Отказы',data:weeks.map(function(w){return w.stack_rej||0;}),backgroundColor:'#E53935',borderRadius:4,seg:'rej'},{label:'Не квал',data:weeks.map(function(w){return w.stack_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4,seg:'nq'},{label:'MQL',data:weeks.map(function(w){return w.stack_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4,seg:'mql'},{label:'SQL',data:weeks.map(function(w){return w.stack_sql||0;}),backgroundColor:'#1A237E',borderRadius:4,seg:'sql'},{label:'Счёт',data:weeks.map(function(w){return w.stack_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4,seg:'inv'},{label:'Оплата',data:weeks.map(function(w){return w.stack_pay||0;}),backgroundColor:'#43A047',borderRadius:4,seg:'pay'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].forEach(function(k){tot+=weeks[i][k]||0;});return tot?tot+' сд.':'';}},tooltip:{callbacks:{label:function(ctx){var l=ctx.dataset.label||'';var v=ctx.raw||0;var w=weeks[ctx.dataIndex]||{};var s=ctx.dataset.seg||'';var sumKey=s?'stack_'+s+'_sum':'';var sumVal=sumKey?(w[sumKey]||0):0;var tot=0;['stack_rej','stack_rej_nq','stack_nq','stack_mql','stack_sql','stack_inv','stack_pay'].forEach(function(k){tot+=w[k]||0;});var pct=tot>0?(v/tot*100).toFixed(1):0;var txt=l+': '+v+' сд. ('+pct+'%)';if(s==='sql'||s==='inv'||s==='pay'){txt+=' · '+sumVal.toLocaleString('ru-RU')+' ₽';}return txt;}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}} });
 
 
 
@@ -838,7 +839,6 @@ async function renderPageMainNew(d) {
       if (window.Chart) {
         try {
           if (document.getElementById('newChFunnel2')) new Chart(document.getElementById('newChFunnel2'), {type:'bar', data:{labels:labels,datasets:[{label:'Отказы неКвал',data:weeks.map(function(w){return w.stack2_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4,seg:'rej_nq'},{label:'Отказы',data:weeks.map(function(w){return w.stack2_rej||0;}),backgroundColor:'#E53935',borderRadius:4,seg:'rej'},{label:'Не квал',data:weeks.map(function(w){return w.stack2_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4,seg:'nq'},{label:'MQL',data:weeks.map(function(w){return w.stack2_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4,seg:'mql'},{label:'SQL',data:weeks.map(function(w){return w.stack2_sql||0;}),backgroundColor:'#1A237E',borderRadius:4,seg:'sql'},{label:'Счёт',data:weeks.map(function(w){return w.stack2_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4,seg:'inv'},{label:'Оплата',data:weeks.map(function(w){return w.stack2_pay||0;}),backgroundColor:'#43A047',borderRadius:4,seg:'pay'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].forEach(function(k){tot+=weeks[i][k]||0;});return tot?tot+' сд.':'';}},tooltip:{callbacks:{label:function(ctx){var l=ctx.dataset.label||'';var v=ctx.raw||0;var w=weeks[ctx.dataIndex]||{};var s=ctx.dataset.seg||'';var sumKey=s?'stack2_'+s+'_sum':'';var sumVal=sumKey?(w[sumKey]||0):0;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].map(function(k){tot+=w[k]||0;});var pct=tot>0?(v/tot*100).toFixed(1):0;var txt=l+': '+v+' сд. ('+pct+'%)';if(s==='sql'||s==='inv'||s==='pay'){txt+=' · '+sumVal.toLocaleString('ru-RU')+' ₽';}return txt;}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}},plugins:[{id:'legendSpacer',beforeLayout(chart){var leg=chart.legend;if(leg&&!leg.__spacer30){var of=leg.fit.bind(leg);leg.fit=function(){of();this.height+=30;};leg.__spacer30=true;}}}] });
-          if (document.getElementById('newChFunnel')) new Chart(document.getElementById('newChFunnel'), {type:'bar', data:{labels:labels,datasets:[{label:'Отказы неКвал',data:weeks.map(function(w){return w.stack_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4,seg:'rej_nq'},{label:'Отказы',data:weeks.map(function(w){return w.stack_rej||0;}),backgroundColor:'#E53935',borderRadius:4,seg:'rej'},{label:'Не квал',data:weeks.map(function(w){return w.stack_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4,seg:'nq'},{label:'MQL',data:weeks.map(function(w){return w.stack_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4,seg:'mql'},{label:'SQL',data:weeks.map(function(w){return w.stack_sql||0;}),backgroundColor:'#1A237E',borderRadius:4,seg:'sql'},{label:'Счёт',data:weeks.map(function(w){return w.stack_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4,seg:'inv'},{label:'Оплата',data:weeks.map(function(w){return w.stack_pay||0;}),backgroundColor:'#43A047',borderRadius:4,seg:'pay'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].forEach(function(k){tot+=weeks[i][k]||0;});return tot?tot+' сд.':'';}},tooltip:{callbacks:{label:function(ctx){var l=ctx.dataset.label||'';var v=ctx.raw||0;var w=weeks[ctx.dataIndex]||{};var s=ctx.dataset.seg||'';var sumKey=s?'stack_'+s+'_sum':'';var sumVal=sumKey?(w[sumKey]||0):0;var tot=0;['stack_rej','stack_rej_nq','stack_nq','stack_mql','stack_sql','stack_inv','stack_pay'].forEach(function(k){tot+=w[k]||0;});var pct=tot>0?(v/tot*100).toFixed(1):0;var txt=l+': '+v+' сд. ('+pct+'%)';if(s==='sql'||s==='inv'||s==='pay'){txt+=' · '+sumVal.toLocaleString('ru-RU')+' ₽';}return txt;}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}} });
         } catch(e){}
         try {
           if (document.getElementById('newChConv')) new Chart(document.getElementById('newChConv'), {type:'line', data:{labels:labels,datasets:[{label:'Лиды\u2192MQL %',data:weeks.map(function(w){return w.conv_lead_mql||0;}),borderColor:'#B0BEC5',tension:0.3,fill:false},{label:'MQL\u2192SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL\u2192Счёт %',data:weeks.map(function(w){return w.conv_sql_invoice||0;}),borderColor:'#43A047',tension:0.3,fill:false},{label:'Счёт\u2192Оплата %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
