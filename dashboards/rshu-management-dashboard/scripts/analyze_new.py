@@ -232,6 +232,7 @@ for x in deals_raw:
         "IS_KOM":    is_kom,
         "IS_OOM":    not is_kom,
         "IS_PRESALE": cat == PRE_SALE_CAT,
+        "EDU_TYPE":   str(x.get("UF_CRM_1765896709800", "") or ""),
         "IS_INTERNAL_SRC": is_internal_source(x.get("SOURCE_ID", "")),
         "UF_DATE_PAY_1C": x.get("UF_DATE_PAY_1C", ""),
         "UF_CRM_1753272713011": x.get("UF_CRM_1753272713011", ""),  # Дата Счет отправлен
@@ -913,6 +914,33 @@ def fsplit(subset, period):
 fmt_ytd  = fsplit([r for r in rows if pay_ytd(r)], "YTD")
 fmt_prev = fsplit(ws_prev_pay, f"W{prev_w}")
 
+# === Тип обучения (UF_CRM_1765896709800) ===
+EDU_TYPE_MAP = {
+    '34699': 'Повышение квалификации',
+    '34700': 'Проф. переподготовка',
+    '34765': 'КОМ',
+}
+
+def extract_edu_type(uf_val):
+    if not uf_val:
+        return None
+    return EDU_TYPE_MAP.get(str(uf_val).strip(), None)
+
+def edusplit(subset, period):
+    g = defaultdict(lambda: {"cnt": 0, "sum": 0.0})
+    for r in subset:
+        if is_paid(r):
+            if r["IS_OOM"] or r["IS_KOM"]:
+                edu = extract_edu_type(r.get("EDU_TYPE", ""))
+                if edu:
+                    g[edu]["cnt"] += 1
+                    g[edu]["sum"] += r["OPP"]
+    return {"period": period, **{k: v for k, v in g.items()}}
+
+edu_ytd  = edusplit([r for r in rows if pay_ytd(r)], "YTD")
+edu_prev = edusplit(ws_prev_pay, f"W{prev_w}")
+edu_cur  = edusplit(ws_cur_pay,  f"W{cur_w}")
+
 # === ТОП продуктов (80% выручки) ===
 prod_data = defaultdict(lambda: {
     "sql": 0, "deals": 0, "sum": 0.0, "durs": [],
@@ -1235,6 +1263,7 @@ out = {
     "src_split_cur":  src_split_cur,
     "btype_ytd":   btype_ytd,  "btype_prev": btype_prev,  "btype_cur": btype_cur,
     "fmt_ytd":     fmt_ytd,    "fmt_prev":   fmt_prev,
+    "edu_ytd":     edu_ytd,    "edu_prev":   edu_prev,    "edu_cur": edu_cur,
     "top_products": top_products,
     "top_companies": top_companies,
     "mgr_top":      mgr_top,   "mgr_prev_top": mgr_prev_top,

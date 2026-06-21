@@ -196,6 +196,9 @@ function buildFilteredData(orig, filteredWeeks) {
     oom_ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.oom_median_check || 0) * (w.oom_won_cnt || 0); }, 0) / oomPay;
     oom_ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.oom_avg_dur || 0) * (w.oom_won_cnt || 0); }, 0) / oomPay;
   }
+  oom_ytd.lose_cnt = sumField('lost_cnt');
+  oom_ytd.won_relevant_cnt = oomPay;
+  oom_ytd.conv_deal_pct = (oomPay + oom_ytd.lose_cnt) > 0 ? (oomPay / (oomPay + oom_ytd.lose_cnt)) * 100 : 0;
   out.oom_ytd = oom_ytd;
   
   // КОМ: пересчёт из понедельных полей
@@ -204,6 +207,9 @@ function buildFilteredData(orig, filteredWeeks) {
     kom_ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.kom_median_check || 0) * (w.kom_won_cnt || 0); }, 0) / komPay;
     kom_ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.kom_avg_dur || 0) * (w.kom_won_cnt || 0); }, 0) / komPay;
   }
+  kom_ytd.lose_cnt = sumField('kom_lost_cnt');
+  kom_ytd.won_relevant_cnt = komPay;
+  kom_ytd.conv_deal_pct = (komPay + kom_ytd.lose_cnt) > 0 ? (komPay / (komPay + kom_ytd.lose_cnt)) * 100 : 0;
   out.kom_ytd = kom_ytd;
   
   // Форматы — оставляем из оригинала (не перезаписываем, т.к. в неделях нет cnt)
@@ -638,10 +644,12 @@ async function renderPageMainNew(d) {
     html += section('ООМ (Открытое обучение)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev);
     html += section('КОМ (Корпоративное обучение)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev);
 
-    // Поступления + Форматы
+    // Поступления по неделям (на всю ширину)
+    html += '<div class="card" style="margin-top:8px"><h2>Поступления по неделям</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
+    // Форматы + Тип обучения
     html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Поступления по неделям</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
     html += '<div class="card"><h2>Поступления по форматам</h2><div class="chartbox-sm"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
+    html += '<div class="card"><h2>Поступления по типу обучения</h2><div class="chartbox-sm"><canvas id="newChEdu"></canvas></div><div id="newEduTable" style="margin-top:8px"></div></div>';
     html += '</div>';
     // Стеки воронок — на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:16px"><h2>Воронка (созданные) <span id="stack2_total" style="font-size:13px;color:#475569;font-weight:400"></span></h2><div style="height:700px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
@@ -655,14 +663,7 @@ async function renderPageMainNew(d) {
     html += '</div>';
     // Средний чек по неделям (на всю ширину)
     html += '<div class="card" style="margin-top:8px"><h2>Средний чек по неделям</h2><div style="height:440px;position:relative"><canvas id="newChAvg"></canvas></div></div>';
-    // Ряд 2: Оплаты/Отказы пончик + Оплаты vs Отказы stacked
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Оплаты / Отказы</h2><div class="twocol" style="gap:12px">';
-    html += '<div><h3 style="text-align:center;font-size:14px;color:#00bcd4;margin-bottom:4px">ООМ</h3><div class="chartbox-sm"><canvas id="newChWlOom"></canvas></div><div id="newChWlOomTbl"></div></div>';
-    html += '<div><h3 style="text-align:center;font-size:14px;color:#9C27B0;margin-bottom:4px">КОМ</h3><div class="chartbox-sm"><canvas id="newChWlKom"></canvas></div><div id="newChWlKomTbl"></div></div>';
-    html += '</div></div>';
-    html += '<div class="card"><h2>Оплаты vs Отказы по неделям</h2><div class="chartbox"><canvas id="newChCnt"></canvas></div></div>';
-    html += '</div>';
+
 
     html += '<div class="twocol" style="margin-top:8px">';
 
@@ -761,11 +762,13 @@ async function renderPageMainNew(d) {
     // Now fill in table data (elements exist now)
     var fmtData = d.fmt_ytd||{};
     var fmtShort = function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};
-    var fmtStr = '<table style="font-size:11px"><tr><th>Формат</th><th>Сумма</th><th>Шт</th><th>Ср.чек</th></tr>';
+    var fmtTot = 0;
+    for(var ftk in fmtData){if(ftk!=='period')fmtTot+=fmtData[ftk].sum||0;}
+    var fmtStr = '<table style="font-size:11px"><tr><th>Формат</th><th>Сумма</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>';
     for (var fk in fmtData) {
       if (fk==='period') continue;
       var fv = fmtData[fk];
-      fmtStr += '<tr><td>'+fmtShort(escapeHtml(fk))+'</td><td>'+fmt(fv.sum)+' \u20bd</td><td>'+fv.cnt+'</td><td>'+fmt(Math.round(fv.sum/fv.cnt))+' \u20bd</td></tr>';
+      fmtStr += '<tr><td>'+fmtShort(escapeHtml(fk))+'</td><td>'+fmt(fv.sum)+' \u20bd</td><td>'+fv.cnt+'</td><td>'+fmt(Math.round(fv.sum/fv.cnt))+' \u20bd</td><td>'+(fmtTot>0?(fv.sum/fmtTot*100).toFixed(1):'0.0')+'%</td></tr>';
     }
     fmtStr += '</table>';
     var el = document.getElementById('newFmtTable');
@@ -832,6 +835,16 @@ async function renderPageMainNew(d) {
           if (document.getElementById('ch_conv_new_qual')) new Chart(document.getElementById('ch_conv_new_qual'), {type:'line', data:{labels:labels,datasets:[{label:'MQL→SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL→Сделки %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
           try {
           if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtShort=function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtShort(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#1976D2','#43A047','#FFD54F','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
+          // Тип обучения: пончик
+          var eduData = d.edu_ytd||{}; var eduFl=[], eduFv=[], eduFsn=[];
+          for(var ek in eduData){if(ek==='period')continue;eduFl.push(ek);eduFsn.push(ek);eduFv.push(eduData[ek].sum||0);}
+          var eduTot=eduFv.reduce(function(a,b){return a+b;},0);
+          if (document.getElementById('newChEdu')) new Chart(document.getElementById('newChEdu'),{type:'doughnut',data:{labels:eduFsn,datasets:[{data:eduFv,backgroundColor:['#1976D2','#43A047','#FFD54F','#9C27B0','#C62828','#7E57C2','#FF9800','#00695C','#880E4F','#1565C0','#2E7D32','#6A1B9A','#E65100','#00838F','#4E342E','#283593','#827717','#37474F','#BF360C','#33691E','#4A148C','#3E2723','#004D40','#311B92','#1A237E']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9}}},datalabels:{color:'#fff',font:{weight:'bold',size:10},formatter:function(v){var p=eduTot>0?(v/eduTot*100).toFixed(1):0;return p+'%';}}}}});
+          // Тип обучения: таблица
+          var eduStr = '<table style="font-size:11px"><tr><th>Направление</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th></tr>';
+          var edul=(eduData||{}); for(var ek in edul){if(ek==='period')continue;var ev=edul[ek]||{sum:0,cnt:0};eduStr+='<tr><td>'+ek+'</td><td>'+fmt(ev.sum)+' ₽</td><td>'+ev.cnt+'</td><td>'+(ev.cnt>0?fmt(Math.round(ev.sum/ev.cnt)):0)+' ₽</td></tr>';}
+          eduStr += '</table>';
+          var eduEl = document.getElementById('newEduTable'); if(eduEl) eduEl.innerHTML = eduStr;
           } catch(e){}
         } catch(e){}
         try {
@@ -844,24 +857,6 @@ async function renderPageMainNew(d) {
           // Источники: таблица под графиком
           var srcEl = document.getElementById('newSrcSplitTable');
           if (srcEl) srcEl.innerHTML = srcTbl;
-        } catch(e){}
-        try {
-          var wT=weeks.reduce(function(s,w){return s+(w.won_cnt||0);},0), lT=weeks.reduce(function(s,w){return s+(w.lost_cnt||0);},0);
-          var oomW=weeks.reduce(function(s,w){return s+(w.won_cnt||0);},0), oomL=weeks.reduce(function(s,w){return s+(w.lost_cnt||0);},0);
-          var komW=weeks.reduce(function(s,w){return s+(w.kom_won_cnt||0);},0), komL=weeks.reduce(function(s,w){return s+(w.kom_lost_cnt||0);},0);
-          var oomTot=oomW+oomL||1, komTot=komW+komL||1;
-          // ООМ пончик
-          if (document.getElementById('newChWlOom')) new Chart(document.getElementById('newChWlOom'),{type:'doughnut',data:{labels:['Оплаты','Отказы'],datasets:[{data:[oomW,oomL],backgroundColor:['#2E7D32','#C62828']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){return (v/oomTot*100).toFixed(1)+'%';}},tooltip:{callbacks:{label:function(ctx){return 'Оплаты: '+(ctx.dataIndex===0?oomW:oomL)+' сд.';}}}}}});
-          // КОМ пончик
-          if (document.getElementById('newChWlKom')) new Chart(document.getElementById('newChWlKom'),{type:'doughnut',data:{labels:['Оплаты','Отказы'],datasets:[{data:[komW,komL],backgroundColor:['#2E7D32','#C62828']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:9}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){return (v/komTot*100).toFixed(1)+'%';}},tooltip:{callbacks:{label:function(ctx){return 'Оплаты: '+(ctx.dataIndex===0?komW:komL)+' сд.';}}}}}});
-          // Таблицы
-          var oomTbl = '<table style="font-size:11px;width:100%;margin-top:4px"><tr><th>Статус</th><th>Шт</th><th>%</th></tr><tr><td>WON</td><td>'+oomW+'</td><td>'+(oomW/oomTot*100).toFixed(1)+'%</td></tr><tr><td>LOSE</td><td>'+oomL+'</td><td>'+(oomL/oomTot*100).toFixed(1)+'%</td></tr></table>';
-          var komTbl = '<table style="font-size:11px;width:100%;margin-top:4px"><tr><th>Статус</th><th>Шт</th><th>%</th></tr><tr><td>WON</td><td>'+komW+'</td><td>'+(komW/komTot*100).toFixed(1)+'%</td></tr><tr><td>LOSE</td><td>'+komL+'</td><td>'+(komL/komTot*100).toFixed(1)+'%</td></tr></table>';
-          var oomEl=document.getElementById('newChWlOomTbl'); if(oomEl) oomEl.innerHTML=oomTbl;
-          var komEl=document.getElementById('newChWlKomTbl'); if(komEl) komEl.innerHTML=komTbl;
-        } catch(e){}
-        try {
-          if (document.getElementById('newChCnt')) new Chart(document.getElementById('newChCnt'),{type:'bar',data:{labels:labels,datasets:[{label:'Оплаты',data:weeks.map(function(w){return (w.won_cnt||0)+(w.kom_won_cnt||0);}),backgroundColor:'#2E7D32',borderRadius:4},{label:'Отказы',data:weeks.map(function(w){return (w.lost_cnt||0)+(w.kom_lost_cnt||0);}),backgroundColor:'#C62828',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=(weeks[i].won_cnt||0)+(weeks[i].kom_won_cnt||0)+(weeks[i].lost_cnt||0)+(weeks[i].kom_lost_cnt||0);return tot?tot+' сд.':'';}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
         } catch(e){}
         try {
           if (document.getElementById('newChAvg')) {
