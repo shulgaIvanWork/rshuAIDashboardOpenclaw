@@ -703,7 +703,7 @@ async function renderPageMainNew(d) {
       +'</table>';
         // Tables section — MBA (Тип покупателя — под графиком B2B/B2C, без дублирования)
     html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
-    html += '<div class="card" style="margin-top:8px"><div class="kpis" id="newRegKpis"><div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация» <span style="color:#C62828;font-size:11px;font-weight:400">(в разработке)</span></div></div></div>';
+    html += '<div class="kpis" id="newRegKpis"></div>';
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
@@ -787,7 +787,7 @@ async function renderPageMainNew(d) {
     var reg = d.reg_ytd||{};
     var regConvSql = reg.total > 0 ? (reg.sql/reg.total*100).toFixed(1) : '0.0';
     var regConvInv = reg.total > 0 ? (reg.invoice/reg.total*100).toFixed(1) : '0.0';
-    var regKpis = '<div class="kpi kpi-reg"><div class="lbl">💰 Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.</span></div></div>';
+    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация» <span style="color:#C62828;font-size:11px;font-weight:400">(в разработке)</span></div><div class="kpi kpi-reg"><div class="lbl">💰 Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL</div><div class="row"><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><span class="si">'+reg.sql+' сд.</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен</div><div class="row"><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><span class="si">'+reg.real_inv_cnt+' сд.</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату</div><div class="val-big">'+reg.conv+'%</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+reg.inv_conv+'%</div></div>';
