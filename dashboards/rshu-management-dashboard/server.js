@@ -311,6 +311,14 @@ app.get('/api/artifacts', async (req, res) => {
         date: d.DATE_CREATE, stage: d.STAGE_ID
       }));
     
+    // Сделки с UF_FORMAT=19042495 (MMBA, требуется уточнение: Личная эффективность, формат СДО)
+    const mmbaDeals = deals
+      .filter(d => String(d.UF_FORMAT) === '19042495' && (parseFloat(d.OPPORTUNITY) || 0) > 0)
+      .map(d => ({
+        id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0,
+        cat: d.CATEGORY_ID, pay: d.UF_DATE_PAY_1C
+      }));
+    
     // Сделка #240316 — специальный артефакт (старая, в работе, с суммой, не входит в выгрузку 2025-2026)
     if (!oldActive.some(a => String(a.id) === '240316')) {
       oldActive.push({
@@ -333,7 +341,8 @@ app.get('/api/artifacts', async (req, res) => {
         komInPresale: { cnt: komInPresale.length },
         nextYear: { cnt: nextYear.length, sum: nextYear.reduce((a,b) => a + b.sum, 0) },
         formatRule2: { cnt: formatRule2.length, sum: formatRule2.reduce((a,b) => a + b.sum, 0) },
-        oldActive: { cnt: oldActive.length, sum: oldActive.reduce((a,b) => a + b.sum, 0) }
+        oldActive: { cnt: oldActive.length, sum: oldActive.reduce((a,b) => a + b.sum, 0) },
+        mmbaDeals: { cnt: mmbaDeals.length, sum: mmbaDeals.reduce((a,b) => a + b.sum, 0) }
       },
       details: {
         returns: returns.slice(0, 50),
@@ -346,7 +355,8 @@ app.get('/api/artifacts', async (req, res) => {
         komInPresale: komInPresale.slice(0, 50),
         nextYear: nextYear.slice(0, 50),
         formatRule2: formatRule2.slice(0, 50),
-        oldActive: oldActive.slice(0, 50)
+        oldActive: oldActive.slice(0, 50),
+        mmbaDeals: mmbaDeals.slice(0, 50)
       }
     });
   } catch (e) {

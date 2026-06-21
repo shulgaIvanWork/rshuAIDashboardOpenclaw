@@ -5,7 +5,7 @@ function loadArtifacts(){
     var el=document.getElementById('newArtifactsBlock');
     if(!el)return;
     var s=d&&d.summary;
-    if(!s||(!s.returns.cnt&&!s.inProgressPaid.cnt&&!s.wonNoPay.cnt&&!s.negativeDuration.cnt&&!s.otherCatPaid.cnt&&!s.nextYear.cnt&&(!s.formatRule2||!s.formatRule2.cnt)&&(!s.oldActive||!s.oldActive.cnt))){
+    if(!s||(!s.returns.cnt&&!s.inProgressPaid.cnt&&!s.wonNoPay.cnt&&!s.negativeDuration.cnt&&!s.otherCatPaid.cnt&&!s.nextYear.cnt&&(!s.formatRule2||!s.formatRule2.cnt)&&(!s.oldActive||!s.oldActive.cnt)&&(!s.mmbaDeals||!s.mmbaDeals.cnt))){
       el.innerHTML='<div style="padding:8px;color:#475569;font-size:12px">Аномалий не обнаружено</div>';return;
     }
     var h='<div style="font-size:12px;background:#F1F3F6;border-radius:8px;padding:12px;margin:8px 0">';
@@ -18,6 +18,7 @@ function loadArtifacts(){
     if(s.nextYear.cnt) h+='<tr><td>📅 «Следующий год»</td><td style="text-align:right">'+s.nextYear.cnt+' шт.</td><td style="text-align:right">0 ₽</td></tr>';
     if(s.formatRule2.cnt) h+='<tr><td>🏷 Формат без UF_FORMAT</td><td style="text-align:right">'+s.formatRule2.cnt+' шт.</td><td style="text-align:right;color:#FF8A65">'+fmt(s.formatRule2.sum)+' ₽</td></tr>';
     if(s.oldActive && s.oldActive.cnt) h+='<tr><td>⏳ Старые сделки Sale в работе</td><td style="text-align:right">'+s.oldActive.cnt+' шт.</td><td style="text-align:right;color:#E65100">'+fmt(s.oldActive.sum)+' ₽</td></tr>';
+    if(s.mmbaDeals && s.mmbaDeals.cnt) h+='<tr><td>📋 MMBA→СДО (Личная эффективность)</td><td style="text-align:right">'+s.mmbaDeals.cnt+' шт.</td><td style="text-align:right;color:#9C27B0">'+fmt(s.mmbaDeals.sum)+' ₽</td></tr>';
     h+='</table></div>';
     el.innerHTML=h;
   }).catch(function(){});
@@ -646,8 +647,7 @@ async function renderPageMainNew(d) {
     html += '<div class="card" style="margin-top:16px"><h2>Воронка (созданные) <span id="stack2_total" style="font-size:13px;color:#475569;font-weight:400"></span></h2><div style="height:700px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     html += '<div class="card"><h2>Воронка (активные)</h2><div style="height:700px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
     // Конверсии
-    html += '<div class="card" style="margin-top:8px"><h2>Конверсии воронки <span style="font-size:12px;color:#475569;font-weight:400">Лиды→MQL→SQL→Счёт→Оплата</span></h2><div class="chartbox"><canvas id="newChConv"></canvas></div></div>';
-
+    
     // Ряд 1: B2B/B2C + Средний чек
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';

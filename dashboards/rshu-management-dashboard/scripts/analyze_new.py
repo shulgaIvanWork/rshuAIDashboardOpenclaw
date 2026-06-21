@@ -59,9 +59,15 @@ SQL_STAGES = {'DETAILS', 'PROPOSAL', '2', '6', 'WON', 'LOSE', 'UC_F2YC3N'}
 # Стадии Счёт отправлен+
 INVOICE_STAGES = {'PROPOSAL', '2', '6', 'WON', 'LOSE', 'UC_F2YC3N'}
 
-# Источники: внутренняя база (исходящие)
-INTERNAL_SOURCES_KEYWORDS = ['аккаунтинг', 'репитсейл', 'реанимаци', 'холодн', 'апсейл',
-                            'repeat', 'accounting', 'up', 'upsale']
+# Источники: внутренняя база (по ID из справочника)
+INTERNAL_SOURCE_IDS = {
+    '79641902894',  # Аккаунтинг
+    '79641902977',  # RepeatSale
+    '79641902926',  # Upsale
+    'UC_7G65N9',    # Реанимация
+    '79641902903',  # Очная/Холодная база
+    'RECOMMENDATION',  # По рекомендации
+}
 
 # Менеджеры: исключения
 EXCLUDED_MANAGER_IDS = {'1', '27119', '21286'}  # James Bond, Кулевцова, Афанасьев
@@ -119,15 +125,11 @@ def is_kom_deal(x):
 
 
 # --- Новая логика: источник входящий/внутренняя база ---
-def is_internal_source(name):
-    """Проверяет, относится ли источник к внутренней базе (исходящие продажи)."""
-    if not name:
+def is_internal_source(source_id):
+    """Проверяет, относится ли источник к внутренней базе (по ID из справочника)."""
+    if not source_id:
         return False
-    nl = name.lower()
-    for kw in INTERNAL_SOURCES_KEYWORDS:
-        if kw in nl:
-            return True
-    return False
+    return str(source_id) in INTERNAL_SOURCE_IDS
 
 
 def normalize_product(title):
@@ -150,20 +152,20 @@ def normalize_product(title):
 def detect_format(title, uf_format):
     """Формат: приоритет UF_FORMAT, fallback по названию."""
     fmt_map = {
-        '19042467': 'ООМ (Очное)', '19042468': 'ОМ (Онлайн)',
-        '19042469': 'СДО', '19042498': 'КОМ',
+        '19042467': 'Очный', '19042468': 'Онлайн',
+        '19042469': 'Видеокурс', '19042498': 'Корпоративное обучение',
         '19042495': 'MMBA', '19042497': 'Вечерний', '19042496': 'ГК',
     }
     if uf_format and str(uf_format) in fmt_map:
         return fmt_map[str(uf_format)]
     t = (title or "").lower()
     if "(сдо)" in t or " сдо" in t or t.endswith("сдо"):
-        return "СДО"
+        return "Видеокурс"
     if "онлайн" in t:
-        return "ОМ (Онлайн)"
+        return "Онлайн"
     if "в г." in t or "москва" in t:
-        return "ООМ (Очное)"
-    return "ОМ (Онлайн)"
+        return "Очный"
+    return "Онлайн"
 
 
 def detect_b2b(x):
@@ -222,7 +224,7 @@ for x in deals_raw:
         "CAT_ID":    int(x.get("CATEGORY_ID", 0)),
         "SRC":       sources_map.get(x.get("SOURCE_ID") or "", x.get("SOURCE_ID") or "—"),
         "SRC_ID":    x.get("SOURCE_ID", ""),
-        "FORMAT":    detect_format(x.get("TITLE", ""), x.get("UF_FORMAT", "")),
+        "FORMAT":    (lambda f: "Видеокурс" if str(x.get("ID", "")) in ("321458", "321895") else f)(detect_format(x.get("TITLE", ""), x.get("UF_FORMAT", ""))),
         "UF_FORMAT": str(x.get("UF_FORMAT", "")),
         "COMPANY_ID": str(x.get("COMPANY_ID", "0")),
         "BTYPE":     detect_b2b(x),  # передаём всю сделку для COMPANY_ID + CATEGORY_ID
@@ -230,7 +232,7 @@ for x in deals_raw:
         "IS_KOM":    is_kom,
         "IS_OOM":    not is_kom,
         "IS_PRESALE": cat == PRE_SALE_CAT,
-        "IS_INTERNAL_SRC": is_internal_source(x.get("SOURCE_ID", "") or sources_map.get(x.get("SOURCE_ID", ""), "")),
+        "IS_INTERNAL_SRC": is_internal_source(x.get("SOURCE_ID", "")),
         "UF_DATE_PAY_1C": x.get("UF_DATE_PAY_1C", ""),
         "UF_CRM_1753272713011": x.get("UF_CRM_1753272713011", ""),  # Дата Счет отправлен
     })
@@ -417,6 +419,8 @@ for w in range(1, cur_w + 1):
         "created_cnt": 0, "created_sum": 0.0,
         "postupleniya": 0.0, "won_cnt": 0, "lost_cnt": 0,
         "leads": 0, "avg_check": 0, "durs": [], "chks": [],
+        "oom_durs": [], "oom_chks": [],
+        "kom_durs": [], "kom_chks": [],
         "mql": 0, "sql": 0, "oplata": 0,
         "kom_postupleniya": 0.0, "kom_won_cnt": 0, "kom_lost_cnt": 0, "invoice_cnt": 0,
         "oom_postupleniya": 0.0, "oom_won_cnt": 0, "oom_leads": 0, "oom_mql": 0,
@@ -472,13 +476,22 @@ for r in rows:
                 weekly[wk]["chks"].append(r["OPP"])
             weekly[wk]["oplata"] += 1  # все оплаты (ООМ + КОМ)
             # По форматам
-            fmt_keys = {"ООМ (Очное)": "fmt_oom", "ОМ (Онлайн)": "fmt_om", "СДО": "fmt_sdo", "КОМ": "fmt_kom"}
+            fmt_keys = {"Очный": "fmt_oom", "Онлайн": "fmt_om", "Видеокурс": "fmt_sdo", "Корпоративное обучение": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
                 weekly[wk][fmt_keys[r["FORMAT"]]] += r["OPP"]
-            if not r["IS_KOM"] and r["DC"]:
-                d = (r["CL"] - r["DC"]).days if r["CL"] else 0
-                if d >= 0:
-                    weekly[wk]["durs"].append(d)
+            if r["IS_KOM"]:
+                weekly[wk]["kom_chks"].append(r["OPP"])
+                if r["DC"]:
+                    d = (r["CL"] - r["DC"]).days if r["CL"] else 0
+                    if d >= 0:
+                        weekly[wk]["kom_durs"].append(d)
+            else:
+                weekly[wk]["oom_chks"].append(r["OPP"])
+                if r["DC"]:
+                    d = (r["CL"] - r["DC"]).days if r["CL"] else 0
+                    if d >= 0:
+                        weekly[wk]["durs"].append(d)
+                        weekly[wk]["oom_durs"].append(d)
 
     # MQL = is_qual_lead (как в карточке 2), по DATE_CREATE
     if r["DC"] and r["DC"].year == YEAR and is_qual_lead_w(r):
@@ -541,6 +554,12 @@ for w, d in weekly.items():
     d["avg_check"]       = d["postupleniya"] / d["won_cnt"] if d["won_cnt"] else 0
     d["median_check"]     = sorted(d["chks"])[len(d["chks"]) // 2] if d["chks"] else 0
     d["avg_dur"]         = sum(d["durs"])        / len(d["durs"])        if d["durs"]        else 0
+    d["oom_avg_check"]   = d["oom_postupleniya"] / d["oom_won_cnt"]     if d["oom_won_cnt"] else 0
+    d["kom_avg_check"]   = d["kom_postupleniya"] / d["kom_won_cnt"]     if d["kom_won_cnt"] else 0
+    d["oom_median_check"] = sorted(d["oom_chks"])[len(d["oom_chks"]) // 2] if d["oom_chks"] else 0
+    d["oom_avg_dur"]     = sum(d["oom_durs"])    / len(d["oom_durs"])    if d["oom_durs"]    else 0
+    d["kom_median_check"] = sorted(d["kom_chks"])[len(d["kom_chks"]) // 2] if d["kom_chks"] else 0
+    d["kom_avg_dur"]     = sum(d["kom_durs"])    / len(d["kom_durs"])    if d["kom_durs"]    else 0
     d["avg_presale_dur"] = sum(d["presale_durs"]) / len(d["presale_durs"]) if d["presale_durs"] else 0
     d["conv_lead_mql"]   = d["mql"]    / d["leads"]  * 100 if d["leads"]  else 0
     d["conv_mql_sql"]    = d["sql"]    / d["mql"]    * 100 if d["mql"]    else 0
@@ -549,6 +568,10 @@ for w, d in weekly.items():
     d["conv_invoice_oplata"] = d["oplata"] / d["invoice_cnt"] * 100 if d["invoice_cnt"] else 0
     del d["durs"]
     del d["chks"]
+    del d["oom_durs"]
+    del d["oom_chks"]
+    del d["kom_durs"]
+    del d["kom_chks"]
     del d["presale_durs"]
 
 # === Stacked bar: этапы воронки по неделям ===
@@ -861,6 +884,20 @@ def bsplit(subset, period_label):
 btype_ytd  = bsplit([r for r in rows if pay_ytd(r)], "YTD")
 btype_prev = bsplit(ws_prev_pay, f"W{prev_w}")
 btype_cur  = bsplit(ws_cur_pay,  f"W{cur_w}")
+
+# === Сплит источников: внутренняя база vs маркетинг ===
+def src_split(subset, period_label):
+    g = {"internal": {"cnt": 0, "sum": 0.0}, "marketing": {"cnt": 0, "sum": 0.0}}
+    for r in subset:
+        if is_paid(r):
+            kw = "internal" if is_internal_source(r.get("SRC_ID", "")) else "marketing"
+            g[kw]["cnt"] += 1
+            g[kw]["sum"] += r["OPP"]
+    return {"period": period_label, **g}
+
+src_split_ytd  = src_split([r for r in rows if pay_ytd(r)], "YTD")
+src_split_prev = src_split(ws_prev_pay, f"W{prev_w}")
+src_split_cur  = src_split(ws_cur_pay,  f"W{cur_w}")
 
 # === Форматы ===
 def fsplit(subset, period):
@@ -1186,6 +1223,9 @@ out = {
     "kom_qual_prev": kom_qual_prev, "kom_qual_cur": kom_qual_cur,
     "weeks":       [weekly[w] for w in sorted(weekly.keys())],
     "src_rating":  src_rating,
+    "src_split_ytd":  src_split_ytd,
+    "src_split_prev": src_split_prev,
+    "src_split_cur":  src_split_cur,
     "btype_ytd":   btype_ytd,  "btype_prev": btype_prev,  "btype_cur": btype_cur,
     "fmt_ytd":     fmt_ytd,    "fmt_prev":   fmt_prev,
     "top_products": top_products,
