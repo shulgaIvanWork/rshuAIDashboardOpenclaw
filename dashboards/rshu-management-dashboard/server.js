@@ -319,6 +319,24 @@ app.get('/api/artifacts', async (req, res) => {
         cat: d.CATEGORY_ID, pay: d.UF_DATE_PAY_1C
       }));
     
+    // Сделки без типа обучения (UF_CRM_1765896709800 пустое)
+    const noTypeEdu = deals
+      .filter(d => {
+        if (!d.UF_DATE_PAY_1C) return false;
+        try {
+          const payY = parseInt(d.UF_DATE_PAY_1C.substring(0, 4));
+          if (payY !== 2026) return false;
+        } catch(e) { return false; }
+        const opp = parseFloat(d.OPPORTUNITY) || 0;
+        if (opp < 11) return false;
+        if (!['0','8','19'].includes(String(d.CATEGORY_ID))) return false;
+        return !String(d.UF_CRM_1765896709800 || '').trim();
+      })
+      .map(d => ({
+        id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0,
+        pay: d.UF_DATE_PAY_1C
+      }));
+    
     // Сделка #240316 — специальный артефакт (старая, в работе, с суммой, не входит в выгрузку 2025-2026)
     if (!oldActive.some(a => String(a.id) === '240316')) {
       oldActive.push({
@@ -342,7 +360,8 @@ app.get('/api/artifacts', async (req, res) => {
         nextYear: { cnt: nextYear.length, sum: nextYear.reduce((a,b) => a + b.sum, 0) },
         formatRule2: { cnt: formatRule2.length, sum: formatRule2.reduce((a,b) => a + b.sum, 0) },
         oldActive: { cnt: oldActive.length, sum: oldActive.reduce((a,b) => a + b.sum, 0) },
-        mmbaDeals: { cnt: mmbaDeals.length, sum: mmbaDeals.reduce((a,b) => a + b.sum, 0) }
+        mmbaDeals: { cnt: mmbaDeals.length, sum: mmbaDeals.reduce((a,b) => a + b.sum, 0) },
+        noTypeEdu: { cnt: noTypeEdu.length, sum: noTypeEdu.reduce((a,b) => a + b.sum, 0) }
       },
       details: {
         returns: returns.slice(0, 50),
