@@ -648,11 +648,13 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Воронка (активные)</h2><div style="height:700px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
     // Конверсии
     
-    // Ряд 1: B2B/B2C + Средний чек
+    // Ряд 1: B2B/B2C + Источники
     html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
-    html += '<div class="card"><h2>Средний чек по неделям</h2><div class="chartbox"><canvas id="newChAvg"></canvas></div></div>';
+    html += '<div class="card"><h2>Тип клиента: B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
+    html += '<div class="card"><h2>Источники: Внутренняя база vs Маркетинговые сделки</h2><div class="chartbox-sm"><canvas id="newChSrcSplit"></canvas></div><div id="newSrcSplitTable"></div></div>';
     html += '</div>';
+    // Средний чек по неделям (на всю ширину)
+    html += '<div class="card" style="margin-top:8px"><h2>Средний чек по неделям</h2><div style="height:440px;position:relative"><canvas id="newChAvg"></canvas></div></div>';
     // Ряд 2: Оплаты/Отказы пончик + Оплаты vs Отказы stacked
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>Оплаты / Отказы</h2><div class="twocol" style="gap:12px">';
@@ -666,12 +668,37 @@ async function renderPageMainNew(d) {
 
     html += '</div>';
 
-    // B2B table
-    var b2bTbl = '<table style="font-size:11px;margin-top:8px"><tr><th>Тип</th><th>Шт</th><th>Сумма</th><th>%</th></tr>'
-      +'<tr><td>B2B</td><td>'+b2bRow.cnt+'</td><td>'+fmt(b2bRow.sum)+'</td><td>'+(b2bRow.sum/totB2b*100).toFixed(1)+'%</td></tr>'
-      +'<tr><td>B2C</td><td>'+b2cRow.cnt+'</td><td>'+fmt(b2cRow.sum)+'</td><td>'+(b2cRow.sum/totB2b*100).toFixed(1)+'%</td></tr></table>';
+    // B2B table (YTD + неделя)
+    var b2bCur = d.btype_cur||{}, b2bCurRow = (b2bCur.B2B||{cnt:0,sum:0}), b2cCurRow = (b2bCur.B2C||{cnt:0,sum:0}), totB2bCur = b2bCurRow.sum+b2cCurRow.sum||1;
+    var curB2bWeekLabel = wkCur && wkCur.label_dates ? 'Неделя '+(d.btype_cur?.period||'').replace('W','')+' ('+wkCur.label_dates+')' : (d.btype_cur?.period||'Неделя');
+    var avgB2bYtd = b2bRow.cnt > 0 ? Math.round(b2bRow.sum / b2bRow.cnt) : 0;
+    var avgB2cYtd = b2cRow.cnt > 0 ? Math.round(b2cRow.sum / b2cRow.cnt) : 0;
+    var avgB2bCur = b2bCurRow.cnt > 0 ? Math.round(b2bCurRow.sum / b2bCurRow.cnt) : 0;
+    var avgB2cCur = b2cCurRow.cnt > 0 ? Math.round(b2cCurRow.sum / b2cCurRow.cnt) : 0;
+    var b2bTbl = '<table style="font-size:11px;margin-top:8px"><tr><th>Период</th><th>Тип</th><th>Шт</th><th>Сумма</th><th>Средний чек</th><th>Доля,%</th></tr>'
+      +'<tr><td>За весь период</td><td><span class="dot" style="background:#3079D2"></span>B2B</td><td>'+b2bRow.cnt+'</td><td>'+fmt(b2bRow.sum)+'</td><td>'+fmt(avgB2bYtd)+'</td><td>'+(b2bRow.sum/totB2b*100).toFixed(1)+'%</td></tr>'
+      +'<tr><td></td><td><span class="dot" style="background:#F57C00"></span>B2C</td><td>'+b2cRow.cnt+'</td><td>'+fmt(b2cRow.sum)+'</td><td>'+fmt(avgB2cYtd)+'</td><td>'+(b2cRow.sum/totB2b*100).toFixed(1)+'%</td></tr>'
+      +'<tr style="border-top:1px dashed #ccc"><td>'+curB2bWeekLabel+'</td><td><span class="dot" style="background:#3079D2"></span>B2B</td><td>'+b2bCurRow.cnt+'</td><td>'+fmt(b2bCurRow.sum)+'</td><td>'+fmt(avgB2bCur)+'</td><td>'+(b2bCurRow.sum/totB2bCur*100).toFixed(1)+'%</td></tr>'
+      +'<tr><td></td><td><span class="dot" style="background:#F57C00"></span>B2C</td><td>'+b2cCurRow.cnt+'</td><td>'+fmt(b2cCurRow.sum)+'</td><td>'+fmt(avgB2cCur)+'</td><td>'+(b2cCurRow.sum/totB2bCur*100).toFixed(1)+'%</td></tr>'
+      +'</table>';
 
-    // Tables section — MBA (Тип покупателя — под графиком B2B/B2C, без дублирования)
+    // Источники: таблица под графиком
+    var srcYtd = d.src_split_ytd||{}, srcCur = d.src_split_cur||{};
+    var srcInternal = srcYtd.internal||{cnt:0,sum:0}, srcMkt = srcYtd.marketing||{cnt:0,sum:0};
+    var srcIntCur = srcCur.internal||{cnt:0,sum:0}, srcMktCur = srcCur.marketing||{cnt:0,sum:0};
+    var srcTot = srcInternal.sum+srcMkt.sum||1, srcTotCur = srcIntCur.sum+srcMktCur.sum||1;
+    var curWeekLabel = wkCur && wkCur.label_dates ? 'Неделя '+(srcCur.period||'').replace('W','')+' ('+wkCur.label_dates+')' : (srcCur.period||'Неделя');
+    var avgIntYtd = srcInternal.cnt > 0 ? Math.round(srcInternal.sum / srcInternal.cnt) : 0;
+    var avgMktYtd = srcMkt.cnt > 0 ? Math.round(srcMkt.sum / srcMkt.cnt) : 0;
+    var avgIntCur = srcIntCur.cnt > 0 ? Math.round(srcIntCur.sum / srcIntCur.cnt) : 0;
+    var avgMktCur = srcMktCur.cnt > 0 ? Math.round(srcMktCur.sum / srcMktCur.cnt) : 0;
+    var srcTbl = '<table style="font-size:11px;margin-top:8px"><tr><th>Период</th><th>Тип</th><th>Шт</th><th>Сумма</th><th>Средний чек</th><th>Доля,%</th></tr>'
+      +'<tr><td>За весь период</td><td><span class="dot" style="background:#1f2a44"></span> Внутренняя база</td><td>'+srcInternal.cnt+'</td><td>'+fmt(srcInternal.sum)+'</td><td>'+fmt(avgIntYtd)+'</td><td>'+(srcInternal.sum/srcTot*100).toFixed(1)+'%</td></tr>'
+      +'<tr><td></td><td><span class="dot" style="background:#00bcd4"></span> Маркетинговые сделки</td><td>'+srcMkt.cnt+'</td><td>'+fmt(srcMkt.sum)+'</td><td>'+fmt(avgMktYtd)+'</td><td>'+(srcMkt.sum/srcTot*100).toFixed(1)+'%</td></tr>'
+      +'<tr style="border-top:1px dashed #ccc"><td>'+curWeekLabel+'</td><td><span class="dot" style="background:#1f2a44"></span> Внутренняя база</td><td>'+srcIntCur.cnt+'</td><td>'+fmt(srcIntCur.sum)+'</td><td>'+fmt(avgIntCur)+'</td><td>'+(srcIntCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
+      +'<tr><td></td><td><span class="dot" style="background:#00bcd4"></span> Маркетинговые сделки</td><td>'+srcMktCur.cnt+'</td><td>'+fmt(srcMktCur.sum)+'</td><td>'+fmt(avgMktCur)+'</td><td>'+(srcMktCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
+      +'</table>';
+        // Tables section — MBA (Тип покупателя — под графиком B2B/B2C, без дублирования)
     html += '<div class="card" style="margin-top:8px"><h3>MBA</h3><div id="newMbaTable"></div></div>';
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
@@ -790,6 +817,11 @@ async function renderPageMainNew(d) {
           // B2B/B2C таблица под графиком
           var b2bEl = document.getElementById('newB2bTable');
           if (b2bEl) b2bEl.innerHTML = b2bTbl;
+          // Источники: пончик
+          if (document.getElementById('newChSrcSplit')) new Chart(document.getElementById('newChSrcSplit'),{type:'doughnut',data:{labels:['Внутренняя база','Маркетинговые сделки'],datasets:[{data:[srcInternal.sum,srcMkt.sum],backgroundColor:['#1f2a44','#00bcd4']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:13},formatter:function(v){var t=srcInternal.sum+srcMkt.sum;return t>0?(v/t*100).toFixed(1)+'%':'';}},tooltip:{callbacks:{label:function(ctx){var i=ctx.dataIndex;var row=i===0?srcInternal:srcMkt;return ctx.label+': '+row.cnt+' шт. · '+fmt(row.sum)+' ₽';}}}}}});
+          // Источники: таблица под графиком
+          var srcEl = document.getElementById('newSrcSplitTable');
+          if (srcEl) srcEl.innerHTML = srcTbl;
         } catch(e){}
         try {
           var wT=weeks.reduce(function(s,w){return s+(w.won_cnt||0);},0), lT=weeks.reduce(function(s,w){return s+(w.lost_cnt||0);},0);
@@ -810,7 +842,11 @@ async function renderPageMainNew(d) {
           if (document.getElementById('newChCnt')) new Chart(document.getElementById('newChCnt'),{type:'bar',data:{labels:labels,datasets:[{label:'Оплаты',data:weeks.map(function(w){return (w.won_cnt||0)+(w.kom_won_cnt||0);}),backgroundColor:'#2E7D32',borderRadius:4},{label:'Отказы',data:weeks.map(function(w){return (w.lost_cnt||0)+(w.kom_lost_cnt||0);}),backgroundColor:'#C62828',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=(weeks[i].won_cnt||0)+(weeks[i].kom_won_cnt||0)+(weeks[i].lost_cnt||0)+(weeks[i].kom_lost_cnt||0);return tot?tot+' сд.':'';}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
         } catch(e){}
         try {
-          if (document.getElementById('newChAvg')) new Chart(document.getElementById('newChAvg'),{type:'line',data:{labels:labels,datasets:[{label:'Средний чек',data:weeks.map(function(w){return w.avg_check||0;}),borderColor:'#3079D2',backgroundColor:'rgba(48,121,210,.1)',tension:0.3,fill:true},{label:'Медиана',data:weeks.map(function(w){return w.median_check||0;}),borderColor:'#FF9800',borderDash:[6,3],tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
+          if (document.getElementById('newChAvg')) {
+            var avOom = weeks.map(function(w){return w.oom_avg_check||0;});
+            var avKom = weeks.map(function(w){return w.kom_avg_check||0;});
+            new Chart(document.getElementById('newChAvg'),{type:'line',data:{labels:labels,datasets:[{label:'ООМ',data:avOom,borderColor:'#00bcd4',tension:0.3,fill:false},{label:'КОМ',data:avKom,borderColor:'#9C27B0',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
+          }
         } catch(e){}
         try {
           if (document.getElementById('newChDur')) new Chart(document.getElementById('newChDur'),{type:'line',data:{labels:labels,datasets:[{label:'Цикл сделки, дн.',data:weeks.map(function(w){return w.avg_dur||0;}),borderColor:'#9A7B3F',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
