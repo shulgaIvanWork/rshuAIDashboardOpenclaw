@@ -780,13 +780,34 @@ async function renderPageMainNew(d) {
 
 
 
-    var weekStr = '<table style="font-size:11px"><tr><th>Неделя</th><th>Лиды</th><th>MQL</th><th>SQL</th><th>Счёт</th><th>Оплачено</th><th>Поступл.</th><th>Ср.чек</th><th>Цикл</th><th>Лиды\u2192MQL</th><th>MQL\u2192SQL</th><th>SQL\u2192Счёт</th><th>Счёт\u2192Оплата</th></tr>';
+    // Недельная таблица — от последней недели к первой
+    var weekStr = '<table style="font-size:11px"><tr><th>Неделя</th><th>Лиды</th><th>MQL</th><th>SQL</th><th>Счёт</th><th>Оплачено</th><th>Поступл.</th><th>Ср.чек</th><th>Цикл</th><th>Лиды\u2192MQL</th><th>MQL\u2192SQL</th><th>SQL\u2192Счёт</th><th>Счёт\u2192Оплата</th><th>Лид\u2192Оплата</th></tr>';
     var tL=0,tM=0,tS=0,tO=0,tP0=0;
-    weeks.forEach(function(w){
-      weekStr += '<tr><td><b>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</b></td><td>'+w.leads+'</td><td>'+w.mql+'</td><td>'+w.sql+'</td><td><b>'+(w.invoice_cnt||0)+'</b></td><td><b>'+w.oplata+'</b></td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td></tr>';
+    // Предварительный расчёт конверсий для всех недель
+    var convs = [];
+    for(var wi=weeks.length-1; wi>=0; wi--){
+      var w = weeks[wi];
+      var conv = (w.leads||0) > 0 ? ((w.oplata||0) / (w.leads||0) * 100) : 0;
+      convs.push({ idx: wi, conv: conv });
+    }
+    // Вывод с дельтой к следующей (нижней) неделе
+    for(var ci=0; ci<convs.length; ci++){
+      var wi = convs[ci].idx;
+      var w = weeks[wi];
+      var convLeadOplata = convs[ci].conv;
+      var convDelta = '';
+      if (ci < convs.length - 1) {
+        var nextConv = convs[ci+1].conv;
+        var diff = convLeadOplata - nextConv;
+        if (diff > 0) convDelta = ' <span style="color:#2E7D32">\u2191+' + diff.toFixed(1) + '%</span>';
+        else if (diff < 0) convDelta = ' <span style="color:#C62828">\u2193' + diff.toFixed(1) + '%</span>';
+        else convDelta = ' <span style="color:#888">\u21920.0%</span>';
+      }
+      weekStr += '<tr><td><b>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</b></td><td>'+w.leads+'</td><td>'+w.mql+'</td><td>'+w.sql+'</td><td><b>'+(w.invoice_cnt||0)+'</b></td><td><b>'+w.oplata+'</b></td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td><td>'+convLeadOplata.toFixed(1)+'%'+convDelta+'</td></tr>';
       tL+=w.leads||0; tM+=w.mql||0; tS+=w.sql||0; tO+=w.oplata||0; tP0+=w.postupleniya||0;
-    });
-    weekStr += '<tr style="font-weight:700;border-top:2px solid #333"><td>ИТОГО</td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td></td><td></td><td></td></tr></table>';
+    }
+    var totConv = tL > 0 ? (tO / tL * 100).toFixed(1) : '0.0';
+    weekStr += '<tr style="font-weight:700;border-top:2px solid #333"><td>ИТОГО</td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td></td><td></td><td></td><td></td><td></td><td></td><td>'+totConv+'%</td></tr></table>';
     el = document.getElementById('newWeekTable'); if(el) el.innerHTML = weekStr;
 
 
