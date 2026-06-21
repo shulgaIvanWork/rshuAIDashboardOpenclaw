@@ -641,7 +641,7 @@ async function renderPageMainNew(d) {
     // Поступления + Форматы
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>Поступления по неделям</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
-    html += '<div class="card"><h2>Форматы</h2><div class="chartbox-sm"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
+    html += '<div class="card"><h2>Поступления по форматам</h2><div class="chartbox-sm"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
     html += '</div>';
     // Стеки воронок — на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:16px"><h2>Воронка (созданные) <span id="stack2_total" style="font-size:13px;color:#475569;font-weight:400"></span></h2><div style="height:700px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
