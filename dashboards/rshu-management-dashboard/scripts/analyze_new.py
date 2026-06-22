@@ -483,16 +483,16 @@ for r in rows:
                 weekly[wk][fmt_keys[r["FORMAT"]]] += r["OPP"]
             if r["IS_KOM"]:
                 weekly[wk]["kom_chks"].append(r["OPP"])
-                if r["DC"]:
-                    d = (r["CL"] - r["DC"]).days if r["CL"] else 0
-                    if d >= 0:
-                        weekly[wk]["kom_durs"].append(d)
             else:
                 weekly[wk]["oom_chks"].append(r["OPP"])
-                if r["DC"]:
-                    d = (r["CL"] - r["DC"]).days if r["CL"] else 0
-                    if d >= 0:
-                        weekly[wk]["durs"].append(d)
+            # Длительность: по PAY_DT (дата оплаты из 1С), не по CLOSEDATE
+            if r["DC"] and r["PAY_DT"]:
+                d = (r["PAY_DT"] - r["DC"]).days
+                if d >= 0:
+                    weekly[wk]["durs"].append(d)          # все сделки (ООМ + КОМ)
+                    if r["IS_KOM"]:
+                        weekly[wk]["kom_durs"].append(d)
+                    else:
                         weekly[wk]["oom_durs"].append(d)
 
     # MQL = is_qual_lead (как в карточке 2), по DATE_CREATE
