@@ -282,7 +282,7 @@ def metrics(subset, is_kom_block=False, is_oom_block=False):
     else:
         # Основная строка — только категории 0|8|19
         pred = lambda r: r["CAT_ID"] in VALID_CATS
-    paid = [r for r in subset if is_paid(r) and pred(r)]
+    paid = [r for r in subset if is_paid(r) and pred(r) and r["PAY_DT"].year == YEAR]
     pos_sum = sum(r["OPP"] for r in paid)
     pos_cnt = len(paid)
     avg     = pos_sum / pos_cnt if pos_cnt else 0
