@@ -646,6 +646,9 @@ async function renderPageMainNew(d) {
     html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev);
     html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev);
 
+    // Регистрация — сразу под KPI
+    html += '<div class="kpis" id="newRegKpis"></div>';
+
     // Поступления по неделям (на всю ширину)
     html += '<div class="card" style="margin-top:8px"><h2>Поступления по неделям</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
     // Форматы + Тип обучения
@@ -653,23 +656,18 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Поступления по форматам</h2><div class="chartbox-sm"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
     html += '<div class="card"><h2>Поступления по типу обучения</h2><div class="chartbox-sm"><canvas id="newChEdu"></canvas></div><div id="newEduTable" style="margin-top:8px"></div></div>';
     html += '</div>';
+    // B2B/B2C + Источники — под Форматами/Типом
+    html += '<div class="twocol" style="margin-top:8px">';
+    html += '<div class="card"><h2>Тип клиента: B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
+    html += '<div class="card"><h2>Источники: Внутренняя база vs Маркетинговые сделки</h2><div class="chartbox-sm"><canvas id="newChSrcSplit"></canvas></div><div id="newSrcSplitTable"></div></div>';
+    html += '</div>';
     // Стеки воронок - на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:16px"><h2>Воронка по неделям <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии на той же неделе)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     html += '<div class="card"><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учетом переходящего остатка, без учета даты создания)</span> <span style="color:#C62828;font-size:11px;font-weight:400">(в разработке)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
     // Конверсии
 
-    // Ряд 1: B2B/B2C + Источники
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Тип клиента: B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
-    html += '<div class="card"><h2>Источники: Внутренняя база vs Маркетинговые сделки</h2><div class="chartbox-sm"><canvas id="newChSrcSplit"></canvas></div><div id="newSrcSplitTable"></div></div>';
-    html += '</div>';
     // Средний чек по неделям (на всю ширину)
     html += '<div class="card" style="margin-top:8px"><h2>Средний чек по неделям</h2><div style="height:440px;position:relative"><canvas id="newChAvg"></canvas></div></div>';
-
-
-    html += '<div class="twocol" style="margin-top:8px">';
-
-    html += '</div>';
 
     // B2B table (YTD + неделя)
     var b2bCur = d.btype_cur||{}, b2bCurRow = (b2bCur.B2B||{cnt:0,sum:0}), b2cCurRow = (b2bCur.B2C||{cnt:0,sum:0}), totB2bCur = b2bCurRow.sum+b2cCurRow.sum||1;
@@ -701,9 +699,8 @@ async function renderPageMainNew(d) {
       +'<tr style="border-top:1px dashed #ccc"><td>'+curWeekLabel+'</td><td><span class="dot" style="background:#1f2a44"></span> Внутренняя база</td><td>'+srcIntCur.cnt+'</td><td>'+fmt(srcIntCur.sum)+'</td><td>'+fmt(avgIntCur)+'</td><td>'+(srcIntCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
       +'<tr><td></td><td><span class="dot" style="background:#00bcd4"></span> Маркетинговые сделки</td><td>'+srcMktCur.cnt+'</td><td>'+fmt(srcMktCur.sum)+'</td><td>'+fmt(avgMktCur)+'</td><td>'+(srcMktCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
       +'</table>';
-        // Tables section - MBA (Тип покупателя - под графиком B2B/B2C, без дублирования)
+        // Tables section - MBA (Тип покупателя)
     html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
-    html += '<div class="kpis" id="newRegKpis"></div>';
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
