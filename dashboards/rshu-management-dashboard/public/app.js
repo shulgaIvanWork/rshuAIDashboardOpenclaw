@@ -94,7 +94,7 @@ async function loadAll() {
 
     renderFilteredData();
 
-    if (document.getElementById('sourceInfo')) document.getElementById('sourceInfo').style.display = 'none';
+    
   } catch (e) {
     console.error('loadAll error:', e);
     if (areaNew) areaNew.innerHTML = '<div class="error-state">❌ Ошибка загрузки: '+escapeHtml(e.message)+'<br>Нажмите «🔄 Обновить данные»</div>';
