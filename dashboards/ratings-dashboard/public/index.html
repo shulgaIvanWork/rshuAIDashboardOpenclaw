@@ -671,6 +671,9 @@ async function renderPageMainNew(d) {
 
     var html = '';
 
+    // ММВА — в самый вверх
+    html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
+
     // Топ-20 продуктов + Источники
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>Топ-20 продуктов</h2><div id="newProductsTable"></div></div>';
@@ -709,6 +712,12 @@ async function renderPageMainNew(d) {
     comps.forEach(function(c, i){compStr+='<tr><td>'+(i+1)+'</td><td><b>'+escapeHtml(c.name)+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+c.last_date+'</td></tr>';});
     compStr += '</table>';
     el = document.getElementById('newCompaniesTable'); if(el) el.innerHTML = compStr;
+
+    // ММВА: заполнение
+    var mbaData = d.mba_rating||[];
+    var mbaTotal = mbaData.reduce(function(s,m){return s+(m.sum||0);},0);
+    var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' ₽</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' ₽</td><td>'+(mbaTotal>0?(m.sum/mbaTotal*100).toFixed(1):'0.0')+'%</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
+    el = document.getElementById('newMbaTable'); if(el) el.innerHTML = mbaStr;
 
   } catch(e) {
     areaNew.innerHTML = '<div class="error-state">❌ <b>Ошибка загрузки</b><br>'+escapeHtml(e.message)+'</div>';

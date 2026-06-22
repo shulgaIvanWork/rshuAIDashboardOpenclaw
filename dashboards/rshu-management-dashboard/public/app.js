@@ -699,8 +699,7 @@ async function renderPageMainNew(d) {
       +'<tr style="border-top:1px dashed #ccc"><td>'+curWeekLabel+'</td><td><span class="dot" style="background:#1f2a44"></span> Внутренняя база</td><td>'+srcIntCur.cnt+'</td><td>'+fmt(srcIntCur.sum)+'</td><td>'+fmt(avgIntCur)+'</td><td>'+(srcIntCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
       +'<tr><td></td><td><span class="dot" style="background:#00bcd4"></span> Маркетинговые сделки</td><td>'+srcMktCur.cnt+'</td><td>'+fmt(srcMktCur.sum)+'</td><td>'+fmt(avgMktCur)+'</td><td>'+(srcMktCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
       +'</table>';
-        // Tables section - MBA (Тип покупателя)
-    html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
+        // MBA — перенесён на ratings-dashboard
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
@@ -776,10 +775,6 @@ async function renderPageMainNew(d) {
     var el2 = document.getElementById('newFmtTableUnderChart');
     if (el2) el2.innerHTML = fmtStr;
 
-    var mbaData = d.mba_rating||[];
-    var mbaTotal = mbaData.reduce(function(s,m){return s+(m.sum||0);},0);
-    var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' \u20bd</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' \u20bd</td><td>'+(mbaTotal>0?(m.sum/mbaTotal*100).toFixed(1):'0.0')+'%</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
-    el = document.getElementById('newMbaTable'); if(el) el.innerHTML = mbaStr;
     // Регистрации: KPI
     var reg = d.reg_ytd||{};
     var regConvSql = reg.total > 0 ? (reg.sql/reg.total*100).toFixed(1) : '0.0';
