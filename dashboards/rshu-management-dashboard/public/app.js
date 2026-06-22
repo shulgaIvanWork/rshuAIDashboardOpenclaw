@@ -81,7 +81,7 @@ async function loadAll() {
   try {
     const d = await api('/api/data/new');
     if (!d || !d.ytd) return;
-    document.getElementById('loadingFill').style.width = '100%';
+    var _lf=document.getElementById('loadingFill');if(_lf)_lf.style.width='100%';
     dataCache = d;
 
     // Устанавливаем dateFrom/dateTo по умолчанию: с первой недели до today
@@ -1168,7 +1168,7 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
 
       var pct = status.progressPct != null ? status.progressPct : 0;
       document.getElementById('statusProgressFill').style.width = Math.min(pct, 100) + '%';
-      document.getElementById('loadingFill').style.width = pct + '%';
+      var _lf2=document.getElementById('loadingFill');if(_lf2)_lf2.style.width=pct+'%';
 
       var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
       if (status.progressSteps) {
@@ -1192,7 +1192,7 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
       }
       if (status.ready && !status.loading) {
         document.getElementById('statusProgressFill').style.width = '100%';
-        document.getElementById('loadingFill').style.width = '100%';
+        var _lf=document.getElementById('loadingFill');if(_lf)_lf.style.width='100%';
         document.getElementById('statusSteps').innerHTML = renderStepLines(4, refreshStepsData, 100);
         document.getElementById('statusDealProgress').textContent = '✅ Загружено за ' + elapsed;
         setTimeout(function() {
@@ -1251,7 +1251,7 @@ function runRefreshPolling() {
 
       var pct = status.progressPct != null ? status.progressPct : 0;
       document.getElementById('statusProgressFill').style.width = Math.min(pct, 100) + '%';
-      document.getElementById('loadingFill').style.width = pct + '%';
+      var _lf2=document.getElementById('loadingFill');if(_lf2)_lf2.style.width=pct+'%';
 
       var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
       if (status.progressSteps) {
@@ -1275,7 +1275,7 @@ function runRefreshPolling() {
       }
       if (status.ready && !status.loading && !status.error) {
         document.getElementById('statusProgressFill').style.width = '100%';
-        document.getElementById('loadingFill').style.width = '100%';
+        var _lf=document.getElementById('loadingFill');if(_lf)_lf.style.width='100%';
         document.getElementById('statusSteps').innerHTML = renderStepLines(4, refreshStepsData, 100);
         document.getElementById('statusDealProgress').textContent = '✅ Загружено за ' + elapsed;
         setTimeout(function() {
