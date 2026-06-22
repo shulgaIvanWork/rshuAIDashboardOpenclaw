@@ -27,7 +27,7 @@ function loadArtifacts(){
 }
 
 
-// Автоопределение пути — работает и самостоятельным сайтом, и как sub-app
+// Автоопределение пути - работает и самостоятельным сайтом, и как sub-app
 var _p = window.location.pathname;
 var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
 window.BASE_PATH = _m ? '/' + _m[1] : '';
@@ -83,7 +83,7 @@ async function loadAll() {
     if (!d || !d.ytd) return;
     document.getElementById('loadingFill').style.width = '100%';
     dataCache = d;
-    
+
     // Устанавливаем dateFrom/dateTo по умолчанию: с первой недели до today
     // По умолчанию: с 1 января текущего года
     document.getElementById('dateFrom').value = '2026-01-01';
@@ -91,9 +91,9 @@ async function loadAll() {
     document.getElementById('dateTo').value = todayStr;
     dateFromCache = document.getElementById('dateFrom').value;
     dateToCache = document.getElementById('dateTo').value;
-    
+
     renderFilteredData();
-    
+
     if (document.getElementById('sourceInfo')) document.getElementById('sourceInfo').style.display = 'none';
   } catch (e) {
     console.error('loadAll error:', e);
@@ -108,36 +108,36 @@ function renderFilteredData() {
   var dateTo = document.getElementById('dateTo').value;
   dateFromCache = dateFrom;
   dateToCache = dateTo;
-  
+
   // Фильтруем недели по диапазону
   var allWeeks = d.weeks || [];
   var filtered = allWeeks;
   if (dateFrom && dateTo) {
     filtered = weeksInRange(allWeeks, dateFrom, dateTo);
   }
-  
+
   // Пересчитываем KPI из отфильтрованных недель
   var filteredData = buildFilteredData(d, filtered);
-  
+
   // Обновляем info
   var infoEl = document.getElementById('filterInfo');
   if (filtered.length === allWeeks.length) {
     infoEl.textContent = 'все недели (' + allWeeks.length + ')';
   } else {
-    infoEl.textContent = 'недели ' + String(filtered[0]?.week||'').padStart(2,'0') + '—' + String(filtered[filtered.length-1]?.week||'').padStart(2,'0') + ' (' + filtered.length + ' из ' + allWeeks.length + ')';
+    infoEl.textContent = 'недели ' + String(filtered[0]?.week||'').padStart(2,'0') + '-' + String(filtered[filtered.length-1]?.week||'').padStart(2,'0') + ' (' + filtered.length + ' из ' + allWeeks.length + ')';
   }
-  
+
   renderPageMainNew(filteredData);
 }
 
 function buildFilteredData(orig, filteredWeeks) {
   var out = JSON.parse(JSON.stringify(orig));
   out.weeks = filteredWeeks;
-  
+
   function sumField(f) {
     return filteredWeeks.reduce(function(s, w) { return s + (w[f] || 0); }, 0);
   }
-  
+
   // Общий YTD
   var ytd = { postupleniya: sumField('postupleniya'), won_relevant_cnt: sumField('oplata') };
   // Копируем все остальные поля из оригинала
@@ -147,21 +147,21 @@ function buildFilteredData(orig, filteredWeeks) {
   }
   ytd.avg_check = ytd.won_relevant_cnt > 0 ? Math.round(ytd.postupleniya / ytd.won_relevant_cnt) : srcYtd.avg_check || 0;
   out.ytd = ytd;
-  
-  // ООМ YTD — берём из оригинала, переписываем только посчитанные поля
+
+  // ООМ YTD - берём из оригинала, переписываем только посчитанные поля
   var oom_ytd = JSON.parse(JSON.stringify(orig.oom_ytd || {}));
   oom_ytd.postupleniya = sumField('oom_postupleniya');
   oom_ytd.won_relevant_cnt = sumField('oom_won_cnt');
   oom_ytd.avg_check = oom_ytd.won_relevant_cnt > 0 ? Math.round(oom_ytd.postupleniya / oom_ytd.won_relevant_cnt) : oom_ytd.avg_check || 0;
   out.oom_ytd = oom_ytd;
-  
-  // КОМ YTD — берём из оригинала, переписываем только посчитанные поля
+
+  // КОМ YTD - берём из оригинала, переписываем только посчитанные поля
   var kom_ytd = JSON.parse(JSON.stringify(orig.kom_ytd || {}));
   kom_ytd.postupleniya = sumField('kom_postupleniya');
   kom_ytd.won_relevant_cnt = sumField('kom_won_cnt');
   kom_ytd.avg_check = kom_ytd.won_relevant_cnt > 0 ? Math.round(kom_ytd.postupleniya / kom_ytd.won_relevant_cnt) : kom_ytd.avg_check || 0;
   out.kom_ytd = kom_ytd;
-  
+
   // cur = последняя неделя, prev = предпоследняя
   var last = filteredWeeks[filteredWeeks.length - 1] || {};
   var prev = filteredWeeks[filteredWeeks.length - 2] || {};
@@ -173,7 +173,7 @@ function buildFilteredData(orig, filteredWeeks) {
   out.kom_prev = { postupleniya: prev.kom_postupleniya || 0, won_relevant_cnt: prev.kom_won_cnt || 0 };
   out.cur_week = last.week || orig.cur_week;
   out.prev_week = prev.week || orig.prev_week;
-  
+
   // Лиды
   out.leads_ytd = sumField('leads');
   out.leads_cur = last.leads || 0;
@@ -183,15 +183,15 @@ function buildFilteredData(orig, filteredWeeks) {
   out.qual_lead_ytd = sumField('mql');
   out.oom_qual_lead_ytd = sumField('oom_mql');
   out.kom_qual_lead_ytd = sumField('mql') - sumField('oom_mql');
-  
-  // Медианный чек — взвешенный по количеству оплат в отфильтрованных неделях
+
+  // Медианный чек - взвешенный по количеству оплат в отфильтрованных неделях
   var totPay = sumField('oplata');
   if (totPay > 0) {
     ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.median_check || 0) * (w.oplata || 0); }, 0) / totPay;
     ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.avg_dur || 0) * (w.oplata || 0); }, 0) / totPay;
   }
   out.ytd = ytd;
-  
+
   // ООМ: пересчёт из понедельных полей
   var oomPay = sumField('oom_won_cnt');
   if (oomPay > 0) {
@@ -202,7 +202,7 @@ function buildFilteredData(orig, filteredWeeks) {
   oom_ytd.won_relevant_cnt = oomPay;
   oom_ytd.conv_deal_pct = (oomPay + oom_ytd.lose_cnt) > 0 ? (oomPay / (oomPay + oom_ytd.lose_cnt)) * 100 : 0;
   out.oom_ytd = oom_ytd;
-  
+
   // КОМ: пересчёт из понедельных полей
   var komPay = sumField('kom_won_cnt');
   if (komPay > 0) {
@@ -213,9 +213,9 @@ function buildFilteredData(orig, filteredWeeks) {
   kom_ytd.won_relevant_cnt = komPay;
   kom_ytd.conv_deal_pct = (komPay + kom_ytd.lose_cnt) > 0 ? (komPay / (komPay + kom_ytd.lose_cnt)) * 100 : 0;
   out.kom_ytd = kom_ytd;
-  
-  // Форматы — оставляем из оригинала (не перезаписываем, т.к. в неделях нет cnt)
-  
+
+  // Форматы - оставляем из оригинала (не перезаписываем, т.к. в неделях нет cnt)
+
   return out;
 }
 
@@ -356,7 +356,7 @@ function renderPage(data) {
 
     <!-- Sources → улучшенный блок с разделением -->
     <div class="card"><h2>Рейтинг источников поступлений</h2>
-      <div class="sub" style="margin:-8px 0 14px">🟠 Входящий трафик · 🔵 Внутренняя база · первая строка — итог</div>
+      <div class="sub" style="margin:-8px 0 14px">🟠 Входящий трафик · 🔵 Внутренняя база · первая строка - итог</div>
       <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
         <thead><tr>
           <th class="sort" data-col="0">#</th><th class="sort" data-col="1">Тип</th><th class="sort" data-col="2">Источник</th><th class="sort" data-col="3">📥 Всего</th><th class="sort" data-col="4">✅ Оплачено</th><th class="sort" data-col="5">💰 Поступления в периоде, ₽</th><th class="sort" data-col="6">💵 Ср.чек</th><th class="sort" data-col="7">⏱ Цикл,дн</th><th class="sort" data-col="8">📊 Конв.%</th><th class="sort" data-col="9">🔄 В работе</th><th class="sort" data-col="10">❌ Отказы</th>
@@ -372,7 +372,7 @@ function renderPage(data) {
           return `<tr${isTotal ? " style='background:#F1F3F6;font-weight:700'" : ""}>
             <td>${isTotal ? '' : i}</td>
             <td>${typeLabel ? '<span style="color:'+typeColor+'">'+typeLabel+'</span>' : ''}</td>
-            <td>${s.name || '—'}</td>
+            <td>${s.name || '-'}</td>
             <td>${s.leads}</td>
             <td><b>${s.deals}</b></td>
             <td><b>${fmt(s.postupleniya)}</b> ₽</td>
@@ -414,7 +414,7 @@ function renderPage(data) {
       <div class="scroll-x" style="max-height:400px;overflow:auto"><table class="sortable">
         <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления в периоде, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📅 Последняя покупка</th></tr></thead>
         <tbody>${(data.top_companies || []).map((c, i) =>
-          `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${c.name || '—'}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${c.last_date || '—'}</td></tr>`
+          `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${c.name || '-'}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${c.last_date || '-'}</td></tr>`
         ).join('')}</tbody>
       </table></div>
     </div>
@@ -468,7 +468,7 @@ function renderPage(data) {
               <td><b>${total.oplata}</b></td>
               <td><b>${fmt(total.postupleniya)}</b></td>
               <td>${totAvg}</td>
-              <td>—</td>
+              <td>-</td>
               <td>${totLm}%</td>
               <td>${totMs}%</td>
               <td>${totSi}%</td>
@@ -504,8 +504,8 @@ function renderPage(data) {
       <div>
         <b>🏆 Лидеры:</b>
         <ul style="margin:6px 0 0 18px;color:#444">
-          <li>Источник: <b>${srcTop.length > 1 ? srcTop[1].name : '—'}</b> (${fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)} ₽)</li>
-          <li>Формат: <b>${fmtData.length > 0 ? fmtData[0][0] : '—'}</b> (${fmtData.length > 0 ? fmt(fmtData[0][1].sum) : 0} ₽)</li>
+          <li>Источник: <b>${srcTop.length > 1 ? srcTop[1].name : '-'}</b> (${fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)} ₽)</li>
+          <li>Формат: <b>${fmtData.length > 0 ? fmtData[0][0] : '-'}</b> (${fmtData.length > 0 ? fmt(fmtData[0][1].sum) : 0} ₽)</li>
           <li>${data.mgr_top && data.mgr_top.length > 0 ? 'Менеджер: <b>' + data.mgr_top[0].name + '</b> (' + fmt(data.mgr_top[0].postupleniya) + ' ₽)' : ''}</li>
         </ul>
       </div>
@@ -513,9 +513,9 @@ function renderPage(data) {
         <b>💡 Рекомендации:</b>
         <ul style="margin:6px 0 0 18px;color:#444">
           ${delta > 5 ? '<li>🚦 <b style="color:#2E7D32">🟢 Рост</b> поступлений +' + Math.abs(delta).toFixed(1) + '% к прошлой неделе</li>' : delta < -5 ? '<li>🚦 <b style="color:#C62828">🔴 Падение</b> поступлений ' + delta.toFixed(1) + '% к прошлой неделе</li>' : '<li>🚦 <b style="color:#F57C00">🟡 Стабильно</b> поступлений</li>'}
-          ${last.won_cnt === 0 && last.postupleniya === 0 ? '<li>⚠️ Текущая неделя без оплат — возможна задержка 1С</li>' : ''}
-          ${(srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка — поработать с качеством лидов</li>' : ''}
-          ${ytd.median_close_days_won > 60 ? '<li>⏱ Медленная скорость закрытия (' + ytd.median_close_days_won + ' дн. медиана) — ускорить обработку</li>' : '<li>⏱ Скорость закрытия: ' + ytd.median_close_days_won + ' дн. (медиана) ✅</li>'}
+          ${last.won_cnt === 0 && last.postupleniya === 0 ? '<li>⚠️ Текущая неделя без оплат - возможна задержка 1С</li>' : ''}
+          ${(srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка - поработать с качеством лидов</li>' : ''}
+          ${ytd.median_close_days_won > 60 ? '<li>⏱ Медленная скорость закрытия (' + ytd.median_close_days_won + ' дн. медиана) - ускорить обработку</li>' : '<li>⏱ Скорость закрытия: ' + ytd.median_close_days_won + ' дн. (медиана) ✅</li>'}
           <li>📌 Средняя скорость закрытия: ${ytd.median_close_days_won} дн. (медиана)</li>
         </ul>
       </div>
@@ -558,7 +558,7 @@ function initTableSort() {
 
 async function renderPageNewLogic() {
   const area = document.getElementById("contentAreaNew");
-  area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка новой логики…</div></div>';
+  area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка новой логики...</div></div>';
   try {
     const data = await api("/api/data/new");
     if (!data.ytd) { area.innerHTML = '<div class="error-state">❌ Нет данных</div>'; return; }
@@ -619,7 +619,7 @@ async function renderPageMainNew(d) {
     var b2b = d.btype_ytd||{}, b2bRow = (b2b.B2B||{cnt:0,sum:0}), b2cRow = (b2b.B2C||{cnt:0,sum:0}), totB2b = b2bRow.sum+b2cRow.sum||1;
     var weeks = d.weeks||[], labels = weeks.map(function(w){return w.label_dates || w.label_short || 'Неделя'+String(w.week).padStart(2,'0');});
     var fmtKeys = Object.keys(d.fmt_ytd||{}).filter(function(k){return k!=='period';});
-    
+
     // Используем последнюю ПОЛНУЮ неделю (пропускаем текущую, если в ней 0 оплат)
     var lastIdx = weeks.length - 1;
     while (lastIdx > 0 && weeks[lastIdx] && weeks[lastIdx].postupleniya === 0 && weeks[lastIdx].oplata === 0) {
@@ -653,11 +653,11 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Поступления по форматам</h2><div class="chartbox-sm"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
     html += '<div class="card"><h2>Поступления по типу обучения</h2><div class="chartbox-sm"><canvas id="newChEdu"></canvas></div><div id="newEduTable" style="margin-top:8px"></div></div>';
     html += '</div>';
-    // Стеки воронок — на всю ширину, друг под другом
+    // Стеки воронок - на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:16px"><h2>Воронка по неделям <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии на той же неделе)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     html += '<div class="card"><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учетом переходящего остатка, без учета даты создания)</span> <span style="color:#C62828;font-size:11px;font-weight:400">(в разработке)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
     // Конверсии
-    
+
     // Ряд 1: B2B/B2C + Источники
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>Тип клиента: B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
@@ -701,7 +701,7 @@ async function renderPageMainNew(d) {
       +'<tr style="border-top:1px dashed #ccc"><td>'+curWeekLabel+'</td><td><span class="dot" style="background:#1f2a44"></span> Внутренняя база</td><td>'+srcIntCur.cnt+'</td><td>'+fmt(srcIntCur.sum)+'</td><td>'+fmt(avgIntCur)+'</td><td>'+(srcIntCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
       +'<tr><td></td><td><span class="dot" style="background:#00bcd4"></span> Маркетинговые сделки</td><td>'+srcMktCur.cnt+'</td><td>'+fmt(srcMktCur.sum)+'</td><td>'+fmt(avgMktCur)+'</td><td>'+(srcMktCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
       +'</table>';
-        // Tables section — MBA (Тип покупателя — под графиком B2B/B2C, без дублирования)
+        // Tables section - MBA (Тип покупателя - под графиком B2B/B2C, без дублирования)
     html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
     html += '<div class="kpis" id="newRegKpis"></div>';
 
@@ -745,19 +745,19 @@ async function renderPageMainNew(d) {
     html += '</ul></div>';
     // Лидеры
     html += '<div><b>🏆 Лидеры:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '—')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽)</li>';
-    html += '<li>Формат: <b>'+(fmtData.length > 0 ? escapeHtml(fmtData[0][0]) : '—')+'</b> ('+fmt(fmtData.length > 0 ? fmtData[0][1].sum : 0)+' ₽)</li>';
+    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '-')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽)</li>';
+    html += '<li>Формат: <b>'+(fmtData.length > 0 ? escapeHtml(fmtData[0][0]) : '-')+'</b> ('+fmt(fmtData.length > 0 ? fmtData[0][1].sum : 0)+' ₽)</li>';
     html += '<li>'+(mgrTop.length > 0 ? 'Менеджер: <b>'+escapeHtml(mgrTop[0].name)+'</b> ('+fmt(mgrTop[0].postupleniya)+' ₽)' : '')+'</li>';
     html += '</ul></div>';
     // Рекомендации
     html += '<div><b>💡 Рекомендации:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += (wkDelta < 0 ? '<li>⚠️ Падение недели к прошлой — проанализировать причины</li>' : '<li>✅ Неделя стабильна или растёт</li>');
-    html += (srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка — поработать с качеством лидов</li>' : '';
+    html += (wkDelta < 0 ? '<li>⚠️ Падение недели к прошлой - проанализировать причины</li>' : '<li>✅ Неделя стабильна или растёт</li>');
+    html += (srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка - поработать с качеством лидов</li>' : '';
     html += '<li>📌 Средняя скорость закрытия: '+(ytd.median_close_days_won||0)+' дн. (медиана)</li>';
     html += '</ul></div>';
     html += '</div></div>';
 
-    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div></div>';
+    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка...</div></div></div></div>';
 
     // Batch update all at once
     areaNew.innerHTML = html;
@@ -798,7 +798,7 @@ async function renderPageMainNew(d) {
 
 
 
-    // Недельная таблица — от последней недели к первой
+    // Недельная таблица - от последней недели к первой
     var weekStr = '<table style="font-size:11px"><tr><th>Неделя</th><th>Лиды</th><th>MQL</th><th>SQL</th><th>Счёт</th><th>Оплачено</th><th>Поступл.</th><th>Ср.чек</th><th>Цикл</th><th>Лиды\u2192MQL</th><th>MQL\u2192SQL</th><th>SQL\u2192Счёт</th><th>Счёт\u2192Оплата</th><th>Лид\u2192Оплата</th></tr>';
     var tL=0,tM=0,tS=0,tO=0,tP0=0;
     // Предварительный расчёт конверсий для всех недель
@@ -1114,6 +1114,21 @@ function renderStepLines(curIdx, steps, progressPct) {
   return h;
 }
 
+// Глобальная функция безопасного fetch
+async function safeFetch(url, opts) {
+  var resp = await fetch(url, opts);
+  if (resp.redirected || resp.url.endsWith('/login')) {
+    window.location.href = '/login';
+    throw new Error('redirect');
+  }
+  var text = await resp.text();
+  if (text.startsWith('<!DOCTYPE')) {
+    window.location.href = '/login';
+    throw new Error('redirect');
+  }
+  return JSON.parse(text);
+}
+
 document.getElementById('refreshBtn').addEventListener('click', async function() {
   this.disabled = true;
   this.textContent = '⏳ Обновление...';
@@ -1138,35 +1153,16 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
   }
 
   try {
-    async function safeFetch(url, opts) {
-      var resp = await fetch(url, opts);
-      if (resp.redirected || resp.url.endsWith('/login')) {
-        window.location.href = '/login';
-        throw new Error('redirect');
-      }
-      var text = await resp.text();
-      if (text.startsWith('<!DOCTYPE')) {
-        window.location.href = '/login';
-        throw new Error('redirect');
-      }
-      return JSON.parse(text);
-    }
-
-    // Сбросим, если было зависшее состояние
-    await safeFetch((window.BASE_PATH || '') + '/api/refresh/reset', { method: 'POST' });
-
-    var resData = await safeFetch((window.BASE_PATH || '') + '/api/refresh', { method: 'POST' });
-    if (!resData.ok) { alert(resData.message); return; }
-
-    // Поллинг статуса
+    await safeFetch((window.BASE_PATH || '') + '/api/refresh', { method: 'POST' });
+    
+    // Поллинг статуса (встроенный, не runRefreshPolling)
     var lastStepIdx = -1;
 
     while (true) {
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(function(r) { setTimeout(r, 5000); });
 
       var status = await safeFetch((window.BASE_PATH || '') + '/api/status');
 
-      // Элапсед
       var elapsed = '';
       if (status.startedAt) {
         var start = new Date(status.startedAt);
@@ -1178,20 +1174,17 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
         document.getElementById('statusElapsed').textContent = '⏱ ' + elapsed;
       }
 
-      // Прогресс-бар
-      var pct = status.progressPct != null ? status.progressPct : Math.min(85, status.currentStepIdx >= 0 ? (status.currentStepIdx / 4) * 85 : 0);
+      var pct = status.progressPct != null ? status.progressPct : 0;
       document.getElementById('statusProgressFill').style.width = Math.min(pct, 100) + '%';
+      document.getElementById('loadingFill').style.width = pct + '%';
 
-      // Шаги
       var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
-      // Определяем реальный curIdx: если все done, показываем last
       if (status.progressSteps) {
         var allDone = status.progressSteps.every(function(s) { return s.done; });
-        if (allDone) curIdx = 4; // все завершены
+        if (allDone) curIdx = 4;
         document.getElementById('statusSteps').innerHTML = renderStepLines(curIdx, status.progressSteps, pct);
       }
 
-      // Прогресс сделок
       var dealText = '';
       if (status.loadingPhase && status.loadingPhase !== 'Запуск скрипта...') {
         dealText = status.loadingPhase;
@@ -1201,30 +1194,26 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
       }
       document.getElementById('statusDealProgress').textContent = dealText;
 
-      // Прогресс-бар в хедере (для загрузки страницы)
-      document.getElementById('loadingFill').style.width = pct + '%';
-
       if (status.error && !status.loading) {
         document.getElementById('statusSteps').innerHTML += '<div class="refresh-step step-error"><span class="step-icon">❌</span><span class="step-label">Ошибка: ' + escapeHtml(status.error) + '</span></div>';
         break;
       }
       if (status.ready && !status.loading) {
         document.getElementById('statusProgressFill').style.width = '100%';
+        document.getElementById('loadingFill').style.width = '100%';
         document.getElementById('statusSteps').innerHTML = renderStepLines(4, refreshStepsData, 100);
         document.getElementById('statusDealProgress').textContent = '✅ Загружено за ' + elapsed;
-        // loadAll сама загрузит данные и отрендерит
-        loadAll().catch(function(e) {});
-        // Скрываем панель через 5 секунд
         setTimeout(function() {
           var pnl = document.getElementById('refreshStatusPanel');
           if (pnl) pnl.style.display = 'none';
         }, 5000);
+        loadAll().catch(function(e) {});
         break;
       }
 
       lastStepIdx = curIdx;
     }
-  } catch (e) { 
+  } catch (e) {
     if (e.message !== 'redirect') {
       alert('Ошибка: ' + e.message);
     }
@@ -1241,6 +1230,73 @@ document.getElementById('dateTo').addEventListener('change', function() {
 });
 
 
+// --- Запуск при загрузке страницы ---
+
+// Функция: показать панель статуса обновления и поллить
+function runRefreshPolling() {
+  var panel = document.getElementById('refreshStatusPanel');
+  if (!panel) {
+    var toolbar = document.querySelector('.toolbar');
+    if (toolbar) toolbar.insertAdjacentHTML('afterend', statusPanelHTML);
+    panel = document.getElementById('refreshStatusPanel');
+  }
+  panel.style.display = 'block';
+
+  var interval = setInterval(async function() {
+    try {
+      var status = await safeFetch((window.BASE_PATH || '') + '/api/status');
+
+      var elapsed = '';
+      if (status.startedAt) {
+        var start = new Date(status.startedAt);
+        var now = new Date();
+        var diff = Math.floor((now - start) / 1000);
+        var min2 = Math.floor(diff / 60);
+        var sec2 = diff % 60;
+        elapsed = min2 + 'м ' + sec2 + 'с';
+        document.getElementById('statusElapsed').textContent = '⏱ ' + elapsed;
+      }
+
+      var pct = status.progressPct != null ? status.progressPct : 0;
+      document.getElementById('statusProgressFill').style.width = Math.min(pct, 100) + '%';
+      document.getElementById('loadingFill').style.width = pct + '%';
+
+      var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
+      if (status.progressSteps) {
+        var allDone = status.progressSteps.every(function(s) { return s.done; });
+        if (allDone) curIdx = 4;
+        document.getElementById('statusSteps').innerHTML = renderStepLines(curIdx, status.progressSteps, pct);
+      }
+
+      var dealText = '';
+      if (status.loadingPhase && status.loadingPhase !== 'Запуск скрипта...') {
+        dealText = status.loadingPhase;
+        if (status.loadingProgress && status.loadingProgress.current > 0) {
+          dealText += ' - ' + status.loadingProgress.current.toLocaleString('ru-RU') + ' сделок';
+        }
+      }
+      document.getElementById('statusDealProgress').textContent = dealText;
+
+      if (status.error && !status.loading) {
+        document.getElementById('statusSteps').innerHTML += '<div class="refresh-step step-error"><span class="step-icon">❌</span><span class="step-label">Ошибка: ' + escapeHtml(status.error) + '</span></div>';
+        clearInterval(interval);
+      }
+      if (status.ready && !status.loading && !status.error) {
+        document.getElementById('statusProgressFill').style.width = '100%';
+        document.getElementById('loadingFill').style.width = '100%';
+        document.getElementById('statusSteps').innerHTML = renderStepLines(4, refreshStepsData, 100);
+        document.getElementById('statusDealProgress').textContent = '✅ Загружено за ' + elapsed;
+        setTimeout(function() {
+          var pnl = document.getElementById('refreshStatusPanel');
+          if (pnl) pnl.style.display = 'none';
+        }, 5000);
+        loadAll().catch(function(e) {});
+        clearInterval(interval);
+      }
+    } catch(e) {}
+  }, 5000);
+}
+
 // Защищённый запуск: ошибка не должна блокировать UI
 loadAll().catch(function(e) {
   var area = document.getElementById('contentArea');
@@ -1248,5 +1304,19 @@ loadAll().catch(function(e) {
   var areaNew = document.getElementById('contentAreaNew');
   if (areaNew) areaNew.innerHTML = areaNew.innerHTML || '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
 });
+
+// Если на сервере уже идёт обновление - показываем панель и поллим
+(async function() {
+  try {
+    var initStatus = await safeFetch((window.BASE_PATH || '') + '/api/status');
+    if (initStatus.loading) {
+      await safeFetch((window.BASE_PATH || '') + '/api/refresh/reset', { method: 'POST' });
+      var recheck = await safeFetch((window.BASE_PATH || '') + '/api/status');
+      if (recheck.loading) {
+        runRefreshPolling();
+      }
+    }
+  } catch(e) {}
+})();
 
 // --- Participants tab ---
