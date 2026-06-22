@@ -711,6 +711,7 @@ async function renderPageMainNew(d) {
         + '</tr>';
     function pct(v) { return (v||0).toFixed(1)+'%'; }
     mgrs.forEach(function(m){
+      if (!m.won && !m.postupleniya) return;
       mgrStr+='<tr><td><b>'+escapeHtml(m.name)+'</b></td>'
         +'<td>'+m.leads+'</td><td>'+m.mql+'</td><td>'+m.sql+'</td><td>'+m.invoice_cnt+'</td>'
         +'<td><b>'+m.won+'</b></td><td>'+m.lost+'</td>'
