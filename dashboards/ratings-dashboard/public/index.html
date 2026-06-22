@@ -704,19 +704,24 @@ async function renderPageMainNew(d) {
     var mgrs = d.mgr_top||[];
     var mgrStr = '<div class="scroll-x" style="max-height:480px;overflow:auto"><table style="font-size:10px;white-space:nowrap"><tr>'
         + '<th>Менеджер</th>'
-        + '<th>👥 Лиды</th><th>🔍 MQL</th><th>🎯 SQL</th><th>📄 Счёт</th>'
-        + '<th>✅ Оплачено</th><th>❌ Отказы</th>'
-        + '<th>💰 Поступления</th><th>💵 Ср.чек</th><th>⏱ Цикл,дн</th>'
-        + '<th>📊 Лид→MQL</th><th>📊 MQL→SQL</th><th>📊 SQL→Счёт</th><th>📊 Счёт→Оплата</th>'
+        + '<th>🔄 В работе (нач.)</th>'
+        + '<th>➕ Создано</th>'
+        + '<th>✅ Оплачено</th>'
+        + '<th>❌ Проиграно</th>'
+        + '<th>🔄 В работе (кон.)</th>'
+        + '<th>💰 Поступления</th>'
+        + '<th>💵 Ср.чек</th>'
+        + '<th>⏱ Цикл,дн</th>'
+        + '<th>📊 Конв.%</th>'
         + '</tr>';
-    function pct(v) { return (v||0).toFixed(1)+'%'; }
     mgrs.forEach(function(m){
-      if (!m.won && !m.postupleniya) return;
+      if (!m.paid && !m.in_work_start && !m.created) return;
       mgrStr+='<tr><td><b>'+escapeHtml(m.name)+'</b></td>'
-        +'<td>'+m.leads+'</td><td>'+m.mql+'</td><td>'+m.sql+'</td><td>'+m.invoice_cnt+'</td>'
-        +'<td><b>'+m.won+'</b></td><td>'+m.lost+'</td>'
-        +'<td><b>'+fmt(m.postupleniya)+'</b> ₽</td><td>'+fmt(m.avg_check)+' ₽</td><td>'+(m.avg_dur||'-')+'</td>'
-        +'<td>'+pct(m.conv_lead_mql)+'</td><td>'+pct(m.conv_mql_sql)+'</td><td>'+pct(m.conv_sql_inv)+'</td><td>'+pct(m.conv_inv_won)+'</td>'
+        +'<td>'+m.in_work_start+'</td><td>'+m.created+'</td>'
+        +'<td><b>'+m.paid+'</b></td><td>'+m.lost+'</td><td><b>'+m.in_work_end+'</b></td>'
+        +'<td><b>'+fmt(m.paid_sum)+'</b> ₽</td><td>'+fmt(m.avg_check)+' ₽</td>'
+        +'<td>'+(m.avg_dur||'-')+'</td>'
+        +'<td>'+(m.conv_pct||0).toFixed(1)+'%</td>'
         +'</tr>';
     });
     mgrStr += '</table></div>';

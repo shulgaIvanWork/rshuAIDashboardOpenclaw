@@ -759,85 +759,96 @@ remaining_row = {
 
 top_products = selected + [remaining_row]
 
-# === Менеджеры ===
-mgr_ytd  = defaultdict(lambda: {"cnt": 0, "sum": 0.0, "lost": 0,
-                               "mql": 0, "sql": 0, "invoice_cnt": 0,
-                               "durs": []})
-mgr_prev = defaultdict(lambda: {"cnt": 0, "sum": 0.0, "lost": 0})
+# === Менеджеры: Воронка (потоковая модель) ===
+# В работе (нач.) → +Создано → −Оплачено → −Проиграно → В работе (кон.)
+
+YEAR_START = datetime(YEAR, 1, 1).date()
+
+mgr_data = defaultdict(lambda: {
+    "in_work_start": 0, "in_work_start_sum": 0.0,
+    "created": 0, "created_sum": 0.0,
+    "paid": 0, "paid_sum": 0.0,
+    "lost": 0,
+    "durs": [],
+})
+
+for r in rows:
+    mgr = r["MGR"]
+    cat = r["CAT_ID"]
+    if cat not in VALID_CATS:
+        continue
+    opp = r["OPP"]
+    if opp < MIN_OPP:
+        continue
+    dc = r["DC"]
+    pay = r["PAY_DT"]
+    cl = r["CL"]
+    sem = r["SEM"]
+    
+    d = mgr_data[mgr]
+    
+    # Создано в 2026
+    if dc and dc.year == YEAR:
+        d["created"] += 1
+        d["created_sum"] += opp
+    
+    # Оплачено в 2026
+    if is_paid(r) and pay and pay.year == YEAR:
+        d["paid"] += 1
+        d["paid_sum"] += opp
+        if dc and pay:
+            dur = (pay - dc).days
+            if dur >= 0:
+                d["durs"].append(dur)
+    
+    # Проиграно в 2026
+    if sem == "F" and cl and cl.year == YEAR:
+        d["lost"] += 1
+    
+    # В работе на начало года (создано до 2026, не оплачено, не проиграно)
+    if dc and dc.date() <= YEAR_START:
+        was_paid_before = pay and pay.date() < YEAR_START
+        was_lost_before = (sem == "F" and cl and cl.date() < YEAR_START)
+        if not was_paid_before and not was_lost_before:
+            d["in_work_start"] += 1
+            d["in_work_start_sum"] += opp
+
 cat_ytd  = defaultdict(lambda: {"cnt": 0, "sum": 0.0})
 for r in rows:
-    if r["IS_OOM"]:
-        if pay_ytd(r):
-            mgr_ytd[r["MGR"]]["cnt"] += 1
-            mgr_ytd[r["MGR"]]["sum"] += r["OPP"]
-            # Длительность по PAY_DT
-            if r["DC"] and r["PAY_DT"]:
-                d = (r["PAY_DT"] - r["DC"]).days
-                if d >= 0:
-                    mgr_ytd[r["MGR"]]["durs"].append(d)
-            cat_ytd[r["CAT"]]["cnt"] += 1
-            cat_ytd[r["CAT"]]["sum"] += r["OPP"]
-            pd_mgr = get_pay_date(r)
-            if pd_mgr and pd_mgr.isocalendar()[:2] == (YEAR, prev_w):
-                mgr_prev[r["MGR"]]["cnt"] += 1
-                mgr_prev[r["MGR"]]["sum"] += r["OPP"]
-        elif r["SEM"] == "F" and r["CL"] and r["CL"].year == YEAR:
-            mgr_ytd[r["MGR"]]["lost"] += 1
-            if r["CL"].date().isocalendar()[:2] == (YEAR, prev_w):
-                mgr_prev[r["MGR"]]["lost"] += 1
-    # MQL, SQL, Invoice — по всем категориям (не только IS_OOM)
-    if r["CAT_ID"] in VALID_CATS and r["DC"] and r["DC"].year == YEAR:
-        # MQL: созданные в PreSale
-        if r["IS_PRESALE"]:
-            mgr_ytd[r["MGR"]]["mql"] += 1
-        # SQL: выигранные в PreSale или на DETAILS+
-        if r["IS_PRESALE"] and r["SEM"] == "S" and r["CL"] and r["CL"].year == YEAR:
-            mgr_ytd[r["MGR"]]["sql"] += 1
-        # Invoice: есть дата счёта
-        if r.get("INV_DT") and r["INV_DT"].year == YEAR and r["SEM"] != "F":
-            mgr_ytd[r["MGR"]]["invoice_cnt"] += 1
-
-mgr_leads_ytd  = Counter()
-mgr_leads_prev = Counter()
-for l in leads:
-    d = parse_dt(l.get("DATE_CREATE"))
-    if not d or d.year != YEAR:
-        continue
-    mgr = users.get(str(l.get("ASSIGNED_BY_ID", "")), str(l.get("ASSIGNED_BY_ID", "")))
-    mgr_leads_ytd[mgr] += 1
-    if d.date().isocalendar()[:2] == (YEAR, prev_w):
-        mgr_leads_prev[mgr] += 1
+    if pay_ytd(r) and r["IS_OOM"]:
+        cat_ytd[r["CAT"]]["cnt"] += 1
+        cat_ytd[r["CAT"]]["sum"] += r["OPP"]
+cat_top = sorted([(k, v["cnt"], v["sum"]) for k, v in cat_ytd.items()], key=lambda x: -x[2])
 
 
-def mgr_row(name, d, leads_cnt):
-    w   = d["cnt"]; s = d["sum"]; lo = d["lost"]
-    avg = s / w if w else 0
-    conv = w / (w + lo) * 100 if (w + lo) else 0
+def mgr_row(name, d):
+    iws = d["in_work_start"]
+    iws_sum = d["in_work_start_sum"]
+    cr = d["created"]
+    cr_sum = d["created_sum"]
+    pd = d["paid"]
+    pd_sum = d["paid_sum"]
+    lo = d["lost"]
+    iwe = iws + cr - pd - lo
+    iwe_sum = iws_sum + cr_sum - pd_sum
+    avg = pd_sum / pd if pd else 0
     durs = d.get("durs", [])
     avg_dur = sum(durs) / len(durs) if durs else 0
-    mql = d.get("mql", 0)
-    sql = d.get("sql", 0)
-    inv = d.get("invoice_cnt", 0)
-    # Конверсии между этапами
-    conv_lead_mql   = mql / leads_cnt * 100 if leads_cnt else 0
-    conv_mql_sql    = sql / mql * 100 if mql else 0
-    conv_sql_inv    = inv / sql * 100 if sql else 0
-    conv_inv_won    = w / inv * 100 if inv else 0
-    return {"name": name, "leads": leads_cnt, "mql": mql, "sql": sql,
-            "invoice_cnt": inv, "won": w, "lost": lo,
-            "conv_pct": round(conv, 1), "postupleniya": s, "avg_check": round(avg),
+    conv = pd / (pd + lo) * 100 if (pd + lo) else 0
+    return {"name": name,
+            "in_work_start": iws, "in_work_start_sum": round(iws_sum),
+            "created": cr, "created_sum": round(cr_sum),
+            "paid": pd, "paid_sum": round(pd_sum),
+            "lost": lo,
+            "in_work_end": iwe, "in_work_end_sum": round(max(0, iwe_sum)),
+            "avg_check": round(avg),
             "avg_dur": round(avg_dur, 1),
-            "conv_lead_mql": round(conv_lead_mql, 1),
-            "conv_mql_sql": round(conv_mql_sql, 1),
-            "conv_sql_inv": round(conv_sql_inv, 1),
-            "conv_inv_won": round(conv_inv_won, 1)}
+            "conv_pct": round(conv, 1)}
 
 
-mgr_top      = sorted([mgr_row(k, v, mgr_leads_ytd[k]) for k, v in mgr_ytd.items()],
-                       key=lambda x: -x["postupleniya"])[:30]
-mgr_prev_top = sorted([mgr_row(k, v, mgr_leads_prev[k]) for k, v in mgr_prev.items()],
-                       key=lambda x: -x["postupleniya"])[:5]
-cat_top      = sorted([(k, v["cnt"], v["sum"]) for k, v in cat_ytd.items()], key=lambda x: -x[2])
+mgr_top = sorted([mgr_row(k, v) for k, v in mgr_data.items()],
+                 key=lambda x: -x["paid_sum"])[:30]
+mgr_prev_top = []
 
 # === ТОП-20 компаний ===
 company_agg = defaultdict(lambda: {"sum": 0.0, "cnt": 0, "last": None})
