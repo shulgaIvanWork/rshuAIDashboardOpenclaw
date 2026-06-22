@@ -1305,16 +1305,12 @@ loadAll().catch(function(e) {
   if (areaNew) areaNew.innerHTML = areaNew.innerHTML || '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
 });
 
-// Если на сервере уже идёт обновление - показываем панель и поллим
+// Если на сервере уже идёт обновление — показываем панель и поллим
 (async function() {
   try {
     var initStatus = await safeFetch((window.BASE_PATH || '') + '/api/status');
     if (initStatus.loading) {
-      await safeFetch((window.BASE_PATH || '') + '/api/refresh/reset', { method: 'POST' });
-      var recheck = await safeFetch((window.BASE_PATH || '') + '/api/status');
-      if (recheck.loading) {
-        runRefreshPolling();
-      }
+      runRefreshPolling();
     }
   } catch(e) {}
 })();
