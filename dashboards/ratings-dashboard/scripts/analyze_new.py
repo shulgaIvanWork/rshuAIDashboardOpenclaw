@@ -670,7 +670,7 @@ def edusplit(subset, period):
     for r in subset:
         if is_paid(r):
             if r["IS_OOM"] or r["IS_KOM"]:
-                edu = extract_edu_type(r.get("EDU_TYPE", ""))
+                edu = extract_edu_type(r.get("UF_CRM_1765896709800", ""))
                 if edu:
                     g[edu]["cnt"] += 1
                     g[edu]["sum"] += r["OPP"]
@@ -759,8 +759,42 @@ remaining_row = {
 
 top_products = selected + [remaining_row]
 
-# === Менеджеры: Воронка (потоковая модель) ===
-# В работе (нач.) → +Создано → −Оплачено → −Проиграно → В работе (кон.)
+# === Менеджеры: Потоковая модель + Этапы воронки ===
+
+# Группы менеджеров
+MGR_GROUPS = {
+    '1': 'bond',          # James Bond
+    '513': 'main',        # Михаил Зеленов
+    '527': 'autopay',     # Дарья Щеткина
+    '516': 'autopay',     # Ольга Гайдукова
+    '528': 'main',        # Ольга Пономарева
+    '12482': 'main',      # Виктория Фефелова
+    '20588': 'hidden',    # Гарри Лучин — уволен
+    '21286': 'afanasyev', # Дмитрий Афанасьев — лид-менеджер
+    '27015': 'main',      # Сергей Иванушкин
+    '19823': 'tech',      # Милана Касабян — ОЗК тех
+    '26192': 'hidden',    # Татьяна Фролова — уволен
+    '27163': 'main',      # Денис Дубаневич
+    '27119': 'tech',      # Мария Кулевцова — ОЗК тех
+    '26343': 'hidden',    # Александр Замулко — уволен
+    '26161': 'hidden',    # Ольга Пайтерова — уволен
+    '27158': 'main',      # Андрей Ермолов
+    '27157': 'hidden',    # Татьяна Горохова — уволен
+    '586': 'tech',        # Анастасия Боброва — КОМ тех
+    '515': 'hidden',      # Дарья Рукина — уволен
+    '517': 'hidden',      # Анна Поцелуева — уволен
+    '23840': 'hidden',    # Сусанна Новосардова — уволен
+    '23715': 'hidden',    # Татьяна Анисимова — уволен
+    '23251': 'hidden',    # Дарья Иванова — уволен
+    '25557': 'hidden',    # Анна Голубь — уволен
+    '24984': 'hidden',    # Александр Елумеев — уволен
+    '24620': 'hidden',    # Михаил Баранов — уволен
+    '23296': 'hidden',    # astafieva@uprav.ru — уволен
+    '24688': 'hidden',    # Игорь Сапожников — уволен
+    '5274': 'tech',       # Елена Ткаченко — КОМ тех
+    '22275': 'tech',      # Виктория Баканова — КОМ тех
+    '25474': 'hidden',    # Алёна Галкина — уволен
+}
 
 YEAR_START = datetime(YEAR, 1, 1).date()
 
@@ -770,9 +804,27 @@ mgr_data = defaultdict(lambda: {
     "paid": 0, "paid_sum": 0.0,
     "lost": 0,
     "durs": [],
+    "leads": 0,
+    "mql": 0, "sql": 0, "invoice_cnt": 0,
+    "group": "",
+    # срезы для оплаченных
+    "b2b_sum": 0.0, "b2c_sum": 0.0,
+    "src_int_sum": 0.0, "src_mkt_sum": 0.0,
+    "fmt_oom_sum": 0.0, "fmt_om_sum": 0.0, "fmt_sdo_sum": 0.0,
+    "edu_pk_sum": 0.0, "edu_pp_sum": 0.0, "edu_kom_sum": 0.0,
 })
 
 for r in rows:
+    mgr_id = str(r.get("MGR_ID", ""))
+    group = MGR_GROUPS.get(mgr_id, 'hidden')
+    
+    if group == 'hidden':
+        mgr_key = 'Прочие'
+        group = 'other'
+    elif group == 'autopay':
+        mgr_key = 'Автооплаты'
+    else:
+        mgr_key = r["MGR"]
     mgr = r["MGR"]
     cat = r["CAT_ID"]
     if cat not in VALID_CATS:
@@ -785,7 +837,11 @@ for r in rows:
     cl = r["CL"]
     sem = r["SEM"]
     
-    d = mgr_data[mgr]
+    d = mgr_data[mgr_key]
+    d["group"] = group
+    d["name"] = mgr_key
+    if group not in ('autopay', 'other'):
+        d["_mgr"] = mgr  # сохраняем оригинальное имя для mgr_row
     
     # Создано в 2026
     if dc and dc.year == YEAR:
@@ -800,18 +856,84 @@ for r in rows:
             dur = (pay - dc).days
             if dur >= 0:
                 d["durs"].append(dur)
+        # срезы
+        if r.get("BTYPE") == "B2B":
+            d["b2b_sum"] += opp
+        else:
+            d["b2c_sum"] += opp
+        if is_internal_source(r.get("SRC", "")):
+            d["src_int_sum"] += opp
+        else:
+            d["src_mkt_sum"] += opp
+        fmt = r.get("FORMAT", "")
+        if fmt == "Очный" or fmt == "ООМ (Очное)":
+            d["fmt_oom_sum"] += opp
+        elif fmt == "Онлайн" or fmt == "ОМ (Онлайн)":
+            d["fmt_om_sum"] += opp
+        elif fmt == "Видеокурс" or fmt == "СДО":
+            d["fmt_sdo_sum"] += opp
+        edu = extract_edu_type(r.get("UF_CRM_1765896709800", ""))
+        if edu == "Повышение квалификации":
+            d["edu_pk_sum"] += opp
+        elif edu == "Проф. переподготовка":
+            d["edu_pp_sum"] += opp
+        elif edu == "Корпоративное обучение":
+            d["edu_kom_sum"] += opp
     
     # Проиграно в 2026
     if sem == "F" and cl and cl.year == YEAR:
         d["lost"] += 1
     
-    # В работе на начало года (создано до 2026, не оплачено, не проиграно)
+    # В работе на начало года
     if dc and dc.date() <= YEAR_START:
         was_paid_before = pay and pay.date() < YEAR_START
         was_lost_before = (sem == "F" and cl and cl.date() < YEAR_START)
         if not was_paid_before and not was_lost_before:
             d["in_work_start"] += 1
             d["in_work_start_sum"] += opp
+    
+    # MQL: квалифицированные лиды (по is_qual_lead_w — любые категории 0|8|19, не NEW)
+    if dc and dc.year == YEAR and is_qual_lead_w(r):
+        d["mql"] += 1
+    
+    # SQL: полная логика как в управленческом
+    stage_code = r.get("STAGE")
+    has_invoice = r.get("UF_CRM_1753272713011")
+    is_sql = False
+    if stage_code in ("DETAILS", "PROPOSAL", "2", "6", "WON"):
+        is_sql = True
+    elif cat == 19 and sem != "S":
+        kom_stage = (stage_code or '').replace('C19:','')
+        kom_has_calc = r.get("UF_CRM_5D133690E1")
+        if kom_stage in ("EXECUTING", "UC_C670BC", "UC_I443UQ"):
+            is_sql = True
+        elif kom_has_calc and kom_stage in ("UC_ALOZ6B", "UC_W4ML6H", "LOSE"):
+            is_sql = True
+    elif has_invoice and stage_code in ("LOSE", "UC_F2YC3N", "UC_W6SCHG", "UC_670ME2", "UC_VKPN0N"):
+        is_sql = True
+    
+    if is_sql and dc and dc.year == YEAR:
+        d["sql"] += 1
+    
+    # Счёт: есть UF_CRM_1753272713011, не LOSE
+    inv_dt = r.get("UF_CRM_1753272713011")
+    if inv_dt:
+        inv_parsed = parse_dt(inv_dt)
+        if inv_parsed and inv_parsed.year == YEAR and sem != "F":
+            d["invoice_cnt"] += 1
+
+# Лиды CRM (crm.lead) — отдельный проход
+for l in leads:
+    d = parse_dt(l.get("DATE_CREATE"))
+    if not d or d.year != YEAR:
+        continue
+    mgr_id_lead = str(l.get("ASSIGNED_BY_ID", ""))
+    group_lead = MGR_GROUPS.get(mgr_id_lead, 'hidden')
+    if group_lead == 'hidden':
+        continue
+    mgr = users.get(mgr_id_lead, mgr_id_lead)
+    mgr_key_lead = 'Автооплаты' if group_lead == 'autopay' else mgr
+    mgr_data[mgr_key_lead]["leads"] += 1
 
 cat_ytd  = defaultdict(lambda: {"cnt": 0, "sum": 0.0})
 for r in rows:
@@ -823,31 +945,51 @@ cat_top = sorted([(k, v["cnt"], v["sum"]) for k, v in cat_ytd.items()], key=lamb
 
 def mgr_row(name, d):
     iws = d["in_work_start"]
-    iws_sum = d["in_work_start_sum"]
     cr = d["created"]
-    cr_sum = d["created_sum"]
     pd = d["paid"]
     pd_sum = d["paid_sum"]
     lo = d["lost"]
     iwe = iws + cr - pd - lo
-    iwe_sum = iws_sum + cr_sum - pd_sum
     avg = pd_sum / pd if pd else 0
     durs = d.get("durs", [])
     avg_dur = sum(durs) / len(durs) if durs else 0
     conv = pd / (pd + lo) * 100 if (pd + lo) else 0
-    return {"name": name,
-            "in_work_start": iws, "in_work_start_sum": round(iws_sum),
-            "created": cr, "created_sum": round(cr_sum),
+    
+    ld = d["leads"]
+    mql = d["mql"]
+    sql = d["sql"]
+    inv = d["invoice_cnt"]
+    
+    # Конверсии
+    conv_lead_mql = mql / ld * 100 if ld else 0
+    conv_mql_sql  = sql / mql * 100 if mql else 0
+    conv_sql_inv  = inv / sql * 100 if sql else 0
+    conv_inv_paid = pd / inv * 100 if inv else 0
+    
+    return {"name": name, "group": d["group"],
+            "in_work_start": iws,
+            "created": cr,
             "paid": pd, "paid_sum": round(pd_sum),
             "lost": lo,
-            "in_work_end": iwe, "in_work_end_sum": round(max(0, iwe_sum)),
+            "in_work_end": iwe,
+            "leads": ld,
+            "mql": mql, "sql": sql, "invoice_cnt": inv,
             "avg_check": round(avg),
             "avg_dur": round(avg_dur, 1),
-            "conv_pct": round(conv, 1)}
+            "conv_pct": round(conv, 1),
+            "conv_lead_mql": round(conv_lead_mql, 1),
+            "conv_mql_sql": round(conv_mql_sql, 1),
+            "conv_sql_inv": round(conv_sql_inv, 1),
+            "conv_inv_paid": round(conv_inv_paid, 1),
+            # срезы
+            "b2b_sum": round(d["b2b_sum"]), "b2c_sum": round(d["b2c_sum"]),
+            "src_int_sum": round(d["src_int_sum"]), "src_mkt_sum": round(d["src_mkt_sum"]),
+            "fmt_oom_sum": round(d["fmt_oom_sum"]), "fmt_om_sum": round(d["fmt_om_sum"]), "fmt_sdo_sum": round(d["fmt_sdo_sum"]),
+            "edu_pk_sum": round(d["edu_pk_sum"]), "edu_pp_sum": round(d["edu_pp_sum"]), "edu_kom_sum": round(d["edu_kom_sum"]),}
 
 
 mgr_top = sorted([mgr_row(k, v) for k, v in mgr_data.items()],
-                 key=lambda x: -x["paid_sum"])[:30]
+                 key=lambda x: (-x["paid_sum"] if x["paid_sum"] else (1 if x["group"] == 'main' else 2)))
 mgr_prev_top = []
 
 # === ТОП-20 компаний ===

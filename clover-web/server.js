@@ -34,6 +34,7 @@ import participantsDashboard from '../dashboards/participants-dashboard/server.j
 import testDashboard from '../dashboards/test-dashboard/server.js';
 import rshuDashboard from '../dashboards/rshu-dashboard/server.js';
 import komDashboard from '../dashboards/kom-dashboard/server.js';
+import managerReportDev from '../dashboards/manager-report-dev/server.js';
 
 // --------------- App ---------------
 const app = express();
@@ -105,6 +106,7 @@ app.use('/ratings-dashboard', requireAuth, ratingsDashboard);
 
 app.use('/participants-dashboard', requireAuth, participantsDashboard);
 app.use('/test-dashboard', requireAuth, testDashboard);
+app.use('/manager-report-dev', requireAuth, managerReportDev);
 
 // --------------- Dashboards page ---------------
 app.get('/dashboards', requireAuth, (req, res) => {
