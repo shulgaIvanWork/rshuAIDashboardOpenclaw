@@ -14,12 +14,53 @@ const CACHE_DIR = path.join(__dirname, 'cache');
 
 await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
 
+// --- Шаги прогресса ---
+const STEP_WEIGHTS = [
+  { key: 'fetch_rest',   label: 'REST API: выгрузка сделок',         weight: 40 },
+  { key: 'fetch_export', label: 'Export API: дополнение сделок',     weight: 10 },
+  { key: 'fetch_dicts',  label: 'Загрузка справочников',             weight: 10 },
+  { key: 'analyze_new',  label: 'Анализ данных',                     weight: 40 },
+];
+
+function initProgressSteps() {
+  return STEP_WEIGHTS.map(s => ({
+    key: s.key,
+    label: s.label,
+    weight: s.weight,
+    done: false,
+    current: 0,
+    total: 0,
+  }));
+}
+
+function calcProgressPct(steps, curIdx) {
+  if (!steps) return 0;
+  var pct = 0;
+  // Примерное кол-во сделок для шага fetch_rest (когда total=0)
+  var ESTIMATED_TOTAL_DEALS = 12000;
+  for (var i = 0; i < steps.length; i++) {
+    if (steps[i].done) {
+      pct += steps[i].weight;
+    } else if (i === curIdx && steps[i].current > 0) {
+      var total = steps[i].total > 0 ? steps[i].total : ESTIMATED_TOTAL_DEALS;
+      pct += steps[i].weight * Math.min(steps[i].current / total, 1);
+    }
+  }
+  return Math.round(pct);
+}
+
 // --- State ---
 const dataState = {
   ready: false,
   loading: false,
   error: null,
   loadedAt: null,
+  startedAt: null,
+  progressSteps: null,
+  progressPct: 0,
+  currentStepIdx: -1,
+  loadingPhase: null,
+  loadingProgress: null,
 };
 
 let aggCache = null;
@@ -45,6 +86,9 @@ function resetLoading() {
   dataState.loading = false;
   dataState.error = 'Сброшено принудительно';
   dataState.startedAt = null;
+  dataState.progressSteps = null;
+  dataState.progressPct = 0;
+  dataState.currentStepIdx = -1;
   dataState.loadingProgress = null;
   dataState.loadingPhase = null;
   console.log('🔄 Loading state reset');
@@ -56,6 +100,9 @@ function runRefresh() {
     dataState.loading = true;
     dataState.error = null;
     dataState.startedAt = new Date().toISOString();
+    dataState.progressSteps = initProgressSteps();
+    dataState.progressPct = 0;
+    dataState.currentStepIdx = -1;
     dataState.loadingProgress = null;
     dataState.loadingPhase = 'Запуск скрипта...';
 
@@ -69,43 +116,64 @@ function runRefresh() {
     let stderr = '';
 
     // Парсим stdout в реальном времени для прогресса
+    // Формат:  ###PROGRESS:{json}
+    const handleProgressMsg = (msg) => {
+      switch (msg.type) {
+        case 'step_start': {
+          const idx = msg.idx;
+          dataState.currentStepIdx = idx;
+          dataState.loadingPhase = (dataState.progressSteps && dataState.progressSteps[idx])
+            ? dataState.progressSteps[idx].label : 'Шаг ' + (idx + 1);
+          break;
+        }
+        case 'step_done': {
+          const idx = msg.idx;
+          if (dataState.progressSteps && dataState.progressSteps[idx]) {
+            dataState.progressSteps[idx].done = true;
+          }
+          dataState.progressPct = calcProgressPct(dataState.progressSteps, dataState.currentStepIdx);
+          break;
+        }
+        case 'step_error': {
+          dataState.error = msg.stderr || 'Ошибка на шаге ' + msg.idx;
+          break;
+        }
+        case 'deals_loaded': {
+          const idx = msg.origin_step != null ? msg.origin_step : dataState.currentStepIdx;
+          if (dataState.progressSteps && dataState.progressSteps[idx]) {
+            dataState.progressSteps[idx].current = msg.count || 0;
+          }
+          dataState.progressPct = calcProgressPct(dataState.progressSteps, dataState.currentStepIdx);
+          dataState.loadingProgress = {
+            current: msg.count || 0,
+            total: 0, // 0 = неизвестно (показываем только кол-во сделок, без %)
+          };
+          break;
+        }
+        case 'finalizing': {
+          dataState.loadingPhase = 'Финализация...';
+          break;
+        }
+        case 'all_done': {
+          dataState.loadingPhase = 'Загрузка завершена';
+          break;
+        }
+      }
+    };
+
     proc.stdout.on('data', (chunk) => {
       const text = chunk.toString();
       stdout += text;
       
-      // Извлекаем прогресс из строк вида:
-      // ▶  fetch_deals.py --reset --batches 9999  → фаза
-      // [CREATE] batch 0..2450  got=2500  progress=2500/32128 → прогресс
-      // ✓  fetch_deals.py — 123.4s → фаза завершена
-      // ✅  Полная выгрузка завершена!
-      
-      const phases = {
-        'fetch_refresh': 'Выгрузка сделок (CRM Export API)',
-        'fetch_dicts': 'Загрузка справочников',
-        'analyze_new': 'Анализ данных (новая логика)',
-};
-      
-      // Определяем фазу
-      for (const [key, label] of Object.entries(phases)) {
-        if (text.includes(`▶  ${key}`) || text.includes(`▶  ${key}.py`)) {
-          dataState.loadingPhase = label;
-          dataState.loadingProgress = null;
-          break;
+      const lines = text.split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('###PROGRESS:')) continue;
+        const raw = line.substring('###PROGRESS:'.length);
+        try {
+          handleProgressMsg(JSON.parse(raw));
+        } catch (e) {
+          // ignore malformed
         }
-      }
-      
-      // Парсим прогресс сделок: progress=2500/32128
-      const progMatch = text.match(/progress=([\d]+)\/([\d]+)/);
-      if (progMatch) {
-        dataState.loadingProgress = {
-          current: parseInt(progMatch[1]),
-          total: parseInt(progMatch[2])
-        };
-      }
-      
-      // Определяем завершение
-      if (text.includes('✅  Полная выгрузка завершена')) {
-        dataState.loadingPhase = 'Финализация...';
       }
     });
     

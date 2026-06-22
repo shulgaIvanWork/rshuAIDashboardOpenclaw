@@ -74,6 +74,8 @@ def fetch_all(year_start):
         total_pages += 1
         if total_pages % 10 == 0:
             print(f'  page {total_pages}: {len(all_deals)} deals...')
+        if total_pages % 3 == 0 or total_pages == 1:
+            print(f'###PROGRESS:{{"type":"deals_loaded","count":{len(all_deals)}}}', flush=True)
 
         nxt = resp.get('next')
         if nxt is None:

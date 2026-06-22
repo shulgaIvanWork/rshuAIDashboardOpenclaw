@@ -1065,14 +1065,79 @@ function drawCharts(data) {
   });
 }
 
-// --- Refresh ---
+// --- Refresh Panel ---
+var refreshStepsData = [
+  { key: 'fetch_rest',   label: 'REST API: выгрузка сделок',         weight: 40 },
+  { key: 'fetch_export', label: 'Export API: дополнение сделок',     weight: 10 },
+  { key: 'fetch_dicts',  label: 'Загрузка справочников',             weight: 10 },
+  { key: 'analyze_new',  label: 'Анализ данных',                     weight: 40 },
+];
+
+var statusPanelHTML = '' +
+  '<div id="refreshStatusPanel" class="refresh-panel" style="display:none">' +
+    '<div class="refresh-header">' +
+      '<span class="refresh-title">🔄 Обновление данных</span>' +
+      '<span class="refresh-elapsed" id="statusElapsed">⏱ 0м 0с</span>' +
+    '</div>' +
+    '<div class="progress-bar refresh-progress-bar">' +
+      '<div class="progress-fill" id="statusProgressFill" style="width:0%"></div>' +
+    '</div>' +
+    '<div id="statusSteps" class="refresh-steps">' +
+      renderStepLines(-1, refreshStepsData, 0) +
+    '</div>' +
+    '<div id="statusDealProgress" class="refresh-deal-progress"></div>' +
+  '</div>';
+
+function renderStepLines(curIdx, steps, progressPct) {
+  var h = '';
+  for (var i = 0; i < steps.length; i++) {
+    var s = steps[i];
+    var icon, cls, label;
+    if (i < curIdx) {
+      icon = '✅';
+      cls = 'step-done';
+      label = s.label;
+    } else if (i === curIdx) {
+      icon = '⏳';
+      cls = 'step-active';
+      label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>';
+    } else {
+      icon = '⬜';
+      cls = 'step-pending';
+      label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>';
+    }
+    h += '<div class="refresh-step ' + cls + '">' +
+      '<span class="step-icon">' + icon + '</span>' +
+      '<span class="step-label">' + label + '</span>' +
+    '</div>';
+  }
+  return h;
+}
+
 document.getElementById('refreshBtn').addEventListener('click', async function() {
   this.disabled = true;
   this.textContent = '⏳ Обновление...';
-  document.getElementById('loadingFill').style.width = '10%';
+
+  // Показываем панель статуса
+  var panel = document.getElementById('refreshStatusPanel');
+  if (!panel) {
+    // Создаём, если не существует
+    var toolbar = document.querySelector('.toolbar');
+    if (toolbar) {
+      toolbar.insertAdjacentHTML('afterend', statusPanelHTML);
+      panel = document.getElementById('refreshStatusPanel');
+    }
+  }
+  if (panel) {
+    // Сбрасываем состояние
+    panel.style.display = 'block';
+    document.getElementById('statusProgressFill').style.width = '0%';
+    document.getElementById('statusSteps').innerHTML = renderStepLines(-1, refreshStepsData, 0);
+    document.getElementById('statusElapsed').textContent = '⏱ 0м 0с';
+    document.getElementById('statusDealProgress').textContent = '';
+  }
 
   try {
-    // Функция безопасного fetch — проверяет, что ответ JSON, а не HTML
     async function safeFetch(url, opts) {
       var resp = await fetch(url, opts);
       if (resp.redirected || resp.url.endsWith('/login')) {
@@ -1086,30 +1151,22 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
       }
       return JSON.parse(text);
     }
-    
+
     // Сбросим, если было зависшее состояние
     await safeFetch((window.BASE_PATH || '') + '/api/refresh/reset', { method: 'POST' });
-    
+
     var resData = await safeFetch((window.BASE_PATH || '') + '/api/refresh', { method: 'POST' });
     if (!resData.ok) { alert(resData.message); return; }
-    
-    // Ждём сколько нужно — без ограничения по времени
-    var pollCount = 0;
-    var statusEl = document.getElementById('loadingBar');
-    var statusText = document.createElement('div');
-    statusText.style.cssText = 'text-align:center;font-size:0.85rem;color:#475569;margin-top:4px;';
-    statusText.id = 'loadingStatusText';
-    var existing = document.getElementById('loadingStatusText');
-    if (existing) existing.remove();
-    statusEl.after(statusText);
-    
+
+    // Поллинг статуса
+    var lastStepIdx = -1;
+
     while (true) {
       await new Promise(r => setTimeout(r, 5000));
-      pollCount++;
-      
+
       var status = await safeFetch((window.BASE_PATH || '') + '/api/status');
-      
-      // Показываем сколько времени прошло
+
+      // Элапсед
       var elapsed = '';
       if (status.startedAt) {
         var start = new Date(status.startedAt);
@@ -1118,36 +1175,54 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
         var min = Math.floor(diff / 60);
         var sec = diff % 60;
         elapsed = min + 'м ' + sec + 'с';
+        document.getElementById('statusElapsed').textContent = '⏱ ' + elapsed;
       }
-      
-      // Показываем фазу и прогресс
-      var progText = '⏳ Загрузка... ' + elapsed;
-      if (status.loadingPhase) {
-        progText = status.loadingPhase;
-        if (status.loadingProgress && status.loadingProgress.total > 0) {
-          var pct = Math.round(status.loadingProgress.current / status.loadingProgress.total * 100);
-          progText += ' — ' + pct + '% (' + status.loadingProgress.current + ' / ' + status.loadingProgress.total + ')';
+
+      // Прогресс-бар
+      var pct = status.progressPct != null ? status.progressPct : Math.min(85, status.currentStepIdx >= 0 ? (status.currentStepIdx / 4) * 85 : 0);
+      document.getElementById('statusProgressFill').style.width = Math.min(pct, 100) + '%';
+
+      // Шаги
+      var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
+      // Определяем реальный curIdx: если все done, показываем last
+      if (status.progressSteps) {
+        var allDone = status.progressSteps.every(function(s) { return s.done; });
+        if (allDone) curIdx = 4; // все завершены
+        document.getElementById('statusSteps').innerHTML = renderStepLines(curIdx, status.progressSteps, pct);
+      }
+
+      // Прогресс сделок
+      var dealText = '';
+      if (status.loadingPhase && status.loadingPhase !== 'Запуск скрипта...') {
+        dealText = status.loadingPhase;
+        if (status.loadingProgress && status.loadingProgress.current > 0) {
+          dealText += ' — ' + status.loadingProgress.current.toLocaleString('ru-RU') + ' сделок';
         }
-        progText += ' • ' + elapsed;
       }
-      
-      document.getElementById('loadingFill').style.width = Math.min(30 + pollCount * 2, 85) + '%';
-      statusText.textContent = progText;
-      
+      document.getElementById('statusDealProgress').textContent = dealText;
+
+      // Прогресс-бар в хедере (для загрузки страницы)
+      document.getElementById('loadingFill').style.width = pct + '%';
+
       if (status.error && !status.loading) {
-        document.getElementById('loadingFill').style.width = '0%';
-        statusText.textContent = '';
-        alert('Ошибка: ' + status.error);
+        document.getElementById('statusSteps').innerHTML += '<div class="refresh-step step-error"><span class="step-icon">❌</span><span class="step-label">Ошибка: ' + escapeHtml(status.error) + '</span></div>';
         break;
       }
       if (status.ready && !status.loading) {
-        document.getElementById('loadingFill').style.width = '100%';
-        statusText.textContent = '✅ Загружено за ' + elapsed;
-        setTimeout(function() { statusText.textContent = ''; }, 5000);
+        document.getElementById('statusProgressFill').style.width = '100%';
+        document.getElementById('statusSteps').innerHTML = renderStepLines(4, refreshStepsData, 100);
+        document.getElementById('statusDealProgress').textContent = '✅ Загружено за ' + elapsed;
         // loadAll сама загрузит данные и отрендерит
         loadAll().catch(function(e) {});
+        // Скрываем панель через 5 секунд
+        setTimeout(function() {
+          var pnl = document.getElementById('refreshStatusPanel');
+          if (pnl) pnl.style.display = 'none';
+        }, 5000);
         break;
       }
+
+      lastStepIdx = curIdx;
     }
   } catch (e) { 
     if (e.message !== 'redirect') {
