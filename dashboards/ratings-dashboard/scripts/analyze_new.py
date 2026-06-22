@@ -818,10 +818,19 @@ def mgr_row(name, d, leads_cnt):
     mql = d.get("mql", 0)
     sql = d.get("sql", 0)
     inv = d.get("invoice_cnt", 0)
+    # Конверсии между этапами
+    conv_lead_mql   = mql / leads_cnt * 100 if leads_cnt else 0
+    conv_mql_sql    = sql / mql * 100 if mql else 0
+    conv_sql_inv    = inv / sql * 100 if sql else 0
+    conv_inv_won    = w / inv * 100 if inv else 0
     return {"name": name, "leads": leads_cnt, "mql": mql, "sql": sql,
             "invoice_cnt": inv, "won": w, "lost": lo,
             "conv_pct": round(conv, 1), "postupleniya": s, "avg_check": round(avg),
-            "avg_dur": round(avg_dur, 1)}
+            "avg_dur": round(avg_dur, 1),
+            "conv_lead_mql": round(conv_lead_mql, 1),
+            "conv_mql_sql": round(conv_mql_sql, 1),
+            "conv_sql_inv": round(conv_sql_inv, 1),
+            "conv_inv_won": round(conv_inv_won, 1)}
 
 
 mgr_top      = sorted([mgr_row(k, v, mgr_leads_ytd[k]) for k, v in mgr_ytd.items()],

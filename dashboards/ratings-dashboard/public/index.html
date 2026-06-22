@@ -702,9 +702,23 @@ async function renderPageMainNew(d) {
     el = document.getElementById('newSrcTable'); if(el) el.innerHTML = srcStr;
 
     var mgrs = d.mgr_top||[];
-    var mgrStr = '<table style="font-size:11px"><tr><th>Менеджер</th><th>Лидов</th><th>Оплачено</th><th>Поступления</th><th>Ср.чек</th><th>Конв.%</th></tr>';
-    mgrs.forEach(function(m){var cv=m.leads>0?(m.won/m.leads*100).toFixed(1):0;mgrStr+='<tr><td><b>'+escapeHtml(m.name)+'</b></td><td>'+m.leads+'</td><td>'+m.won+'</td><td>'+fmt(m.postupleniya)+' ₽</td><td>'+fmt(m.avg_check)+' ₽</td><td>'+cv+'%</td></tr>';});
-    mgrStr += '</table>';
+    var mgrStr = '<div class="scroll-x" style="max-height:480px;overflow:auto"><table style="font-size:10px;white-space:nowrap"><tr>'
+        + '<th>Менеджер</th>'
+        + '<th>👥 Лиды</th><th>🔍 MQL</th><th>🎯 SQL</th><th>📄 Счёт</th>'
+        + '<th>✅ Оплачено</th><th>❌ Отказы</th>'
+        + '<th>💰 Поступления</th><th>💵 Ср.чек</th><th>⏱ Цикл,дн</th>'
+        + '<th>📊 Лид→MQL</th><th>📊 MQL→SQL</th><th>📊 SQL→Счёт</th><th>📊 Счёт→Оплата</th>'
+        + '</tr>';
+    function pct(v) { return (v||0).toFixed(1)+'%'; }
+    mgrs.forEach(function(m){
+      mgrStr+='<tr><td><b>'+escapeHtml(m.name)+'</b></td>'
+        +'<td>'+m.leads+'</td><td>'+m.mql+'</td><td>'+m.sql+'</td><td>'+m.invoice_cnt+'</td>'
+        +'<td><b>'+m.won+'</b></td><td>'+m.lost+'</td>'
+        +'<td><b>'+fmt(m.postupleniya)+'</b> ₽</td><td>'+fmt(m.avg_check)+' ₽</td><td>'+(m.avg_dur||'-')+'</td>'
+        +'<td>'+pct(m.conv_lead_mql)+'</td><td>'+pct(m.conv_mql_sql)+'</td><td>'+pct(m.conv_sql_inv)+'</td><td>'+pct(m.conv_inv_won)+'</td>'
+        +'</tr>';
+    });
+    mgrStr += '</table></div>';
     el = document.getElementById('newMgrsTable'); if(el) el.innerHTML = mgrStr;
 
     var comps = d.top_companies || [];
