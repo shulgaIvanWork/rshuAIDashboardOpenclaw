@@ -29,7 +29,7 @@ company_ids = set()
 for d in deals:
     ccinfo = cc.get(d["ID"], {})
     coid = str(ccinfo.get("COMPANY_ID", d.get("COMPANY_ID", "0")))
-    if coid != "0":
+    if coid not in ("0", "None"):
         company_ids.add(coid)
 
 print(f"Компаний: {len(company_ids)}")

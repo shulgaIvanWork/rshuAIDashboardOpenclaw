@@ -275,7 +275,7 @@ def metrics(subset, is_kom_block=False, is_oom_block=False):
     else:
         # Основная строка — только категории 0|8|19
         pred = lambda r: r["CAT_ID"] in VALID_CATS
-    paid = [r for r in subset if is_paid(r) and pred(r)]
+    paid = [r for r in subset if is_paid(r) and pred(r) and r["PAY_DT"].year == YEAR]
     pos_sum = sum(r["OPP"] for r in paid)
     pos_cnt = len(paid)
     avg     = pos_sum / pos_cnt if pos_cnt else 0
@@ -418,6 +418,7 @@ for w in range(1, cur_w + 1):
         "kom_postupleniya": 0.0, "kom_won_cnt": 0, "invoice_cnt": 0,
         "fmt_oom": 0.0, "fmt_om": 0.0, "fmt_sdo": 0.0, "fmt_kom": 0.0,
         "presale_durs": [],
+        "oom_durs": [], "kom_durs": [],
     }
 
 for r in rows:
@@ -452,20 +453,25 @@ for r in rows:
             wk = None
         if wk and wk in weekly:
             weekly[wk]["postupleniya"] += r["OPP"]
+            weekly[wk]["oplata"] += 1  # все оплаты (ООМ + КОМ)
             if r["IS_KOM"]:
                 weekly[wk]["kom_postupleniya"] += r["OPP"]
                 weekly[wk]["kom_won_cnt"]       += 1
             else:
                 weekly[wk]["won_cnt"]       += 1
-                weekly[wk]["oplata"]         += 1
             # По форматам
             fmt_keys = {"ООМ (Очное)": "fmt_oom", "ОМ (Онлайн)": "fmt_om", "СДО": "fmt_sdo", "КОМ": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
                 weekly[wk][fmt_keys[r["FORMAT"]]] += r["OPP"]
-            if not r["IS_KOM"] and r["DC"]:
-                d = (r["CL"] - r["DC"]).days if r["CL"] else 0
+            # Длительность по PAY_DT (UF_DATE_PAY_1C), не по CLOSEDATE
+            if r["DC"] and r["PAY_DT"]:
+                d = (r["PAY_DT"] - r["DC"]).days
                 if d >= 0:
-                    weekly[wk]["durs"].append(d)
+                    weekly[wk]["durs"].append(d)          # все сделки (ООМ + КОМ)
+                    if r["IS_KOM"]:
+                        weekly[wk]["kom_durs"].append(d)   # КОМ отдельно
+                    else:
+                        weekly[wk]["oom_durs"].append(d)   # ООМ отдельно
 
     # MQL = is_qual_lead (как в карточке 2), по DATE_CREATE
     if r["DC"] and r["DC"].year == YEAR and is_qual_lead_w(r):
@@ -523,6 +529,8 @@ for r in rows:
 for w, d in weekly.items():
     d["avg_check"]       = d["postupleniya"] / d["won_cnt"] if d["won_cnt"] else 0
     d["avg_dur"]         = sum(d["durs"])        / len(d["durs"])        if d["durs"]        else 0
+    d["oom_avg_dur"]     = sum(d["oom_durs"])    / len(d["oom_durs"])    if d["oom_durs"]    else 0
+    d["kom_avg_dur"]     = sum(d["kom_durs"])    / len(d["kom_durs"])    if d["kom_durs"]    else 0
     d["avg_presale_dur"] = sum(d["presale_durs"]) / len(d["presale_durs"]) if d["presale_durs"] else 0
     d["conv_lead_mql"]   = d["mql"]    / d["leads"]  * 100 if d["leads"]  else 0
     d["conv_mql_sql"]    = d["sql"]    / d["mql"]    * 100 if d["mql"]    else 0
@@ -530,6 +538,8 @@ for w, d in weekly.items():
     d["conv_sql_oplata"]  = d["oplata"] / d["sql"]    * 100 if d["sql"]    else 0
     d["conv_invoice_oplata"] = d["oplata"] / d["invoice_cnt"] * 100 if d["invoice_cnt"] else 0
     del d["durs"]
+    del d["oom_durs"]
+    del d["kom_durs"]
     del d["presale_durs"]
 
 # === Источники + полная аналитика ===
@@ -599,8 +609,8 @@ src_list = sorted([src_item(k, v) for k, v in src_data.items()],
 all_durs = []
 for r in rows:
     if pay_ytd(r):
-        if r["DC"] and r["CL"]:
-            d = (r["CL"] - r["DC"]).days
+        if r["DC"] and r["PAY_DT"]:
+            d = (r["PAY_DT"] - r["DC"]).days
             if d >= 0:
                 all_durs.append(d)
 
@@ -643,6 +653,33 @@ def fsplit(subset, period):
 fmt_ytd  = fsplit([r for r in rows if pay_ytd(r)], "YTD")
 fmt_prev = fsplit(ws_prev_pay, f"W{prev_w}")
 
+# === Тип обучения (UF_CRM_1765896709800) ===
+EDU_TYPE_MAP = {
+    '34699': 'Повышение квалификации',
+    '34700': 'Проф. переподготовка',
+    '34765': 'Корпоративное обучение',
+}
+
+def extract_edu_type(uf_val):
+    if not uf_val:
+        return None
+    return EDU_TYPE_MAP.get(str(uf_val).strip(), None)
+
+def edusplit(subset, period):
+    g = defaultdict(lambda: {"cnt": 0, "sum": 0.0})
+    for r in subset:
+        if is_paid(r):
+            if r["IS_OOM"] or r["IS_KOM"]:
+                edu = extract_edu_type(r.get("EDU_TYPE", ""))
+                if edu:
+                    g[edu]["cnt"] += 1
+                    g[edu]["sum"] += r["OPP"]
+    return {"period": period, **{k: v for k, v in g.items()}}
+
+edu_ytd  = edusplit([r for r in rows if pay_ytd(r)], "YTD")
+edu_prev = edusplit(ws_prev_pay, f"W{prev_w}")
+edu_cur  = edusplit(ws_cur_pay,  f"W{cur_w}")
+
 # === ТОП продуктов (80% выручки) ===
 prod_data = defaultdict(lambda: {
     "sql": 0, "deals": 0, "sum": 0.0, "durs": [],
@@ -661,8 +698,8 @@ for r in rows:
     if pay_ytd(r):
         prod_data[key]["deals"] += 1
         prod_data[key]["sum"] += r["OPP"]
-        if r["DC"] and r["CL"]:
-            d = (r["CL"] - r["DC"]).days
+        if r["DC"] and r["PAY_DT"]:
+            d = (r["PAY_DT"] - r["DC"]).days
             if d >= 0:
                 prod_data[key]["durs"].append(d)
 
@@ -723,7 +760,9 @@ remaining_row = {
 top_products = selected + [remaining_row]
 
 # === Менеджеры ===
-mgr_ytd  = defaultdict(lambda: {"cnt": 0, "sum": 0.0, "lost": 0})
+mgr_ytd  = defaultdict(lambda: {"cnt": 0, "sum": 0.0, "lost": 0,
+                               "mql": 0, "sql": 0, "invoice_cnt": 0,
+                               "durs": []})
 mgr_prev = defaultdict(lambda: {"cnt": 0, "sum": 0.0, "lost": 0})
 cat_ytd  = defaultdict(lambda: {"cnt": 0, "sum": 0.0})
 for r in rows:
@@ -731,6 +770,11 @@ for r in rows:
         if pay_ytd(r):
             mgr_ytd[r["MGR"]]["cnt"] += 1
             mgr_ytd[r["MGR"]]["sum"] += r["OPP"]
+            # Длительность по PAY_DT
+            if r["DC"] and r["PAY_DT"]:
+                d = (r["PAY_DT"] - r["DC"]).days
+                if d >= 0:
+                    mgr_ytd[r["MGR"]]["durs"].append(d)
             cat_ytd[r["CAT"]]["cnt"] += 1
             cat_ytd[r["CAT"]]["sum"] += r["OPP"]
             pd_mgr = get_pay_date(r)
@@ -741,6 +785,17 @@ for r in rows:
             mgr_ytd[r["MGR"]]["lost"] += 1
             if r["CL"].date().isocalendar()[:2] == (YEAR, prev_w):
                 mgr_prev[r["MGR"]]["lost"] += 1
+    # MQL, SQL, Invoice — по всем категориям (не только IS_OOM)
+    if r["CAT_ID"] in VALID_CATS and r["DC"] and r["DC"].year == YEAR:
+        # MQL: созданные в PreSale
+        if r["IS_PRESALE"]:
+            mgr_ytd[r["MGR"]]["mql"] += 1
+        # SQL: выигранные в PreSale или на DETAILS+
+        if r["IS_PRESALE"] and r["SEM"] == "S" and r["CL"] and r["CL"].year == YEAR:
+            mgr_ytd[r["MGR"]]["sql"] += 1
+        # Invoice: есть дата счёта
+        if r.get("INV_DT") and r["INV_DT"].year == YEAR and r["SEM"] != "F":
+            mgr_ytd[r["MGR"]]["invoice_cnt"] += 1
 
 mgr_leads_ytd  = Counter()
 mgr_leads_prev = Counter()
@@ -758,8 +813,15 @@ def mgr_row(name, d, leads_cnt):
     w   = d["cnt"]; s = d["sum"]; lo = d["lost"]
     avg = s / w if w else 0
     conv = w / (w + lo) * 100 if (w + lo) else 0
-    return {"name": name, "leads": leads_cnt, "won": w, "lost": lo,
-            "conv_pct": round(conv, 1), "postupleniya": s, "avg_check": round(avg)}
+    durs = d.get("durs", [])
+    avg_dur = sum(durs) / len(durs) if durs else 0
+    mql = d.get("mql", 0)
+    sql = d.get("sql", 0)
+    inv = d.get("invoice_cnt", 0)
+    return {"name": name, "leads": leads_cnt, "mql": mql, "sql": sql,
+            "invoice_cnt": inv, "won": w, "lost": lo,
+            "conv_pct": round(conv, 1), "postupleniya": s, "avg_check": round(avg),
+            "avg_dur": round(avg_dur, 1)}
 
 
 mgr_top      = sorted([mgr_row(k, v, mgr_leads_ytd[k]) for k, v in mgr_ytd.items()],
@@ -955,6 +1017,7 @@ out = {
     "src_rating":  src_rating,
     "btype_ytd":   btype_ytd,  "btype_prev": btype_prev,  "btype_cur": btype_cur,
     "fmt_ytd":     fmt_ytd,    "fmt_prev":   fmt_prev,
+    "edu_ytd":     edu_ytd,    "edu_prev":   edu_prev,    "edu_cur": edu_cur,
     "top_products": top_products,
     "top_companies": top_companies,
     "mgr_top":      mgr_top,   "mgr_prev_top": mgr_prev_top,

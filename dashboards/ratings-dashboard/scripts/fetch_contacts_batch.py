@@ -31,7 +31,7 @@ contact_ids = set()
 for d in deals:
     ccinfo = cc.get(d["ID"], {})
     cid = str(ccinfo.get("CONTACT_ID", d.get("CONTACT_ID", "0")))
-    if cid != "0":
+    if cid not in ("0", "None"):
         contact_ids.add(cid)
 
 print(f"Нужно контактов: {len(contact_ids)}")

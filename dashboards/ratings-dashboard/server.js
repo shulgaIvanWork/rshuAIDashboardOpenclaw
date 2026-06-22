@@ -28,12 +28,6 @@ let aggCache = null;
 async function loadCache() {
   try {
     const raw = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg.json'), 'utf-8'));
-    // Add OOM/KOM aliases (agg.json doesn't have oom_* fields)
-    raw.oom_ytd = { ...raw.ytd };
-    raw.oom_prev = { ...raw.prev };
-    raw.oom_cur = { ...raw.cur };
-    /* raw.oom_leads_ytd = raw.leads_ytd; — оставляем значение из agg.json */
-    /* raw.kom_leads_ytd = raw.kom_leads_ytd || ... — оставляем из agg.json */
     aggCache = raw;
     dataState.ready = true;
     dataState.loadedAt = new Date().toISOString();
