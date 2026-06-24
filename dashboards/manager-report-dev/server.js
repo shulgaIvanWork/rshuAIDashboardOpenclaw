@@ -17,6 +17,11 @@ function parseDT(s) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+// Очищает STAGE_ID от префикса категории (C0:, C19:, C8:) — export API
+function cleanStage(sid) {
+  return (sid || '').replace(/^C\d+:/, '');
+}
+
 // === Логика analyze_new.py на JS (только для менеджеров) ===
 const MIN_OPP = 11;
 const VALID_CATS = new Set([0, 8, 19]);
@@ -79,7 +84,6 @@ function calcManagers(deals, dicts, fromDate, toDate) {
   }
 
   const YEAR_START = new Date(2026, 0, 1);
-  const cutoff = isFiltered ? fromDate : YEAR_START;
 
   for (const d of deals) {
     const cat = parseInt(d.CATEGORY_ID) || 0;
@@ -93,6 +97,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const pay = parseDT(d.UF_DATE_PAY_1C);
     const cl = parseDT(d.CLOSEDATE);
     const sem = d.STAGE_SEMANTIC_ID || '';
+    const stage = cleanStage(d.STAGE_ID);
 
     let inPeriod = true;
     if (isFiltered) {
@@ -106,10 +111,11 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const m = getMgr(key);
     if (group !== 'hidden') m.group = group;
 
-    // in_work_start — только для YTD (без фильтра)
-    if (!isFiltered && dc && dc <= cutoff) {
-      const wasPaid = pay && pay < cutoff;
-      const wasLost = sem === 'F' && cl && cl < cutoff;
+    // in_work_start — сделки в работе на начало периода (для любого периода)
+    const periodStart = isFiltered ? fromDate : YEAR_START;
+    if (dc && dc <= periodStart) {
+      const wasPaid = pay && pay < periodStart;
+      const wasLost = sem === 'F' && cl && cl < periodStart;
       if (!wasPaid && !wasLost) {
         m.in_work_start++;
       }
@@ -154,9 +160,12 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // lost
+    // lost — только за 2026 год (YEAR) или за выбранный период
     if (sem === 'F') {
-      if (!isFiltered || (cl && cl >= fromDate && cl <= toDate)) {
+      const lostYear = cl ? cl.getFullYear() : 0;
+      if (!isFiltered && lostYear === YEAR) {
+        m.lost++;
+      } else if (isFiltered && cl && cl >= fromDate && cl <= toDate) {
         m.lost++;
       }
     }
@@ -165,8 +174,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     if (dc && dc.getFullYear() === YEAR) {
       let isMql = false;
       if (cat === 0) {
-        const st = d.STAGE || '';
-        if (!['NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'].includes(st)) isMql = true;
+        if (!['NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'].includes(stage)) isMql = true;
       } else if (cat === 19) {
         if (sem !== 'S' && sem !== 'F') isMql = true;
       }
@@ -177,17 +185,14 @@ function calcManagers(deals, dicts, fromDate, toDate) {
 
     // SQL
     if (dc && dc.getFullYear() === YEAR) {
-      const stageCode = d.STAGE || '';
       const hasInvoice = d.UF_CRM_1753272713011;
       let isSql = false;
-      if (['DETAILS', 'PROPOSAL', '2', '6', 'WON'].includes(stageCode)) {
+      if (['DETAILS', 'PROPOSAL', '2', '6', 'WON'].includes(stage)) {
         isSql = true;
       } else if (cat === 19 && sem !== 'S') {
-        const ks = stageCode.replace('C19:', '');
-        const kc = d.UF_CRM_5D133690E1;
-        if (['EXECUTING', 'UC_C670BC', 'UC_I443UQ'].includes(ks)) isSql = true;
-        else if (kc && ['UC_ALOZ6B', 'UC_W4ML6H', 'LOSE'].includes(ks)) isSql = true;
-      } else if (hasInvoice && ['LOSE', 'UC_F2YC3N', 'UC_W6SCHG', 'UC_670ME2', 'UC_VKPN0N'].includes(stageCode)) {
+        if (['EXECUTING', 'UC_C670BC', 'UC_I443UQ'].includes(stage)) isSql = true;
+        else if (hasInvoice && ['LOSE', 'UC_ALOZ6B', 'UC_W4ML6H'].includes(stage)) isSql = true;
+      } else if (hasInvoice && ['LOSE', 'UC_F2YC3N', 'UC_W6SCHG', 'UC_670ME2', 'UC_VKPN0N'].includes(stage)) {
         isSql = true;
       }
       if (isSql && (!isFiltered || (dc >= fromDate && dc <= toDate))) {

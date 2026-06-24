@@ -79,10 +79,11 @@ function load() {
 }
 
 function app(mgrs, periodLabel) {
-  mgrs = mgrs.filter(function(m){return m.paid||m.created||m.leads;});
+  mgrs = mgrs.filter(function(m){return m.paid||m.created||m.in_work_start;});
   var tot = {
     paid: sum(mgrs,'paid'),
     lost: sum(mgrs,'lost'),
+    created: sum(mgrs,'created'),
     post: sum(mgrs,'paid_sum'),
     dur: wavg(mgrs,'avg_dur','paid'),
     conv: sum(mgrs,'paid')/(sum(mgrs,'paid')+sum(mgrs,'lost'))*100,
@@ -102,13 +103,14 @@ function app(mgrs, periodLabel) {
   html += '</div>';
 
   // Summary
+  var start = sum(mgrs,'in_work_start');
   html += '<div class=summary-grid>';
-  html += card('✅ Оплачено YTD', n(tot.paid));
-  html += card('💰 Поступления YTD', n(tot.post)+' ₽');
+  html += card('📦 В работе (нач.)', n(start));
+  html += card('➕ Создано', n(tot.created = sum(mgrs,'created')));
+  html += card('💰 Поступления', n(tot.post)+' ₽');
   html += card('⏱ Средний цикл', tot.dur.toFixed(1)+' дн');
-  html += card('📊 Конверсия', tot.conv.toFixed(1)+'%');
-  html += card('❌ Проиграно YTD', n(tot.lost));
-  html += card('🔄 В работе (кон.)', n(tot.end));
+  html += card('📊 Конверсия', (tot.conv||0).toFixed(1)+'%');
+  html += card('❌ Проиграно', n(tot.lost));
   html += '</div>';
 
   // Table 1
@@ -139,15 +141,14 @@ function card(l,v) { return '<div class=summary-card><div class=lbl>'+l+'</div><
 function tab1(mgrs) {
   var cols = [
     {k:'name',l:'Менеджер'},
-    {k:'leads',l:'👥 Лиды'},
+    {k:'in_work_start',l:'📦 В работе(н)'},
     {k:'created',l:'➕ Создано'},
     {k:'mql',l:'🔍 MQL'},
     {k:'sql',l:'🎯 SQL'},
     {k:'invoice_cnt',l:'📄 Счёт'},
     {k:'paid',l:'✅ Оплачено'},
     {k:'lost',l:'❌ Отказы'},
-    {k:'in_work_start',l:'🔄 в раб(н)'},
-    {k:'in_work_end',l:'🔄 в раб(к)'},
+    {k:'in_work_end',l:'🔄 В работе(к)'},
     {k:'paid_sum',l:'💰 Пост-я'},
     {k:'avg_check',l:'💵 Ср.чек'},
     {k:'avg_dur',l:'⏱ Цикл'},

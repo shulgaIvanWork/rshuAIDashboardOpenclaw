@@ -230,6 +230,11 @@ app.use(express.json({ limit: '50mb' }));
 // Status
 app.get('/api/status', (req, res) => res.json(dataState));
 
+// User info (role from auth middleware in clover-web)
+app.get('/api/user', (req, res) => {
+  res.json({ role: (req.user && req.user.role) || 'guest' });
+});
+
 // Main data
 app.get('/api/data', (req, res) => {
   if (!aggCache) return res.status(503).json({ error: 'Data not loaded' });
@@ -250,6 +255,9 @@ app.get('/api/data/new', async (req, res) => {
 });
 
 app.post('/api/refresh', async (req, res) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ ok: false, message: 'Only admins can refresh data' });
+  }
   if (dataState.loading) return res.json({ ok: false, message: 'Already loading' });
   res.json({ ok: true, message: 'Refresh started' });
   runRefresh().catch(e => console.error('Refresh failed:', e.message));

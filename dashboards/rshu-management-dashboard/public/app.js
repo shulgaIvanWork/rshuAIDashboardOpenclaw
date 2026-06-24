@@ -32,6 +32,8 @@ var _p = window.location.pathname;
 var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
 window.BASE_PATH = _m ? '/' + _m[1] : '';
 
+let userRole = 'guest';
+
 
 // Защита от падения, если CDN с Chart.js не загрузился
 if (typeof Chart !== 'undefined' && Chart.register && typeof ChartDataLabels !== 'undefined') {
@@ -76,8 +78,20 @@ async function api(path) {
 }
 
 async function loadAll() {
+  // Fetch user role first
+  try {
+    var u = await safeFetch((window.BASE_PATH || '') + '/api/user');
+    if (u && u.role) userRole = u.role;
+  } catch(e) {}
+
+  // Create refresh button only for admins
+  if (userRole === 'admin') {
+    initRefreshButton();
+  }
+
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
+
   try {
     const d = await api('/api/data/new');
     if (!d || !d.ytd) return;
@@ -753,7 +767,9 @@ async function renderPageMainNew(d) {
     html += '</ul></div>';
     html += '</div></div>';
 
-    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка...</div></div></div></div>';
+    if (userRole === 'admin') {
+      html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка...</div></div></div></div>';
+    }
 
     // Batch update all at once
     areaNew.innerHTML = html;
@@ -1121,28 +1137,35 @@ async function safeFetch(url, opts) {
   return JSON.parse(text);
 }
 
-document.getElementById('refreshBtn').addEventListener('click', async function() {
-  this.disabled = true;
-  this.textContent = '⏳ Обновление...';
+function initRefreshButton() {
+  var toolbar = document.querySelector('.toolbar');
+  if (!toolbar) return;
+  var btn = document.createElement('button');
+  btn.id = 'refreshBtn';
+  btn.textContent = '🔄 Обновить данные';
+  toolbar.appendChild(btn);
 
-  // Показываем панель статуса
-  var panel = document.getElementById('refreshStatusPanel');
-  if (!panel) {
-    // Создаём, если не существует
-    var toolbar = document.querySelector('.toolbar');
-    if (toolbar) {
-      toolbar.insertAdjacentHTML('afterend', statusPanelHTML);
-      panel = document.getElementById('refreshStatusPanel');
+  btn.addEventListener('click', async function() {
+    this.disabled = true;
+    this.textContent = '⏳ Обновление...';
+
+    // Показываем панель статуса
+    var panel = document.getElementById('refreshStatusPanel');
+    if (!panel) {
+      // Создаём, если не существует
+      if (toolbar) {
+        toolbar.insertAdjacentHTML('afterend', statusPanelHTML);
+        panel = document.getElementById('refreshStatusPanel');
+      }
     }
-  }
-  if (panel) {
-    // Сбрасываем состояние
-    panel.style.display = 'block';
-    document.getElementById('statusProgressFill').style.width = '0%';
-    document.getElementById('statusSteps').innerHTML = renderStepLines(-1, refreshStepsData, 0);
-    document.getElementById('statusElapsed').textContent = '⏱ 0м 0с';
-    document.getElementById('statusDealProgress').textContent = '';
-  }
+    if (panel) {
+      // Сбрасываем состояние
+      panel.style.display = 'block';
+      document.getElementById('statusProgressFill').style.width = '0%';
+      document.getElementById('statusSteps').innerHTML = renderStepLines(-1, refreshStepsData, 0);
+      document.getElementById('statusElapsed').textContent = '⏱ 0м 0с';
+      document.getElementById('statusDealProgress').textContent = '';
+    }
 
   try {
     await safeFetch((window.BASE_PATH || '') + '/api/refresh', { method: 'POST' });
@@ -1212,6 +1235,7 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
   }
   finally { this.disabled = false; this.textContent = '🔄 Обновить данные'; }
 });
+}
 
 // --- Date filter ---
 document.getElementById('dateFrom').addEventListener('change', function() {

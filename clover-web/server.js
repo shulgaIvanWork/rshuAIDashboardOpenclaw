@@ -277,7 +277,8 @@ function getAvailableDashboards(user) {
     'ratings-dashboard': { url: '/ratings-dashboard/' },
     'kom-dashboard': { url: '/kom-dashboard/' },
     'participants-dashboard': { url: '/participants-dashboard/' },
-    'test-dashboard': { url: '/test-dashboard/' }
+    'test-dashboard': { url: '/test-dashboard/' },
+    'manager-report-dev': { url: '/manager-report-dev/' }
   };
 
   try {

@@ -26,5 +26,9 @@
   "ratings-dashboard": {
     "label": "Рейтинги",
     "icon": "🏆"
+  },
+  "manager-report-dev": {
+    "label": "Отчёт для менеджеров (dev)",
+    "icon": "📊"
   }
 }
