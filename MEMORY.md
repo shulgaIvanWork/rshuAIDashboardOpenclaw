@@ -135,3 +135,6 @@ all_ids = sorted(numeric_ids, key=int)
    - `public/index.html` — фронт
 3. Смонтировать в `web-interface/server.js` через `app.use('/path', requireAuth, subApp)`
 4. Учесть архитектуру: Express.js на порту 3000 проксируется через nginx на uprav.tech, никаких отдельных портов
+5. **Добавить в реестр дашбордов (иначе ссылка на странице `/dashboards` поведёт в `/dashboard-files/...` вместо правильного URL):**
+   - В `web-interface/server.js` — добавить дашборд в объект `knownProjects` в функции `getAvailableDashboards()`: `'my-dashboard': { url: '/my-dashboard/' }`
+   - В `web-interface/data/dashboards.json` — добавить объект с `label` (название) и `icon` (эмодзи) для отображения на карточке дашборда
