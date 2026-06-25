@@ -7,50 +7,90 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #333; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px 30px; }
-    .header h1 { font-size: 22px; font-weight: 600; }
-    .header p { font-size: 13px; opacity: 0.85; margin-top: 4px; }
-    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
-    .tabs { display: flex; gap: 4px; background: #e0e4e8; padding: 4px; border-radius: 10px; margin-bottom: 20px; }
-    .tab { padding: 10px 20px; border: none; background: transparent; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; color: #555; transition: all 0.2s; }
-    .tab:hover { background: rgba(255,255,255,0.5); }
-    .tab.active { background: white; color: #333; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px; }
-    .card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    .card h3 { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-    .card .value { font-size: 28px; font-weight: 700; }
-    .card .sub { font-size: 12px; color: #888; margin-top: 4px; }
-    .card .green { color: #22c55e; }
-    .card .red { color: #ef4444; }
-    .card .blue { color: #3b82f6; }
-    .card .orange { color: #f59e0b; }
-    .card .purple { color: #8b5cf6; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .full { grid-column: 1 / -1; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F7F8FA; padding: 24px; color: #0F172A; }
+    .wrap { max-width: 1500px; margin: 0 auto; }
+    h1 { font-size: 26px; font-weight: 700; margin: 0 0 4px; }
+    .sub { color: #475569; font-size: 13px; margin-bottom: 24px; }
+    .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+    .toolbar button { background: #093EB4; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: .2s; }
+    .toolbar button:hover { background: #3079D2; }
+    .toolbar button:disabled { background: #475569; cursor: wait; }
+    .loading-bar { height: 3px; background: #e0e0e0; border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
+    .loading-bar .fill { height: 100%; width: 0%; background: #093EB4; transition: width .5s; }
+
+    .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
+    .kpi { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .kpi .lbl { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px; }
+    .kpi .val { font-size: 18px; font-weight: 700; margin: 4px 0 2px; color: #0F172A; }
+    .kpi .sub { font-size: 12px; color: #475569; margin: 0; }
+    .kpi .val-big { font-size: 21px; font-weight: 700; }
+    .kpi .si { font-size: 12px; color: #475569; font-weight: 400; }
+    .kpi .lbl2 { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin: 4px 0; }
+    .kpi .row { display: flex; justify-content: space-between; align-items: baseline; }
+    .kpi-total { background-color: rgba(31, 42, 68, 0.08) !important; }
+    .kpi-oom { background-color: rgba(0, 188, 212, 0.12) !important; }
+    .kpi-kom { background-color: rgba(156, 39, 176, 0.12) !important; }
+    .kpi-reg { background-color: rgba(76, 175, 80, 0.12) !important; }
+    .c-total { color: #1f2a44 !important; }
+    .c-oom { color: #00bcd4 !important; }
+    .c-kom { color: #9C27B0 !important; }
+    .c-reg { color: #4CAF50 !important; }
+    .kpi-header { grid-column: 1 / -1; font-size: 15px; font-weight: 700; margin: 4px 0; }
+    .delta-up { color: #2E7D32; font-size: 12px; }
+    .delta-down { color: #C62828; font-size: 12px; }
+    .delta-flat { color: #475569; font-size: 12px; }
+
+    .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .card.kom { border-left: 4px solid #7A2E2E; }
+    .card h2 { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+    .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+    .chartbox { height: 340px; position: relative; }
+    .chartbox-sm { height: 240px; position: relative; }
+    .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .threecol { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #e5e7eb; color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-    td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
-    tr:hover td { background: #f9fafb; }
-    .chart-container { position: relative; height: 300px; }
-    .loading-state { padding: 60px; text-align: center; color: #677; }
-    .loading-state .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #C8A45C; border-radius: 50%; animation: spin .8s linear infinite; margin-bottom: 12px; }
+    th { background: #093EB4; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; position: sticky; top: 0; }
+    td { padding: 8px 12px; border-bottom: 1px solid #E2E8F0; }
+    tr:hover td { background: #F1F3F6; }
+    tr.cur td { background: #F1F3F6; font-weight: 600; }
+    .scroll-x { overflow-x: auto; }
+    .loading-state { padding: 60px; text-align: center; color: #475569; }
+    .loading-state .spinner { width: 40px; height: 40px; border: 4px solid #E2E8F0; border-top-color: #093EB4; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .error-state { padding: 40px; text-align: center; color: #C62828; font-size: 16px; }
-    .loading { padding: 40px; text-align: center; color: #888; }
-    .loading::after { content: '...'; animation: dots 1.5s steps(4, end) infinite; }
-    @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-    .badge-green { background: #dcfce7; color: #16a34a; }
-    .badge-red { background: #fee2e2; color: #dc2626; }
-    .badge-blue { background: #dbeafe; color: #2563eb; }
-    .badge-gray { background: #f3f4f6; color: #6b7280; }
-    .progress-bar { height: 6px; background: #e5e7eb; border-radius: 3px; margin: 8px 0; overflow: hidden; }
-    .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
-    .tooltip { position: relative; cursor: help; border-bottom: 1px dashed #ccc; }
-    @media (max-width: 768px) { .row { grid-template-columns: 1fr; } }
+    .error-state { padding: 40px; text-align: center; color: #C62828; }
+    .dt { font-size: 11px; color: #475569; font-weight: 400; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    th.sort { cursor: pointer; user-select: none; }
+    th.sort:hover { background: #3079D2; }
+    th.sort::after { content: ' ⇅'; font-size: 10px; opacity: .4; font-weight: 400; }
+    th.sort.asc::after { content: ' ▲'; opacity: 1; }
+    th.sort.desc::after { content: ' ▼'; opacity: 1; }
+    .badge-prev { display:inline-block; background:#E8F5E9; color:#2E7D32; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px }
+    .badge-new { display:inline-block; background:#FFF3E0; color:#E65100; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px }
+    .tdleft { text-align: left; }
+    .tdright { text-align: right; }
+    .deal-title { font-weight: 600; }
+    .muted { color: #475569; font-size: 11px; }
+    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } .twocol, .threecol { grid-template-columns: 1fr; } }
+
+    .refresh-panel { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    .refresh-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .refresh-title { font-size: 16px; font-weight: 600; color: #0F172A; }
+    .refresh-elapsed { font-size: 14px; color: #475569; font-weight: 500; }
+    .refresh-progress-bar { height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; margin-bottom: 14px; }
+    .refresh-progress-bar .progress-fill { height: 100%; background: linear-gradient(90deg, #093EB4, #3079D2); border-radius: 4px; transition: width .8s ease; }
+    .refresh-steps { margin-top: 4px; }
+    .refresh-step { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #F1F3F6; }
+    .refresh-step:last-child { border-bottom: none; }
+    .refresh-step .step-icon { width: 28px; font-size: 16px; text-align: center; flex-shrink: 0; }
+    .refresh-step .step-label { font-size: 14px; color: #0F172A; margin-left: 8px; }
+    .refresh-step .step-weight { font-size: 12px; color: #888; font-weight: 400; }
+    .refresh-step.step-active .step-label { font-weight: 600; color: #093EB4; }
+    .refresh-step.step-done { opacity: 0.85; }
+    .refresh-step.step-done .step-label { color: #475569; }
+    .refresh-step.step-pending .step-label { color: #94A3B8; }
+    .refresh-step.step-error .step-label { color: #C62828; font-weight: 500; }
+    .refresh-deal-progress { font-size: 13px; color: #475569; margin-top: 10px; text-align: center; font-weight: 500; }
   </style>
 </head>
 <body>
@@ -206,6 +246,48 @@
   <script>
   // ============ DATA FETCHING ============
   const BASE = '/test-dashboard/api';
+
+  var refreshStepsData = [
+    { key: 'fetch_data',   label: 'Загрузка данных',         weight: 50 },
+    { key: 'analyze',      label: 'Анализ данных',           weight: 50 },
+  ];
+
+  var statusPanelHTML = '' +
+    '<div id="refreshStatusPanel" class="refresh-panel" style="display:none">' +
+      '<div class="refresh-header">' +
+        '<span class="refresh-title">🔄 Обновление данных</span>' +
+        '<span class="refresh-elapsed" id="statusElapsed">⏱ 0м 0с</span>' +
+      '</div>' +
+      '<div class="progress-bar refresh-progress-bar">' +
+        '<div class="progress-fill" id="statusProgressFill" style="width:0%"></div>' +
+      '</div>' +
+      '<div id="statusSteps" class="refresh-steps"></div>' +
+      '<div id="statusDealProgress" class="refresh-deal-progress"></div>' +
+    '</div>';
+
+  function renderStepLines(curIdx, steps, progressPct) {
+    var h = '';
+    for (var i = 0; i < steps.length; i++) {
+      var s = steps[i];
+      var icon, cls, label;
+      if (i < curIdx) { icon = '\u2705'; cls = 'step-done'; label = s.label; }
+      else if (i === curIdx) { icon = '\u23f3'; cls = 'step-active'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
+      else { icon = '\u2b1c'; cls = 'step-pending'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
+      h += '<div class="refresh-step ' + cls + '">' +
+        '<span class="step-icon">' + icon + '</span>' +
+        '<span class="step-label">' + label + '</span>' +
+      '</div>';
+    }
+    return h;
+  }
+
+  async function safeFetch(url, opts) {
+    var resp = await fetch(url, opts);
+    if (resp.redirected || resp.url.endsWith('/login')) { window.location.href = '/login'; throw new Error('redirect'); }
+    var text = await resp.text();
+    if (text.startsWith('<!DOCTYPE')) { window.location.href = '/login'; throw new Error('redirect'); }
+    return JSON.parse(text);
+  }
 
   // Безопасный fetch с проверкой редиректа на логин
   async function safeFetch(url) {
@@ -1023,6 +1105,14 @@
 
   // ============ INIT ============
   loadAll();
+  function initRefreshButton() {
+    var toolbar = document.querySelector('.toolbar');
+    if (!toolbar) return;
+    var btn = document.createElement('button');
+    btn.id = 'refreshBtn';
+    btn.textContent = '\ud83d\udd04 Обновить данные';
+    toolbar.appendChild(btn);
+  }
   </script>
 </body>
 </html>
