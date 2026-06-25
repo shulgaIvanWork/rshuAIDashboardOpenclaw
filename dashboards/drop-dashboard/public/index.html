@@ -231,18 +231,20 @@ document.getElementById('tabBar').addEventListener('click', function(e) {
 });
 
 async function api(path) {
-  const r = await fetch((window.BASE_PATH || '') + path);
-  if (r.redirected || r.url.endsWith('/login')) { window.location.href = '/login'; throw new Error('redirect'); }
+  var r = await fetch((window.BASE_PATH || '') + path);
   var text = await r.text();
-  if (text.startsWith('<!DOCTYPE')) { window.location.href = '/login'; throw new Error('redirect'); }
-  return JSON.parse(text);
+  if (r.redirected || text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+    throw new Error('login required');
+  }
+  try { return JSON.parse(text); }
+  catch(e) { return { error: 'parse error', raw: text.substring(0,200) }; }
 }
 
 async function loadAll() {
   // Get user role and init refresh button for admins
   var userRole = 'user';
   try {
-    var userInfo = await api('/api/me');
+    var userInfo = await api('/api/user');
     userRole = userInfo.role || 'user';
   } catch(e) {}
   if (userRole === 'admin') {

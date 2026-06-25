@@ -159,6 +159,11 @@ app.use(express.json({ limit: '50mb' }));
 // Status
 app.get('/api/status', (req, res) => res.json(dataState));
 
+// User info
+app.get('/api/user', (req, res) => {
+  res.json({ role: (req.user && req.user.role) || 'guest' });
+});
+
 // Main data
 app.get('/api/data', (req, res) => {
   if (!aggCache) return res.status(503).json({ error: 'Data not loaded' });
