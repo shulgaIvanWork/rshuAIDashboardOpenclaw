@@ -4,7 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const RATINGS_CACHE = path.resolve(__dirname, '../ratings-dashboard/cache');
+const MY_CACHE = path.resolve(__dirname, 'cache');
 const router = express.Router();
 
 let aggCache = null;
@@ -243,10 +243,10 @@ function calcManagers(deals, dicts, fromDate, toDate) {
 // Загрузка кэша
 async function loadCache() {
   try {
-    const raw = JSON.parse(await fs.readFile(path.join(RATINGS_CACHE, 'agg.json'), 'utf-8'));
+    const raw = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'agg.json'), 'utf-8'));
     aggCache = raw;
-    dealsCache = JSON.parse(await fs.readFile(path.join(RATINGS_CACHE, 'deals_NEW.json'), 'utf-8'));
-    dictsCache = JSON.parse(await fs.readFile(path.join(RATINGS_CACHE, 'dicts.json'), 'utf-8'));
+    dealsCache = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'deals_NEW.json'), 'utf-8'));
+    dictsCache = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'dicts.json'), 'utf-8'));
     console.log(`[manager-report-dev] Cache: ${aggCache.mgr_top?.length || 0} managers, ${dealsCache.length} deals`);
   } catch (e) {
     console.log('[manager-report-dev] Cache error:', e.message);
@@ -293,6 +293,25 @@ router.get('/api/managers', (req, res) => {
     fmt_ytd: aggCache.fmt_ytd,
     loadedAt: aggCache.today,
   });
+});
+
+router.get('/api/funnel', async (req, res) => {
+  try {
+    const data = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'agg.json'), 'utf-8'));
+    const weeks = (data.weeks || []).map(function(w) {
+      return {
+        label_dates: w.label_dates,
+        week: w.week,
+        stack_rej_nq: w.stack_rej_nq || 0, stack_rej: w.stack_rej || 0,
+        stack_nq: w.stack_nq || 0, stack_mql: w.stack_mql || 0,
+        stack_sql: w.stack_sql || 0, stack_inv: w.stack_inv || 0,
+        stack_pay: w.stack_pay || 0
+      };
+    });
+    res.json({ weeks });
+  } catch (e) {
+    res.json({ weeks: [] });
+  }
 });
 
 router.get('/api/status', (req, res) => {

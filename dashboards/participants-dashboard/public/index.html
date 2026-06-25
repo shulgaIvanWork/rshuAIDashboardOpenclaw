@@ -152,23 +152,36 @@ async function api(path) {
 }
 
 async function loadAll() {
-  // Единственная точка входа: загружаем данные для новой логики
-  var areaNew = null; /* removed in participants version */
-  if (!areaNew) return;
+  // Загружаем данные и информацию об актуальности
   try {
     const d = await api('/api/data/new');
     if (!d || !d.ytd) return;
-    if (areaNew._loaded) return; // уже загружено
-    areaNew._loaded = true;
+    
     document.getElementById('loadingFill').style.width = '100%';
     document.getElementById('exportBtn').disabled = false;
-    document.getElementById('sourceInfo').textContent =
-      `Битрикс24 · актуально на ${d.today} · Недели Н${String(d.weeks[0].week).padStart(2,'0')}–Н${String(d.cur_week).padStart(2,'0')}, обновлено: ${new Date().toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+    
+    var weeks = d.weeks || [];
+    var srcInfo = 'Битрикс24';
+    if (d.today) {
+      srcInfo += ' · актуально на ' + d.today;
+    }
+    if (weeks.length > 0) {
+      srcInfo += ' · Недели Н' + String(weeks[0].week).padStart(2,'0') + '–Н' + String(d.cur_week || weeks[weeks.length-1].week).padStart(2,'0');
+    }
+    srcInfo += ' · обновлено: ' + new Date().toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('sourceInfo').textContent = srcInfo;
+    
     dataCache = d;
-    renderPageMainNew(d);
+    
+    // Загружаем участников для активного таба
+    var activeTab = document.querySelector('.tab.active');
+    if (activeTab) {
+      var tabName = activeTab.dataset.tab;
+      if (tabName === 'participants') loadParticipants();
+      if (tabName === 'participantsCur') loadParticipantsCurrent();
+    }
   } catch (e) {
     console.error('loadAll error:', e);
-    if (areaNew) areaNew.innerHTML = '<div class="error-state">❌ Ошибка загрузки: '+escapeHtml(e.message)+'<br>Нажмите «🔄 Обновить данные»</div>';
   }
 }
 
@@ -973,40 +986,42 @@ async function loadParticipants() {
     
     let html = '<table class="sortable" id="participantsTable"><thead><tr>' +
       '<th class="sort" data-col="0">#</th>' +
-      '<th class="sort" data-col="1" style="text-align:left;min-width:180px">Программа / Тематика</th>' +
-      '<th class="sort" data-col="2" style="text-align:left;min-width:80px">Формат</th>' +
-      '<th class="sort" data-col="3" style="text-align:left;min-width:140px">Участник</th>' +
-      '<th class="sort" data-col="4" style="text-align:left;min-width:100px">Регион</th>' +
-      '<th class="sort" data-col="5" style="text-align:left;min-width:200px">Компания</th>' +
-      '<th class="sort" data-col="6" style="text-align:right">Сумма, ₽</th>' +
-      '<th class="sort" data-col="7">Дата</th>' +
-      '<th class="sort" data-col="8">Статус</th>' +
-      '<th class="sort" data-col="9" style="text-align:left">Менеджер</th>' +
-      '<th class="sort" data-col="10">Ранее учились?</th>' +
+      '<th class="sort" data-col="1" style="text-align:left;min-width:180px">Программа (модуль)</th>' +
+      '<th class="sort" data-col="2" style="text-align:left;min-width:120px">Тема / Сделка</th>' +
+      '<th class="sort" data-col="3" style="text-align:left;min-width:80px">Формат</th>' +
+      '<th class="sort" data-col="4" style="text-align:left;min-width:140px">Участник</th>' +
+      '<th class="sort" data-col="5" style="text-align:left;min-width:100px">Регион</th>' +
+      '<th class="sort" data-col="6" style="text-align:left;min-width:200px">Компания</th>' +
+      '<th class="sort" data-col="7" style="text-align:right">Сумма, ₽</th>' +
+      '<th class="sort" data-col="8">Дата модуля</th>' +
+      '<th class="sort" data-col="9">Статус</th>' +
+      '<th class="sort" data-col="10" style="text-align:left">Менеджер</th>' +
       '</tr></thead><tbody>';
     
     for (let i = 0; i < res.participants.length; i++) {
       const p = res.participants[i];
       const rowClass = i < 3 ? ' class="top3"' : '';
-      const prevBadge = p.hadPrevTraining 
-        ? '<span class="badge-prev">✅ Да (' + p.prevTrainingDate + ')</span>' 
-        : '<span class="badge-new">🆕 Нет</span>';
       const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
       const fmtColor = p.format === 'ОМ (Онлайн)' ? '#43A047' : '#1976D2';
       const fmtLabel = p.format === 'ОМ (Онлайн)' ? '🌐 ОМ' : '🏫 ООМ';
       const regionLabel = p.region ? escapeHtml(p.region) : '—';
+      let stageColor = '#2E7D32';
+      if (p.stage === 'Счёт отправлен') stageColor = '#FF9800';
+      else if (p.stage === 'Постоплата') stageColor = '#9C27B0';
+      else if (p.stage === 'Частично оплачен') stageColor = '#2196F3';
+      else if (p.stage === 'WON') stageColor = '#2E7D32';
       html += '<tr' + rowClass + '>' +
         '<td>' + (i + 1) + '</td>' +
-        '<td class="tdleft"><span class="deal-title">' + escapeHtml(p.title) + '</span></td>' +
+        '<td class="tdleft"><b>' + escapeHtml(p.program) + '</b></td>' +
+        '<td class="tdleft" style="font-size:11px;color:#666">' + escapeHtml(p.title) + '</td>' +
         '<td><span style="color:' + fmtColor + ';font-weight:600">' + fmtLabel + '</span></td>' +
         '<td class="tdleft">' + escapeHtml(p.participant) + '</td>' +
         '<td class="tdleft">' + regionLabel + '</td>' +
         '<td class="tdleft">' + escapeHtml(p.company.substring(0, 60)) + (p.company.length > 60 ? '…' : '') + '</td>' +
         '<td class="tdright">' + amount + '</td>' +
         '<td>' + p.date + '</td>' +
-        '<td>' + p.stage + '</td>' +
+        '<td style="color:' + stageColor + ';font-weight:600">' + p.stage + '</td>' +
         '<td class="tdleft">' + escapeHtml(p.manager) + '</td>' +
-        '<td>' + prevBadge + '</td>' +
         '</tr>';
     }
     
@@ -1059,40 +1074,42 @@ async function loadParticipantsCurrent() {
     
     let html = '<table class="sortable" id="participantsCurTable"><thead><tr>' +
       '<th class="sort" data-col="0">#</th>' +
-      '<th class="sort" data-col="1" style="text-align:left;min-width:180px">Программа / Тематика</th>' +
-      '<th class="sort" data-col="2" style="text-align:left;min-width:80px">Формат</th>' +
-      '<th class="sort" data-col="3" style="text-align:left;min-width:140px">Участник</th>' +
-      '<th class="sort" data-col="4" style="text-align:left;min-width:100px">Регион</th>' +
-      '<th class="sort" data-col="5" style="text-align:left;min-width:200px">Компания</th>' +
-      '<th class="sort" data-col="6" style="text-align:right">Сумма, ₽</th>' +
-      '<th class="sort" data-col="7">Дата</th>' +
-      '<th class="sort" data-col="8">Статус</th>' +
-      '<th class="sort" data-col="9" style="text-align:left">Менеджер</th>' +
-      '<th class="sort" data-col="10">Ранее учились?</th>' +
+      '<th class="sort" data-col="1" style="text-align:left;min-width:180px">Программа (модуль)</th>' +
+      '<th class="sort" data-col="2" style="text-align:left;min-width:120px">Тема / Сделка</th>' +
+      '<th class="sort" data-col="3" style="text-align:left;min-width:80px">Формат</th>' +
+      '<th class="sort" data-col="4" style="text-align:left;min-width:140px">Участник</th>' +
+      '<th class="sort" data-col="5" style="text-align:left;min-width:100px">Регион</th>' +
+      '<th class="sort" data-col="6" style="text-align:left;min-width:200px">Компания</th>' +
+      '<th class="sort" data-col="7" style="text-align:right">Сумма, ₽</th>' +
+      '<th class="sort" data-col="8">Дата модуля</th>' +
+      '<th class="sort" data-col="9">Статус</th>' +
+      '<th class="sort" data-col="10" style="text-align:left">Менеджер</th>' +
       '</tr></thead><tbody>';
     
     for (let i = 0; i < res.participants.length; i++) {
       const p = res.participants[i];
       const rowClass = i < 3 ? ' class="top3"' : '';
-      const prevBadge = p.hadPrevTraining 
-        ? '<span class="badge-prev">✅ Да (' + p.prevTrainingDate + ')</span>' 
-        : '<span class="badge-new">🆕 Нет</span>';
       const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
       const fmtColor = p.format === 'ОМ (Онлайн)' ? '#43A047' : '#1976D2';
       const fmtLabel = p.format === 'ОМ (Онлайн)' ? '🌐 ОМ' : '🏫 ООМ';
       const regionLabel = p.region ? escapeHtml(p.region) : '—';
+      let stageColor = '#2E7D32';
+      if (p.stage === 'Счёт отправлен') stageColor = '#FF9800';
+      else if (p.stage === 'Постоплата') stageColor = '#9C27B0';
+      else if (p.stage === 'Частично оплачен') stageColor = '#2196F3';
+      else if (p.stage === 'WON') stageColor = '#2E7D32';
       html += '<tr' + rowClass + '>' +
         '<td>' + (i + 1) + '</td>' +
-        '<td class="tdleft"><span class="deal-title">' + escapeHtml(p.title) + '</span></td>' +
+        '<td class="tdleft"><b>' + escapeHtml(p.program) + '</b></td>' +
+        '<td class="tdleft" style="font-size:11px;color:#666">' + escapeHtml(p.title) + '</td>' +
         '<td><span style="color:' + fmtColor + ';font-weight:600">' + fmtLabel + '</span></td>' +
         '<td class="tdleft">' + escapeHtml(p.participant) + '</td>' +
         '<td class="tdleft">' + regionLabel + '</td>' +
         '<td class="tdleft">' + escapeHtml(p.company.substring(0, 60)) + (p.company.length > 60 ? '…' : '') + '</td>' +
         '<td class="tdright">' + amount + '</td>' +
         '<td>' + p.date + '</td>' +
-        '<td>' + p.stage + '</td>' +
+        '<td style="color:' + stageColor + ';font-weight:600">' + p.stage + '</td>' +
         '<td class="tdleft">' + escapeHtml(p.manager) + '</td>' +
-        '<td>' + prevBadge + '</td>' +
         '</tr>';
     }
     

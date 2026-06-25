@@ -1,5 +1,4 @@
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-function fmt(n){return (n||0).toLocaleString('ru-RU');}
 function loadArtifacts(){
   fetch(window.BASE_PATH+'/api/artifacts').then(function(r){return r.json();}).then(function(d){
     var el=document.getElementById('newArtifactsBlock');
@@ -97,6 +96,14 @@ async function loadAll() {
     if (!d || !d.ytd) return;
     var _lf=document.getElementById('loadingFill');if(_lf)_lf.style.width='100%';
     dataCache = d;
+
+    // Дата обновления в заголовке
+    var dateEl = document.getElementById('updateDate');
+    if (dateEl && d._loadedAt) {
+      var dt = new Date(d._loadedAt);
+      var dtStr = dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      dateEl.textContent = '(Данные на: ' + dtStr + ' MSK)';
+    }
 
     // Устанавливаем dateFrom/dateTo по умолчанию: с первой недели до today
     // По умолчанию: с 1 января текущего года
@@ -659,7 +666,6 @@ async function renderPageMainNew(d) {
     html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0);
     html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev);
     html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev);
-
     // Регистрация — сразу под KPI
     html += '<div class="kpis" id="newRegKpis"></div>';
 
@@ -677,7 +683,6 @@ async function renderPageMainNew(d) {
     html += '</div>';
     // Стеки воронок - на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:16px"><h2>Воронка по неделям <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии на той же неделе)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
-    html += '<div class="card"><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учетом переходящего остатка, без учета даты создания)</span> <span style="color:#C62828;font-size:11px;font-weight:400">(в разработке)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel"></canvas></div></div>';
     // Конверсии
 
     // Средний чек по неделям (на всю ширину)
@@ -795,7 +800,7 @@ async function renderPageMainNew(d) {
     var reg = d.reg_ytd||{};
     var regConvSql = reg.total > 0 ? (reg.sql/reg.total*100).toFixed(1) : '0.0';
     var regConvInv = reg.total > 0 ? (reg.invoice/reg.total*100).toFixed(1) : '0.0';
-    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация» <span style="color:#C62828;font-size:11px;font-weight:400">(в разработке)</span></div><div class="kpi kpi-reg"><div class="lbl">💰 Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.</span></div></div>';
+    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div><div class="kpi kpi-reg"><div class="lbl">💰 Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL</div><div class="row"><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><span class="si">'+reg.sql+' сд.</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен</div><div class="row"><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><span class="si">'+reg.real_inv_cnt+' сд.</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату</div><div class="val-big">'+reg.conv+'%</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+reg.inv_conv+'%</div></div>';
@@ -806,34 +811,30 @@ async function renderPageMainNew(d) {
 
 
 
-    // Недельная таблица - от последней недели к первой
+    // Недельная таблица — снизу вверх (последняя неделя первой)
+    var tL=0,tM=0,tS=0,tInv=0,tO=0,tP0=0;
+    for(var wi=0; wi<weeks.length; wi++){
+      var w = weeks[wi];
+      tL+=w.leads||0; tM+=w.mql||0; tS+=w.sql||0; tInv+=w.invoice_cnt||0; tO+=w.oplata||0; tP0+=w.postupleniya||0;
+    }
+    var tAvgChk = tO > 0 ? tP0 / tO : 0;
+    var tDurNum = 0, tDurDen = 0;
+    weeks.forEach(function(w){ tDurNum += (w.avg_dur||0) * (w.oplata||0); tDurDen += w.oplata||0; });
+    var tAvgDur = tDurDen > 0 ? tDurNum / tDurDen : 0;
+    var tCl = tL > 0 ? tM / tL * 100 : 0;
+    var tCs = tM > 0 ? tS / tM * 100 : 0;
+    var tSi = tS > 0 ? tInv / tS * 100 : 0;
+    var tIo = tInv > 0 ? tO / tInv * 100 : 0;
+    var tLo = tL > 0 ? tO / tL * 100 : 0;
     var weekStr = '<table style="font-size:11px"><tr><th>Неделя</th><th>Лиды</th><th>MQL</th><th>SQL</th><th>Счёт</th><th>Оплачено</th><th>Поступл.</th><th>Ср.чек</th><th>Цикл</th><th>Лиды\u2192MQL</th><th>MQL\u2192SQL</th><th>SQL\u2192Счёт</th><th>Счёт\u2192Оплата</th><th>Лид\u2192Оплата</th></tr>';
-    var tL=0,tM=0,tS=0,tO=0,tP0=0;
-    // Предварительный расчёт конверсий для всех недель
-    var convs = [];
+    // ИТОГО первой строкой
+    weekStr += '<tr style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>\uD83D\uDCCA ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
+    // Недели
     for(var wi=weeks.length-1; wi>=0; wi--){
       var w = weeks[wi];
-      var conv = (w.leads||0) > 0 ? ((w.oplata||0) / (w.leads||0) * 100) : 0;
-      convs.push({ idx: wi, conv: conv });
+      weekStr += '<tr><td><b>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</b></td><td>'+w.leads+'</td><td>'+w.mql+'</td><td>'+w.sql+'</td><td><b>'+(w.invoice_cnt||0)+'</b></td><td><b>'+w.oplata+'</b></td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td><td>'+(w.leads>0?(w.oplata/w.leads*100).toFixed(1):'0.0')+'%</td></tr>';
     }
-    // Вывод с дельтой к следующей (нижней) неделе
-    for(var ci=0; ci<convs.length; ci++){
-      var wi = convs[ci].idx;
-      var w = weeks[wi];
-      var convLeadOplata = convs[ci].conv;
-      var convDelta = '';
-      if (ci < convs.length - 1) {
-        var nextConv = convs[ci+1].conv;
-        var diff = convLeadOplata - nextConv;
-        if (diff > 0) convDelta = ' <span style="color:#2E7D32">\u2191+' + diff.toFixed(1) + '%</span>';
-        else if (diff < 0) convDelta = ' <span style="color:#C62828">\u2193' + diff.toFixed(1) + '%</span>';
-        else convDelta = ' <span style="color:#888">\u21920.0%</span>';
-      }
-      weekStr += '<tr><td><b>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</b></td><td>'+w.leads+'</td><td>'+w.mql+'</td><td>'+w.sql+'</td><td><b>'+(w.invoice_cnt||0)+'</b></td><td><b>'+w.oplata+'</b></td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td><td>'+convLeadOplata.toFixed(1)+'%'+convDelta+'</td></tr>';
-      tL+=w.leads||0; tM+=w.mql||0; tS+=w.sql||0; tO+=w.oplata||0; tP0+=w.postupleniya||0;
-    }
-    var totConv = tL > 0 ? (tO / tL * 100).toFixed(1) : '0.0';
-    weekStr += '<tr style="font-weight:700;border-top:2px solid #333"><td>ИТОГО</td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td></td><td></td><td></td><td></td><td></td><td></td><td>'+totConv+'%</td></tr></table>';
+    weekStr += '</table>';
     el = document.getElementById('newWeekTable'); if(el) el.innerHTML = weekStr;
 
 
@@ -846,7 +847,6 @@ async function renderPageMainNew(d) {
       if (window.Chart) {
         try {
           if (document.getElementById('newChFunnel2')) new Chart(document.getElementById('newChFunnel2'), {type:'bar', data:{labels:labels,datasets:[{label:'Отказы неКвал',data:weeks.map(function(w){return w.stack2_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4,seg:'rej_nq'},{label:'Отказы',data:weeks.map(function(w){return w.stack2_rej||0;}),backgroundColor:'#E53935',borderRadius:4,seg:'rej'},{label:'Не квал',data:weeks.map(function(w){return w.stack2_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4,seg:'nq'},{label:'MQL',data:weeks.map(function(w){return w.stack2_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4,seg:'mql'},{label:'SQL',data:weeks.map(function(w){return w.stack2_sql||0;}),backgroundColor:'#1A237E',borderRadius:4,seg:'sql'},{label:'Счёт',data:weeks.map(function(w){return w.stack2_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4,seg:'inv'},{label:'Оплата',data:weeks.map(function(w){return w.stack2_pay||0;}),backgroundColor:'#43A047',borderRadius:4,seg:'pay'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].forEach(function(k){tot+=weeks[i][k]||0;});return tot?tot+' сд.':'';}},tooltip:{callbacks:{label:function(ctx){var l=ctx.dataset.label||'';var v=ctx.raw||0;var w=weeks[ctx.dataIndex]||{};var s=ctx.dataset.seg||'';var sumKey=s?'stack2_'+s+'_sum':'';var sumVal=sumKey?(w[sumKey]||0):0;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].map(function(k){tot+=w[k]||0;});var pct=tot>0?(v/tot*100).toFixed(1):0;var txt=l+': '+v+' сд. ('+pct+'%)';if(s==='sql'||s==='inv'||s==='pay'){txt+=' · '+sumVal.toLocaleString('ru-RU')+' ₽';}return txt;}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}},plugins:[{id:'legendSpacer',beforeLayout(chart){var leg=chart.legend;if(leg&&!leg.__spacer30){var of=leg.fit.bind(leg);leg.fit=function(){of();this.height+=30;};leg.__spacer30=true;}}}] });
-          if (document.getElementById('newChFunnel')) new Chart(document.getElementById('newChFunnel'), {type:'bar', data:{labels:labels,datasets:[{label:'Отказы неКвал',data:weeks.map(function(w){return w.stack_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4,seg:'rej_nq'},{label:'Отказы',data:weeks.map(function(w){return w.stack_rej||0;}),backgroundColor:'#E53935',borderRadius:4,seg:'rej'},{label:'Не квал',data:weeks.map(function(w){return w.stack_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4,seg:'nq'},{label:'MQL',data:weeks.map(function(w){return w.stack_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4,seg:'mql'},{label:'SQL',data:weeks.map(function(w){return w.stack_sql||0;}),backgroundColor:'#1A237E',borderRadius:4,seg:'sql'},{label:'Счёт',data:weeks.map(function(w){return w.stack_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4,seg:'inv'},{label:'Оплата',data:weeks.map(function(w){return w.stack_pay||0;}),backgroundColor:'#43A047',borderRadius:4,seg:'pay'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=0;['stack_rej','stack_rej_nq','stack_nq','stack_mql','stack_sql','stack_inv','stack_pay'].forEach(function(k){tot+=weeks[i][k]||0;});return tot?tot+' сд.':'';}},tooltip:{callbacks:{label:function(ctx){var l=ctx.dataset.label||'';var v=ctx.raw||0;var w=weeks[ctx.dataIndex]||{};var s=ctx.dataset.seg||'';var sumKey=s?'stack_'+s+'_sum':'';var sumVal=sumKey?(w[sumKey]||0):0;var tot=0;['stack_rej','stack_rej_nq','stack_nq','stack_mql','stack_sql','stack_inv','stack_pay'].forEach(function(k){tot+=w[k]||0;});var pct=tot>0?(v/tot*100).toFixed(1):0;var txt=l+': '+v+' сд. ('+pct+'%)';if(s==='sql'||s==='inv'||s==='pay'){txt+=' · '+sumVal.toLocaleString('ru-RU')+' ₽';}return txt;}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}} });
         } catch(e){}
         try {
           if (document.getElementById('newChConv')) new Chart(document.getElementById('newChConv'), {type:'line', data:{labels:labels,datasets:[{label:'Лиды\u2192MQL %',data:weeks.map(function(w){return w.conv_lead_mql||0;}),borderColor:'#B0BEC5',tension:0.3,fill:false},{label:'MQL\u2192SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL\u2192Счёт %',data:weeks.map(function(w){return w.conv_sql_invoice||0;}),borderColor:'#43A047',tension:0.3,fill:false},{label:'Счёт\u2192Оплата %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});

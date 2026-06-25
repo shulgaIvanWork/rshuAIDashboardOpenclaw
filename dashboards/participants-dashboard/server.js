@@ -361,8 +361,17 @@ app.get('/api/export', async (req, res) => {
 });
 
 // --- Helper: load participant data & build participants list ---
+// Новая логика: проверка по модулям (продуктовым строкам) вместо интервала сделки
 async function buildParticipants(weekIndex) {
   if (!aggCache) throw new Error('Data not loaded');
+
+  // Загружаем modules.json (продуктовые строки с датами модулей)
+  let modulesData = {};
+  try {
+    modulesData = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'modules.json'), 'utf-8'));
+  } catch (e) {
+    console.log('modules.json not found, skipping module check');
+  }
 
   const [dealsRaw, companiesRaw, contactsRaw, dictsRaw, ccRaw, contExtRaw, formatRaw, compExtRaw] = await Promise.all([
     fs.readFile(path.join(CACHE_DIR, 'deals_2026.json'), 'utf-8').catch(() => '[]'),
@@ -434,6 +443,13 @@ async function buildParticipants(weekIndex) {
     return isNaN(d.getTime()) ? null : d;
   }
 
+  function parseModuleDate(s) {
+    // Дата в формате YYYY-MM-DD или ISO
+    if (!s) return null;
+    const d = new Date(s.substring(0, 10) + 'T00:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  }
+
   function isRealTraining(title, dealId) {
     const t = (title || '').toLowerCase();
     const skipWords = ['копия для статистики', 'входящий звонок', 'запрос программы',
@@ -448,57 +464,61 @@ async function buildParticipants(weekIndex) {
     return true;
   }
 
-  // Дата начала и окончания обучения (приоритет: товар → сделка → CLOSEDATE)
-  function getLearnPeriod(d) {
-    let start = toDate(d.UF_CRM_DATE_START_LEARN);
-    let end = toDate(d.UF_CRM_DATE_END_LEARN);
-    // Fallback на CLOSEDATE, если дат обучения нет
-    if (!start && !end) {
-      const cd = toDate(d.CLOSEDATE);
-      if (cd) {
-        start = cd;
-        end = cd;
-      }
-    }
-    return { start, end };
+  // Проверка: пересекается ли модуль с неделей
+  function moduleOverlapsWeek(module) {
+    const start = parseModuleDate(module.date_start);
+    const end = parseModuleDate(module.date_end);
+    if (!start || !end) return false;
+    return start <= range.end && end >= range.start;
   }
 
-  // Проверка: пересекается ли период обучения с неделей
-  function learnOverlapsWeek(d) {
-    const p = getLearnPeriod(d);
-    if (!p.start || !p.end) return false;
-    return p.start <= range.end && p.end >= range.start;
-  }
+  // Релевантные стадии: WON + Счёт отправлен + Постоплата + Частично оплачен
+  const TARGET_STAGES = new Set(['WON', 'PROPOSAL', '2', '6', 'C0:WON', 'C0:PROPOSAL', 'C0:2', 'C0:6']);
 
-  // Find ООМ/ОМ сделки — WON, у которых обучение пересекается с неделей
-  const OOM_OM_DEALS = deals.filter(d => {
+  // Фильтруем сделки: категория 0 (ООМ/ОМ), нужные стадии, не КОМ
+  const candidateDeals = deals.filter(d => {
+    if (String(d.CATEGORY_ID) !== '0') return false;
+    if (!TARGET_STAGES.has(d.STAGE_ID)) return false;
+    // Фильтр по формату
     const catName = cats[String(d.CATEGORY_ID || '0')];
     const fmt = detectFormat(d.TITLE, catName, d.ID);
     if (fmt !== 'ООМ (Очное)' && fmt !== 'ОМ (Онлайн)') return false;
-    if (d.STAGE_SEMANTIC_ID !== 'S') return false;
-    if (d.CLOSED !== 'Y') return false;
-    if (!learnOverlapsWeek(d)) return false;
+    // Проверяем сумму: реальные сделки с суммой или учебные
     const opp = parseFloat(d.OPPORTUNITY || 0);
     if (opp > 0) return true;
     return isRealTraining(d.TITLE, d.ID);
   });
 
-  // Build company history
-  const companyHistory = {};
-  for (const d of deals) {
-    const catName = cats[String(d.CATEGORY_ID || '0')];
-    const fmt = detectFormat(d.TITLE, catName, d.ID);
-    if (fmt === 'КОМ') continue;
-    const coId = String(cc[d.ID]?.COMPANY_ID || d.COMPANY_ID || '0');
-    if (!companyHistory[coId]) companyHistory[coId] = [];
-    companyHistory[coId].push({ date: d.CLOSEDATE || d.DATE_CREATE, title: d.TITLE });
-  }
-
+  // Строим участников по модулям
   const participants = [];
-  const seen = new Set();
+  const seen = new Set();  // ключ: сдeлка + модуль
 
-  for (const d of OOM_OM_DEALS) {
-    const ccinfo = cc[d.ID] || {};
+  for (const d of candidateDeals) {
+    const did = d.ID;
+    const dealModules = modulesData[did] || [];
+
+    // Если нет модулей в кэше — пробуем старую логику по датам сделки
+    if (dealModules.length === 0) {
+      const learnStart = toDate(d.UF_CRM_DATE_START_LEARN);
+      const learnEnd = toDate(d.UF_CRM_DATE_END_LEARN);
+      if (!learnStart || !learnEnd) continue;
+      if (!(learnStart <= range.end && learnEnd >= range.start)) continue;
+      // Эмулируем один модуль из дат сделки
+      const displayDate = learnStart ? learnStart.toLocaleDateString('ru-RU') : '—';
+      dealModules.push({
+        product_id: '0',
+        original_name: '—',
+        date_start: learnStart ? learnStart.toISOString().substring(0, 10) : null,
+        date_end: learnEnd ? learnEnd.toISOString().substring(0, 10) : null
+      });
+    }
+
+    // Фильтруем модули, которые проходят на этой неделе
+    const weekModules = dealModules.filter(m => moduleOverlapsWeek(m));
+    if (weekModules.length === 0) continue;
+
+    // Данные сделки
+    const ccinfo = cc[did] || {};
     const coId = String(ccinfo.COMPANY_ID || d.COMPANY_ID || '0');
     const contactId = String(ccinfo.CONTACT_ID || d.CONTACT_ID || '0');
 
@@ -508,69 +528,60 @@ async function buildParticipants(weekIndex) {
     const opp = parseFloat(d.OPPORTUNITY || 0);
     const manager = users[String(d.ASSIGNED_BY_ID || '')] || String(d.ASSIGNED_BY_ID || '—');
 
-    // Check history
-    const prevDeals = companyHistory[coId] || [];
-    const closedDate = d.CLOSEDATE || d.DATE_CREATE;
-    let hadPrev = false;
-    let prevDates = '';
-    if (closedDate && prevDeals.length > 0) {
-      const cd = new Date(closedDate.replace('+03:00', '').replace('+00:00', '').substring(0, 19));
-      const earlier = prevDeals.filter(p => {
-        if (!p.date) return false;
-        const pd = new Date(p.date.replace('+03:00', '').replace('+00:00', '').substring(0, 19));
-        return pd < cd;
-      });
-      hadPrev = earlier.length > 0;
-      if (hadPrev) {
-        const lastDate = earlier.reduce((a, b) => {
-          const da = new Date(a.date.replace('+03:00', '').replace('+00:00', '').substring(0, 19));
-          const db = new Date(b.date.replace('+03:00', '').replace('+00:00', '').substring(0, 19));
-          return da > db ? a : b;
-        }, earlier[0]);
-        if (lastDate.date) {
-          const d = new Date(lastDate.date.replace('+03:00', '').replace('+00:00', '').substring(0, 19));
-          prevDates = d.toLocaleDateString('ru-RU');
-        }
-      }
-    }
-
-    // Дата обучения (для показа в таблице)
-    const learnStart = toDate(d.UF_CRM_DATE_START_LEARN);
-    const learnEnd = toDate(d.UF_CRM_DATE_END_LEARN);
-    const displayDate = learnStart ? learnStart.toLocaleDateString('ru-RU') 
-      : (learnEnd ? learnEnd.toLocaleDateString('ru-RU') 
-      : (closedDate ? new Date(closedDate.replace('+03:00', '').replace('+00:00', '').substring(0, 19)).toLocaleDateString('ru-RU') : '—'));
-
-    const key = d.ID;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    // Region resolution: contact → company fallback
+    // Region: contact → company fallback
     let region = (contactsExt[contactId]?.region || contactsExt[contactId]?.locality || '');
     if (!region && companiesExt[coId]?.region) {
       region = companiesExt[coId].region;
     }
 
-    participants.push({
-      id: d.ID,
-      title: d.TITLE || '—',
-      program: d.TITLE || '—',
-      theme: d.TITLE ? d.TITLE.trim() : '—',
-      participant: contactName,
-      company: companyName,
-      companyId: coId,
-      amount: opp,
-      date: displayDate,
-      manager,
-      hadPrevTraining: hadPrev,
-      prevTrainingDate: prevDates,
-      stage: d.STAGE_SEMANTIC_ID === 'S' ? 'WON' : d.STAGE_SEMANTIC_ID === 'F' ? 'LOSE' : 'В работе',
-      isPaid: d.CLOSED === 'Y' && d.STAGE_SEMANTIC_ID === 'S',
-      format: detectFormat(d.TITLE, cats[String(d.CATEGORY_ID || '0')], d.ID),
-      region
-    });
+    // Стадия для отображения
+    const stageLabel = d.STAGE_ID === 'WON' || d.STAGE_ID === 'C0:WON' ? 'WON'
+      : d.STAGE_ID === 'PROPOSAL' || d.STAGE_ID === 'C0:PROPOSAL' ? 'Счёт отправлен'
+      : d.STAGE_ID === '2' || d.STAGE_ID === 'C0:2' ? 'Постоплата'
+      : d.STAGE_ID === '6' || d.STAGE_ID === 'C0:6' ? 'Частично оплачен'
+      : d.STAGE_SEMANTIC_ID === 'S' ? 'WON'
+      : d.STAGE_SEMANTIC_ID === 'F' ? 'LOSE' : 'В работе';
+
+    const isPaid = d.STAGE_SEMANTIC_ID === 'S' || d.STAGE_ID === 'WON' || d.STAGE_ID === 'C0:WON';
+
+    for (const mod of weekModules) {
+      const key = `${did}_${mod.product_id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      // Парсим название модуля из original_name или из названия продуктовой строки
+      const moduleName = mod.original_name 
+        || (mod.product_name ? mod.product_name.replace(/^Оказание образовательных услуг по теме \"(.+?)\".*$/, '$1').trim() : '—')
+        || '—';
+
+      // Дата проведения модуля
+      const modStart = parseModuleDate(mod.date_start);
+      const modDisplayDate = modStart ? modStart.toLocaleDateString('ru-RU') : '—';
+
+      participants.push({
+        id: did,
+        title: d.TITLE || '—',
+        program: moduleName,
+        theme: moduleName,
+        participant: contactName,
+        company: companyName,
+        companyId: coId,
+        amount: opp,
+        date: modDisplayDate,
+        moduleDateStart: mod.date_start,
+        moduleDateEnd: mod.date_end,
+        manager,
+        hadPrevTraining: false,
+        prevTrainingDate: '',
+        stage: stageLabel,
+        isPaid,
+        format: detectFormat(d.TITLE, cats[String(d.CATEGORY_ID || '0')], d.ID),
+        region
+      });
+    }
   }
 
+  // Сортировка по дате модуля
   participants.sort((a, b) => {
     if (a.date === '—') return 1;
     if (b.date === '—') return -1;

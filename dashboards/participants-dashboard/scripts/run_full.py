@@ -64,7 +64,10 @@ if os.path.exists(src):
     shutil.copy2(src, dst)
     print(f"✓  agg_new.json → agg.json (скопирован)")
 
-# --- Шаг 7: Excel ---
+# --- Шаг 7: Модули (продуктовые строки) для дашборда участников ---
+run("fetch_modules.py")
+
+# --- Шаг 8: Excel ---
 run("build_xlsx.py")
 
 print("\n" + "=" * 60)

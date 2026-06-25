@@ -6,6 +6,7 @@
 <title>ИИ-РОП: Отчёт по менеджерам</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Inter', -apple-system, sans-serif; background: #F1F3F6; color: #1f2a44; font-size: 13px; }
@@ -131,7 +132,19 @@ function app(mgrs, periodLabel) {
   html += renderBars(mgrs);
   html += '</div>';
 
+  // Менеджеры YTD
+  html += '<div class=card><h2>Менеджеры YTD <span style="font-size:12px;color:#888;font-weight:400">(основная воронка · лиды из CRM)</span></h2><div class=scroll-x>';
+  html += '<table style="font-size:11px;white-space:nowrap"><tr><th>Менеджер</th><th>Лидов CRM</th><th>WON</th><th>Проигр</th><th>Конв.%</th><th>Ср.чек, ₽</th><th>Поступления, ₽</th></tr>';
+  mgrs.filter(function(m){return m.leads > 0;}).forEach(function(m, i){
+    html += '<tr><td><b>'+e(m.name)+'</b></td><td>'+m.leads+'</td><td><b>'+m.paid+'</b></td><td>'+m.lost+'</td><td>'+(m.conv_pct||0).toFixed(1)+'%</td><td>'+n(m.avg_check)+' ₽</td><td><b>'+n(m.paid_sum)+'</b> ₽</td></tr>';
+  });
+  html += '</table></div></div>';
+
+  // Воронка
+  html += '<div class=card><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учетом переходящего остатка, без учета даты создания)</span></h2><div style="height:600px;position:relative"><canvas id="funnelChart"></canvas></div></div>';
+
   document.getElementById('app').innerHTML = html;
+  loadFunnel();
 }
 
 function sum(arr,k) { return arr.reduce(function(s,x){return s+(x[k]||0);},0); }
@@ -299,6 +312,32 @@ function renderBars(mgrs) {
 }
 
 load();
+
+function loadFunnel() {
+  var canvas = document.getElementById('funnelChart');
+  if (!canvas || !window.Chart) return;
+  fetch(BP+'/api/funnel').then(function(r){return r.json();}).then(function(d){
+    var weeks = d.weeks || [];
+    if (!weeks.length) return;
+    var labels = weeks.map(function(w){ return w.label_dates || 'Неделя'+String(w.week).padStart(2,'0'); });
+    new Chart(canvas, {
+      type:'bar', data:{ labels:labels, datasets:[
+        {label:'Отказы неКвал', data:weeks.map(function(w){return w.stack_rej_nq||0;}), backgroundColor:'#880E4F', borderRadius:4 },
+        {label:'Отказы', data:weeks.map(function(w){return w.stack_rej||0;}), backgroundColor:'#E53935', borderRadius:4 },
+        {label:'Не квал', data:weeks.map(function(w){return w.stack_nq||0;}), backgroundColor:'#FFD54F', borderRadius:4 },
+        {label:'MQL', data:weeks.map(function(w){return w.stack_mql||0;}), backgroundColor:'#42A5F5', borderRadius:4 },
+        {label:'SQL', data:weeks.map(function(w){return w.stack_sql||0;}), backgroundColor:'#1A237E', borderRadius:4 },
+        {label:'Счёт', data:weeks.map(function(w){return w.stack_inv||0;}), backgroundColor:'#7E57C2', borderRadius:4 },
+        {label:'Оплата', data:weeks.map(function(w){return w.stack_pay||0;}), backgroundColor:'#43A047', borderRadius:4 }
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:'top',labels:{font:{size:10}}}, datalabels:{display:false} },
+        scales:{ x:{stacked:true}, y:{stacked:true,beginAtZero:true} }
+      }
+    });
+  }).catch(function(){});
+}
 </script>
 </body>
 </html>

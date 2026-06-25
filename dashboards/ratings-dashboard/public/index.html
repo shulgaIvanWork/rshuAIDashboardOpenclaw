@@ -107,7 +107,7 @@ window.BASE_PATH = _m ? '/' + _m[1] : '';
 <body>
 <div class="wrap">
   <h1>Рейтинги 2026</h1>
-  <p class="sub" id="sourceInfo">Топ-20 продуктов · Источники · Менеджеры · Топ-20 компаний</p>
+  <p class="sub" id="sourceInfo">Топ-20 продуктов · Источники · Топ-20 компаний</p>
   <div class="loading-bar" id="loadingBar"><div class="fill" id="loadingFill"></div></div>
   <div class="toolbar">
     <button id="refreshBtn">🔄 Обновить данные</button>
@@ -413,6 +413,7 @@ function renderPage(data) {
     </div>
     <div class="twocol">
       <div class="card"><h2>📊 Поступления по неделям, ₽</h2><div class="chartbox"><canvas id="ch_pos"></canvas></div></div>
+    </div>
 
     <!-- B2B + Formats -->
     <div class="twocol">
@@ -499,15 +500,6 @@ function renderPage(data) {
     </div>
 
     <!-- Managers -->
-    <div class="card"><h2>Менеджеры YTD <span style="font-size:13px;color:#888;font-weight:400">(основная воронка · лиды из CRM)</span></h2>
-      <div class="scroll-x"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Менеджер</th><th class="sort" data-col="2">Лидов CRM</th><th class="sort" data-col="3">WON</th><th class="sort" data-col="4">Проигр</th><th class="sort" data-col="5">Конв.%</th><th class="sort" data-col="6">Ср. чек, ₽</th><th class="sort" data-col="7">Поступления, ₽</th></tr></thead>
-        <tbody>${(data.mgr_top || []).filter(m => m.leads > 0).map((m, i) =>
-          `<tr><td>${i+1}</td><td>${m.name}</td><td>${m.leads}</td><td>${m.won}</td><td>${m.lost}</td><td>${m.conv_pct}%</td><td>${fmt(m.avg_check)} ₽</td><td><b>${fmt(m.postupleniya)}</b> ₽</td></tr>`
-        ).join('')}</tbody>
-      </table></div>
-    </div>
-
     <!-- Charts row -->
     <div class="twocol">
       <div class="card"><h2>Кол-во сделок: WON vs LOSE</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
@@ -674,58 +666,39 @@ async function renderPageMainNew(d) {
     // ММВА — в самый вверх
     html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
 
-    // Топ-20 продуктов + Источники
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Топ-20 продуктов</h2><div id="newProductsTable"></div></div>';
-    html += '<div class="card"><h2>Источники</h2><div id="newSrcTable"></div></div>';
-    html += '</div>';
-    html += '<div class="card"><h2>Менеджеры</h2><div id="newMgrsTable"></div></div>';
+    // Топ-20 продуктов
+    html += '<div class="card" style="margin-top:8px"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto;max-height:520px;overflow-y:auto"><div id="newProductsTable"></div></div></div>';
+    // Источники
+    html += '<div class="card"><h2>Рейтинг источников поступлений</h2><div class="sub" style="margin:-8px 0 14px">Сводные данные с начала года · первая строка — итог · клик по заголовку для сортировки</div><div style="overflow-x:auto;max-height:520px;overflow-y:auto"><div id="newSrcTable"></div></div></div>';
     html += '<div class="card"><h2>Топ-20 компаний</h2><div id="newCompaniesTable"></div></div>';
 
     areaNew.innerHTML = html;
 
     // Fill tables
     var prods = d.top_products||[];
-    var prodStr = '<table style="font-size:11px"><tr><th>#</th><th>Продукт</th><th>Кол-во</th><th>Выручка</th><th>Ср.чек</th></tr>';
+    var prodStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">SQL</th><th class="sort" data-col="3">Сделки</th><th class="sort" data-col="4">Поступления, ₽</th><th class="sort" data-col="5">Ср.чек, ₽</th><th class="sort" data-col="6">Срок WON</th><th class="sort" data-col="7">Доля</th></tr>';
     prods.slice(0,20).forEach(function(p,i){
       if(!p.name) return;
-      var ps=p.sum||p.deals_sum||0, pc=p.cnt||p.deals||0;
-      prodStr += '<tr><td>'+(i+1)+'</td><td><b>'+escapeHtml(p.name)+'</b></td><td>'+pc+'</td><td>'+fmt(ps)+' ₽</td><td>'+fmt(Math.round(ps/(pc||1)))+' ₽</td></tr>';
+      var isRem = (p.name||'').includes('Остальные');
+      var pc=p.cnt||p.deals||0;
+      prodStr += '<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td>'+(p.sql||0)+'</td><td><b>'+pc+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'дн</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td></tr>';
     });
     prodStr += '</table>';
     var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
 
     var src = d.src_rating||[];
-    var srcStr = '<table style="font-size:11px"><tr><th>Источник</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th></tr>';
-    src.slice(0,15).forEach(function(s){if(!s.name||s.name==='ИТОГО')return;srcStr+='<tr><td>'+escapeHtml(s.name)+'</td><td>'+fmt(s.postupleniya)+' ₽</td><td>'+s.deals+'</td><td>'+fmt(s.avg_check)+' ₽</td></tr>';});
+    var srcStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Источник</th><th class="sort" data-col="2">Поступления, ₽</th><th class="sort" data-col="3">MQL</th><th class="sort" data-col="4">SQL</th><th class="sort" data-col="5">Сделки</th><th class="sort" data-col="6">MQL→SQL</th><th class="sort" data-col="7">SQL→Сд.</th><th class="sort" data-col="8">Лид→Сд.</th><th class="sort" data-col="9">Лидов</th><th class="sort" data-col="10">Ср.чек, ₽</th><th class="sort" data-col="11">Срок WON</th></tr>';
+    src.forEach(function(s,i){
+      if(!s.name) return;
+      var isTotal = i === 0;
+      srcStr += '<tr'+(isTotal?' style="background:#fff8e1;font-weight:700"':'')+'><td>'+(isTotal?'':i)+'</td><td>'+escapeHtml(s.name)+'</td><td><b>'+fmt(s.postupleniya)+'</b> ₽</td><td>'+(s.mql||0)+'</td><td>'+(s.sql||0)+'</td><td>'+(s.deals||0)+'</td><td>'+(s.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(s.conv_sql_deals||0).toFixed(1)+'%</td><td>'+(s.conv_lead_deals||0).toFixed(1)+'%</td><td>'+(s.leads||0)+'</td><td>'+fmt(s.avg_check)+'</td><td>'+(s.avg_won_days||0).toFixed(1)+'дн</td></tr>';
+    });
     srcStr += '</table>';
     el = document.getElementById('newSrcTable'); if(el) el.innerHTML = srcStr;
 
-    var mgrs = d.mgr_top||[];
-    var mgrStr = '<div class="scroll-x" style="max-height:480px;overflow:auto"><table style="font-size:10px;white-space:nowrap"><tr>'
-        + '<th>Менеджер</th>'
-        + '<th>🔄 В работе (нач.)</th>'
-        + '<th>➕ Создано</th>'
-        + '<th>✅ Оплачено</th>'
-        + '<th>❌ Проиграно</th>'
-        + '<th>🔄 В работе (кон.)</th>'
-        + '<th>💰 Поступления</th>'
-        + '<th>💵 Ср.чек</th>'
-        + '<th>⏱ Цикл,дн</th>'
-        + '<th>📊 Конв.%</th>'
-        + '</tr>';
-    mgrs.forEach(function(m){
-      if (!m.paid && !m.in_work_start && !m.created) return;
-      mgrStr+='<tr><td><b>'+escapeHtml(m.name)+'</b></td>'
-        +'<td>'+m.in_work_start+'</td><td>'+m.created+'</td>'
-        +'<td><b>'+m.paid+'</b></td><td>'+m.lost+'</td><td><b>'+m.in_work_end+'</b></td>'
-        +'<td><b>'+fmt(m.paid_sum)+'</b> ₽</td><td>'+fmt(m.avg_check)+' ₽</td>'
-        +'<td>'+(m.avg_dur||'-')+'</td>'
-        +'<td>'+(m.conv_pct||0).toFixed(1)+'%</td>'
-        +'</tr>';
-    });
-    mgrStr += '</table></div>';
-    el = document.getElementById('newMgrsTable'); if(el) el.innerHTML = mgrStr;
+    // Сортировка
+    if (typeof initTableSort === 'function') initTableSort();
+
 
     var comps = d.top_companies || [];
     var compStr = '<table style="font-size:11px"><tr><th>#</th><th>Компания</th><th>Поступления</th><th>Сделок</th><th>Ср.чек</th><th>Последняя оплата</th></tr>';

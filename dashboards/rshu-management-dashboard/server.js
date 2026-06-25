@@ -246,8 +246,12 @@ app.get('/api/data', (req, res) => {
 app.get('/api/data/new', async (req, res) => {
   const aggNewPath = path.join(CACHE_DIR, 'agg.json');
   try {
-    const data = JSON.parse(await fs.readFile(aggNewPath, 'utf-8'));
-    // OOM/KOM данные — из agg.json (analyze_new.py), не переопределяем
+    const [raw, stat] = await Promise.all([
+      fs.readFile(aggNewPath, 'utf-8'),
+      fs.stat(aggNewPath)
+    ]);
+    const data = JSON.parse(raw);
+    data._loadedAt = stat.mtime.toISOString();
     res.json(data);
   } catch (e) {
     res.status(503).json({ error: 'New logic data not loaded' });
