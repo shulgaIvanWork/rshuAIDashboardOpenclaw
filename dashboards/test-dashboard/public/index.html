@@ -296,22 +296,6 @@
     return JSON.parse(text);
   }
 
-  // Безопасный fetch с проверкой редиректа на логин
-  async function safeFetch(url) {
-    const r = await fetch(url);
-    const text = await r.text();
-    if (r.redirected || text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
-      window.location.href = '/login';
-      throw new Error('redirect');
-    }
-    try {
-      return JSON.parse(text);
-    } catch(e) {
-      console.error('Invalid JSON from', url, text.substring(0, 200));
-      throw new Error('Invalid response from server');
-    }
-  }
-
   let metrikaData = null, roistatOrders = null, roistatCalls = null, bitrixDeals = null;
 
   async function loadAll() {

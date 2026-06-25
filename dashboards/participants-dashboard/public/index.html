@@ -122,6 +122,11 @@ async function safeFetch(url, opts) {
     .tdright { text-align: right; }
     .deal-title { font-weight: 600; }
     .muted { color: #475569; font-size: 11px; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab { padding: 10px 20px; cursor: pointer; color: #475569; font-size: 14px; font-weight: 600; border-bottom: 3px solid transparent; transition: all .2s; border-radius: 8px 8px 0 0; background: none; border-top: none; border-left: none; border-right: none; }
+    .tab:hover { color: #093EB4; background: #F1F3F6; }
+    .tab.active { color: #093EB4; border-bottom-color: #093EB4; background: #fff; }
+    
     @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } .twocol, .threecol { grid-template-columns: 1fr; } }
 
     .refresh-panel { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
@@ -163,7 +168,7 @@ async function safeFetch(url, opts) {
     <div class="loading-state" id="loadingState"><div class="spinner"></div><div>Загрузка данных…</div></div>
   </div>
   
-  <div id="participantsArea" style="display:none">
+  <div id="participantsArea" style="display:block">
     <div class="card" id="participantsCard">
       <h2 id="participantsTitle">👥 Участники ООМ / ОМ за прошлую неделю</h2>
       <div class="sub" style="margin:-8px 0 14px">Тематика, программа, участник, компания, регион, сумма оплаты</div>
