@@ -154,6 +154,7 @@ async function safeFetch(url, opts) {
     <button id="aprilTabBtn" class="tab-btn">📋 Май (итоги)</button>
     <button id="forecastTabBtn" class="tab-btn alt">🔮 Июнь (прогноз)</button>
     <button id="productsTabBtn" class="tab-btn">⭐ Рейтинг продуктов</button>
+    <button id="refreshBtn" style="background:#093EB4;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:500">🔄 Обновить данные</button>
   </div>
   <div id="contentArea">
     <div class="loading-state" id="loadingState"><div class="spinner"></div><div>Загрузка данных…</div></div>
@@ -227,7 +228,7 @@ async function loadAll(period) {
           <div style="font-size:48px;margin-bottom:16px">📭</div>
           <div style="font-size:18px;font-weight:600;margin-bottom:8px">Нет загруженных данных</div>
           <div style="color:#6a7a9a;margin-bottom:24px">Нажмите «Обновить данные», чтобы загрузить информацию из Битрикс24</div>
-          <button id="refreshBtn" style="background:#093EB4;color:#fff;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:16px;font-weight:500">🔄 Загрузить данные</button>
+          <button style="background:#093EB4;color:#fff;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:16px;font-weight:500" onclick="document.getElementById('refreshBtn').click()">🔄 Загрузить данные</button>
         </div>`;
       document.getElementById('sourceInfo').textContent = 'Источник: Битрикс24 · данные не загружены';
       document.getElementById('loadingFill').style.width = '0%';

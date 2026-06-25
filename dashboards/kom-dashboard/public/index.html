@@ -153,7 +153,6 @@ async function safeFetch(url, opts) {
   <div class="header-actions">
     <span class="badge-live">Январь — Май 2026</span>
     <button class="btn btn-refresh" id="refreshBtn">🔄 Обновить</button>
-    <button class="btn btn-export">📥 Excel</button>
   </div>
 </div>
 <div id="loadingOverlay" class="loading-overlay"><div class="loading-spinner">⏳ Обновление данных...</div></div>
@@ -424,7 +423,6 @@ document.getElementById('refreshBtn').addEventListener('click',async function(){
   for(let i=0;i<120;i++){await new Promise(r=>setTimeout(r,3000));const st=await(await fetch((window.BASE_PATH||'')+'/api/status')).json();if(st.ready){await loadData();break}}
   this.disabled=false;this.textContent='🔄 Обновить';document.getElementById('loadingOverlay').classList.remove('active');
 });
-document.querySelector('.btn-export').addEventListener('click',()=>window.location.href=(window.BASE_PATH||'')+'/api/export');
 
 loadData();
 initRefreshButton();
