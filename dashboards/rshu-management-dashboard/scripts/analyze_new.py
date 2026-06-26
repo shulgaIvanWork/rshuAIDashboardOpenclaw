@@ -427,6 +427,7 @@ for w in range(1, cur_w + 1):
         "kom_postupleniya": 0.0, "kom_won_cnt": 0, "kom_lost_cnt": 0, "invoice_cnt": 0,
         "oom_postupleniya": 0.0, "oom_won_cnt": 0, "oom_leads": 0, "oom_mql": 0,
         "fmt_oom": 0.0, "fmt_om": 0.0, "fmt_sdo": 0.0, "fmt_kom": 0.0,
+        "fmt_oom_cnt": 0, "fmt_om_cnt": 0, "fmt_sdo_cnt": 0, "fmt_kom_cnt": 0,
         "presale_durs": [],
         # B2B/B2C per week
         "btype_B2B_cnt": 0, "btype_B2B_sum": 0.0,
@@ -496,7 +497,9 @@ for r in rows:
             # По форматам
             fmt_keys = {"Очный": "fmt_oom", "Онлайн": "fmt_om", "Видеокурс": "fmt_sdo", "Корпоративное обучение": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
-                weekly[wk][fmt_keys[r["FORMAT"]]] += r["OPP"]
+                fk = fmt_keys[r["FORMAT"]]
+                weekly[wk][fk] += r["OPP"]
+                weekly[wk][fk + "_cnt"] += 1
             # B2B/B2C per week
             btype = r.get("BTYPE", "B2C")
             weekly[wk][f"btype_{btype}_cnt"] += 1
