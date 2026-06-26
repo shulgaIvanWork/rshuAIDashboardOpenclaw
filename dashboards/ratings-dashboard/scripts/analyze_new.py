@@ -1063,7 +1063,7 @@ def has_mba_in_title(title):
         return True
     return 'mba' in t or 'mmba' in t
 
-mba_rating = defaultdict(lambda: {'cnt': 0, 'sum': 0.0, 'deals': 0})
+mba_rating = defaultdict(lambda: {'cnt': 0, 'sum': 0.0, 'deals': 0, 'fmt': defaultdict(lambda: {'cnt': 0, 'sum': 0.0})})
 for r in rows:
     if is_paid(r) and get_pay_year(r) == YEAR:
         if not has_mba_in_title(r['TITLE']):
@@ -1075,9 +1075,21 @@ for r in rows:
         mba_rating[mba_type]['cnt'] += 1
         mba_rating[mba_type]['sum'] += r['OPP']
         mba_rating[mba_type]['deals'] += 1
+        fmt = r.get('FORMAT', '?')
+        mba_rating[mba_type]['fmt'][fmt]['cnt'] += 1
+        mba_rating[mba_type]['fmt'][fmt]['sum'] += r['OPP']
 
 mba_rating_list = sorted(
-    [{'type': k, 'cnt': v['cnt'], 'sum': v['sum'], 'deals': v['deals'], 'avg_check': round(v['sum']/v['cnt']) if v['cnt'] else 0}
+    [{
+        'type': k, 'cnt': v['cnt'], 'sum': v['sum'], 'deals': v['deals'],
+        'avg_check': round(v['sum']/v['cnt']) if v['cnt'] else 0,
+        'fmt_ochn_cnt': v['fmt'].get('ООМ (Очное)', {}).get('cnt', 0),
+        'fmt_ochn_sum': v['fmt'].get('ООМ (Очное)', {}).get('sum', 0),
+        'fmt_online_cnt': v['fmt'].get('ОМ (Онлайн)', {}).get('cnt', 0),
+        'fmt_online_sum': v['fmt'].get('ОМ (Онлайн)', {}).get('sum', 0),
+        'fmt_sdo_cnt': v['fmt'].get('СДО', {}).get('cnt', 0),
+        'fmt_sdo_sum': v['fmt'].get('СДО', {}).get('sum', 0),
+    }
      for k, v in mba_rating.items()],
     key=lambda x: -x['sum'])
 
