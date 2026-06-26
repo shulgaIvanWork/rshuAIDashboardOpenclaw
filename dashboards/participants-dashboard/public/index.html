@@ -307,7 +307,7 @@ function renderPage(data) {
   // Formats table
   const fmtData = Object.entries(data.fmt_ytd || {}).filter(([k]) => k !== 'period').sort((a,b) => b[1].sum - a[1].sum);
   const totFmt = fmtData.reduce((s, [,v]) => s + v.sum, 0) || 1;
-  const fmtColors = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#1976D2", "СДО": "#F57C00", "КОМ": "#C62828" };
+  const fmtColors = { "Очно": "#2E7D32", "Онлайн": "#1976D2" };
 
   // Sources (with full analytics)
   const srcTop = data.src_rating || [];
@@ -878,13 +878,11 @@ function drawCharts(data) {
   });
 
   // Formats stacked bar (weekly)
-  const fmtColorsArr = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#1976D2", "СДО": "#F57C00", "КОМ": "#C62828" };
-  const fmtKeys = ["ООМ (Очное)", "СДО", "ОМ (Онлайн)", "КОМ"];
+  const fmtColorsArr = { "Очно": "#2E7D32", "Онлайн": "#1976D2" };
+  const fmtKeys = ["Очно", "Онлайн"];
   const fmt_week = {
-    "ООМ (Очное)": weeks.map(w => w.fmt_oom || 0),
-    "СДО":         weeks.map(w => w.fmt_sdo || 0),
-    "ОМ (Онлайн)": weeks.map(w => w.fmt_om || 0),
-    "КОМ":         weeks.map(w => w.fmt_kom || 0),
+    "Очно":   weeks.map(w => (w.fmt_oom||0) + (w.fmt_sdo||0)),
+    "Онлайн": weeks.map(w => w.fmt_om || 0),
   };
   chartInstances.ch_fmt = new Chart(document.getElementById('ch_fmt'), {
     type: 'bar',
@@ -1097,8 +1095,8 @@ async function loadParticipants() {
       const p = res.participants[i];
       const rowClass = i < 3 ? ' class="top3"' : '';
       const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
-      const fmtColor = p.format === 'ОМ (Онлайн)' ? '#43A047' : '#1976D2';
-      const fmtLabel = p.format === 'ОМ (Онлайн)' ? '🌐 ОМ' : '🏫 ООМ';
+      const fmtColor = p.format === 'Онлайн' ? '#1976D2' : '#2E7D32';
+      const fmtLabel = p.format === 'Онлайн' ? '<span class="dot" style="background:#1976D2"></span>Онлайн' : '<span class="dot" style="background:#2E7D32"></span>Очно';
       const regionLabel = p.region ? escapeHtml(p.region) : '—';
       let stageColor = '#2E7D32';
       if (p.stage === 'Счёт отправлен') stageColor = '#FF9800';
@@ -1185,8 +1183,8 @@ async function loadParticipantsCurrent() {
       const p = res.participants[i];
       const rowClass = i < 3 ? ' class="top3"' : '';
       const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
-      const fmtColor = p.format === 'ОМ (Онлайн)' ? '#43A047' : '#1976D2';
-      const fmtLabel = p.format === 'ОМ (Онлайн)' ? '🌐 ОМ' : '🏫 ООМ';
+      const fmtColor = p.format === 'Онлайн' ? '#1976D2' : '#2E7D32';
+      const fmtLabel = p.format === 'Онлайн' ? '<span class="dot" style="background:#1976D2"></span>Онлайн' : '<span class="dot" style="background:#2E7D32"></span>Очно';
       const regionLabel = p.region ? escapeHtml(p.region) : '—';
       let stageColor = '#2E7D32';
       if (p.stage === 'Счёт отправлен') stageColor = '#FF9800';

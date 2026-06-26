@@ -150,7 +150,7 @@ def normalize_product(title):
 def detect_format(title, uf_format):
     """Формат: приоритет UF_FORMAT, fallback по названию."""
     fmt_map = {
-        '19042467': 'ООМ (Очное)', '19042468': 'ОМ (Онлайн)',
+        '19042467': 'Очно', '19042468': 'Онлайн',
         '19042469': 'СДО', '19042498': 'КОМ',
         '19042495': 'MMBA', '19042497': 'Вечерний', '19042496': 'ГК',
     }
@@ -160,10 +160,10 @@ def detect_format(title, uf_format):
     if "(сдо)" in t or " сдо" in t or t.endswith("сдо"):
         return "СДО"
     if "онлайн" in t:
-        return "ОМ (Онлайн)"
+        return "Онлайн"
     if "в г." in t or "москва" in t:
-        return "ООМ (Очное)"
-    return "ОМ (Онлайн)"
+        return "Очно"
+    return "Онлайн"
 
 
 def detect_b2b(did):
@@ -459,7 +459,7 @@ for r in rows:
                 weekly[wk]["won_cnt"]       += 1
                 weekly[wk]["oplata"]         += 1
             # По форматам
-            fmt_keys = {"ООМ (Очное)": "fmt_oom", "ОМ (Онлайн)": "fmt_om", "СДО": "fmt_sdo", "КОМ": "fmt_kom"}
+            fmt_keys = {"Очно": "fmt_oom", "Онлайн": "fmt_om", "КОМ": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
                 weekly[wk][fmt_keys[r["FORMAT"]]] += r["OPP"]
             if not r["IS_KOM"] and r["DC"]:
@@ -634,7 +634,7 @@ def fsplit(subset, period):
     g = defaultdict(lambda: {"cnt": 0, "sum": 0.0})
     for r in subset:
         if is_paid(r):
-            if r["IS_OOM"] or r["IS_KOM"]:
+            if (r["IS_OOM"] or r["IS_KOM"]) and r["FORMAT"] != "СДО":
                 g[r["FORMAT"]]["cnt"] += 1
                 g[r["FORMAT"]]["sum"] += r["OPP"]
     return {"period": period, **{k: v for k, v in g.items()}}
