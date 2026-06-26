@@ -96,6 +96,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const dc = parseDT(d.DATE_CREATE);
     const pay = parseDT(d.UF_DATE_PAY_1C);
     const cl = parseDT(d.CLOSEDATE);
+    const loseDt = parseDT(d.UF_CRM_1753341391806) || cl;  // Дата отказа (или CLOSEDATE как fallback)
     const sem = d.STAGE_SEMANTIC_ID || '';
     const stage = cleanStage(d.STAGE_ID);
 
@@ -103,7 +104,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     if (isFiltered) {
       const dcOk = dc && dc >= fromDate && dc <= toDate;
       const payOk = pay && pay >= fromDate && pay <= toDate;
-      const lostOk = sem === 'F' && cl && cl >= fromDate && cl <= toDate;
+      const lostOk = sem === 'F' && loseDt && loseDt >= fromDate && loseDt <= toDate;
       inPeriod = dcOk || payOk || lostOk;
       if (!inPeriod) continue;
     }
@@ -116,7 +117,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const periodStart = isFiltered ? fromDate : YEAR_START;
     if (dc && dc <= periodStart && (cat === 0 || cat === 19)) {
       const wasPaid = pay && pay < periodStart;
-      const wasLost = sem === 'F' && cl && cl < periodStart;
+      const wasLost = sem === 'F' && loseDt && loseDt < periodStart;
       if (!wasPaid && !wasLost) {
         m.in_work_start++;
       }
@@ -161,12 +162,12 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // lost — только за 2026 год (YEAR) или за выбранный период
-    if (sem === 'F') {
-      const lostYear = cl ? cl.getFullYear() : 0;
+    // lost — только кат 0 и 19 (без PreSale), по дате отказа
+    if (sem === 'F' && (cat === 0 || cat === 19)) {
+      const lostYear = loseDt ? loseDt.getFullYear() : 0;
       if (!isFiltered && lostYear === YEAR) {
         m.lost++;
-      } else if (isFiltered && cl && cl >= fromDate && cl <= toDate) {
+      } else if (isFiltered && loseDt && loseDt >= fromDate && loseDt <= toDate) {
         m.lost++;
       }
     }
