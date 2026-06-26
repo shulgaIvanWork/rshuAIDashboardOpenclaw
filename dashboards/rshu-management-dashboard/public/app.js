@@ -263,25 +263,13 @@ function buildFilteredData(orig, filteredWeeks) {
   var srcMk = { cnt: sumField('src_mkt_cnt'), sum: sumField('src_mkt_sum') };
   out.src_split_ytd = { period: 'YTD', internal: srcIt, marketing: srcMk };
 
-  // Регистрация — пересчитываем из понедельных
+  // Регистрация — готовые данные из calc_reg_funnel, без пересчёта через недели
   var regData = JSON.parse(JSON.stringify(orig.reg_ytd || {}));
   if (Object.keys(regData).length > 0) {
-    var regTotal = sumField('reg_total');
-    var regPaid = sumField('reg_paid');
-    var regPaidSum = sumField('reg_paid_sum');
-    var regSql = sumField('reg_sql');
-    var regInv = sumField('reg_invoice');
-    var regLose = sumField('reg_lose');
-    regData.total = regTotal;
-    regData.paid = regPaid;
-    regData.total_paid = regPaid;
-    regData.total_paid_sum = regPaidSum;
-    regData.sql = regSql;
-    regData.invoice = regInv;
-    regData.lose = regLose;
-    regData.avg_check = regPaid > 0 ? Math.round(regPaidSum / regPaid) : 0;
-    regData.conv = regTotal > 0 ? parseFloat((regPaid / regTotal * 100).toFixed(1)) : 0;
-    regData.lose_pct = regTotal > 0 ? parseFloat((regLose / regTotal * 100).toFixed(1)) : 0;
+    // Поля уже заполнены calc_reg_funnel, используем как есть
+    regData.avg_check = regData.total_paid > 0 ? Math.round(regData.total_paid_sum / regData.total_paid) : 0;
+    regData.conv = regData.total > 0 ? parseFloat((regData.total_paid / regData.total * 100).toFixed(1)) : 0;
+    regData.lose_pct = regData.total > 0 ? parseFloat((regData.lose / regData.total * 100).toFixed(1)) : 0;
   }
   out.reg_ytd = regData;
 
