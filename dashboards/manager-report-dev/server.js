@@ -114,9 +114,9 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     if (group !== 'hidden') m.group = group;
 
     // in_work_start — сделки в работе на начало периода (для любого периода)
-    // PreSale (кат 8) не входит — это квалификация, не у менеджеров
+    // PreSale (кат 8) не входит; Автооплаты и ОЗК = 0 (всегда оплачиваются)
     const periodStart = isFiltered ? fromDate : YEAR_START;
-    if (dc && dc <= periodStart && (cat === 0 || cat === 19)) {
+    if (dc && dc <= periodStart && (cat === 0 || cat === 19) && group !== 'autopay' && group !== 'ozk') {
       const wasPaid = pay && pay < periodStart;
       const wasLost = sem === 'F' && loseDt && loseDt < periodStart;
       if (!wasPaid && !wasLost) {
