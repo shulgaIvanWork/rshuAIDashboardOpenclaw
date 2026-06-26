@@ -845,22 +845,15 @@ def has_mba_in_title(title):
 mba_rating = defaultdict(lambda: {'cnt': 0, 'sum': 0.0, 'deals': 0})
 for r in rows:
     if is_paid(r) and get_pay_year(r) == YEAR:
-        is_mba = False
-        direction_ids = r.get('UF_CRM_1498466811', [])
-        if isinstance(direction_ids, str):
-            direction_ids = [direction_ids]
-        if any(d in MBA_DIRECTION_IDS for d in direction_ids):
-            is_mba = True
-        if not is_mba and has_mba_in_title(r['TITLE']):
-            is_mba = True
-        if is_mba:
-            mba_type = detect_mba_type(r['TITLE'])
-            if mba_type is None:
-                # Артефакт — сделка с MBA/MMBA в названии, но не попадает ни в одну группу
-                continue
-            mba_rating[mba_type]['cnt'] += 1
-            mba_rating[mba_type]['sum'] += r['OPP']
-            mba_rating[mba_type]['deals'] += 1
+        if not has_mba_in_title(r['TITLE']):
+            continue
+        mba_type = detect_mba_type(r['TITLE'])
+        if mba_type is None:
+            # Артефакт — сделка с MBA/MMBA в названии, но не попадает ни в одну группу
+            continue
+        mba_rating[mba_type]['cnt'] += 1
+        mba_rating[mba_type]['sum'] += r['OPP']
+        mba_rating[mba_type]['deals'] += 1
 
 mba_rating_list = sorted(
     [{'type': k, 'cnt': v['cnt'], 'sum': v['sum'], 'deals': v['deals'], 'avg_check': round(v['sum']/v['cnt']) if v['cnt'] else 0}
