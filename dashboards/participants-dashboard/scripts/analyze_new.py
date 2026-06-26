@@ -802,10 +802,10 @@ MBA_DIRECTION_IDS = {'1917', '35288'}
 def detect_mba_type(title):
     t = (title or '').lower()
     # 1. Micro MBA
-    if 'micro' in t or 'микро' in t:
+    if ("micro" in t or "микро" in t) and ("mba" in t or "mmba" in t):
         return 'Micro MBA'
     # 2. MBA Эксперт
-    if 'эксперт' in t or 'expert' in t:
+    if ("эксперт" in t or "expert" in t) and ("mba" in t or "mmba" in t):
         return 'MBA Эксперт'
     # 3. MBA Лидер — "MBA Лидер: Продажи", "MBA Лидер: Финансы"
     if ('лидер' in t or 'leader' in t) and ('mba' in t or 'mmba' in t):
@@ -828,9 +828,9 @@ def detect_mba_type(title):
 def has_mba_in_title(title):
     t = (title or '').lower()
     # Проверяем все 5 групп ММВА
-    if 'micro' in t or 'микро' in t:
+    if ("micro" in t or "микро" in t) and ("mba" in t or "mmba" in t):
         return True
-    if 'эксперт' in t or 'expert' in t:
+    if ("эксперт" in t or "expert" in t) and ("mba" in t or "mmba" in t):
         return True
     if ('лидер' in t or 'leader' in t) and ('mba' in t or 'mmba' in t):
         return True
