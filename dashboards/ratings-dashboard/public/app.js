@@ -1,6 +1,5 @@
 // ========== Helper functions ==========
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-function fmt(n){return (n||0).toLocaleString('ru-RU');}
 function loadArtifacts(){
   fetch(window.BASE_PATH+'/api/artifacts').then(function(r){return r.json();}).then(function(d){
     var el=document.getElementById('newArtifactsBlock');
@@ -965,7 +964,7 @@ async function refreshButtonHandler() {
     }
   }
   finally { this.disabled = false; this.textContent = '🔄 Обновить данные'; }
-});
+}
 
 // --- Date filter ---
 document.addEventListener('DOMContentLoaded', function() {
