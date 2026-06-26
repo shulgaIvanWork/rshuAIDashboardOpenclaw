@@ -33,7 +33,7 @@ print(f"  Сделок: {len(deals_raw)}  Лидов: {len(leads)}")
 
 # Ограничение периода: до прошлого воскресенья 07.06.2026 для сверки
 # Для продакшена: date.today()
-TODAY = date(2026, 6, 7)
+TODAY = date.today()
 YEAR  = config.YEAR
 MIN_OPP = config.MIN_OPP
 
