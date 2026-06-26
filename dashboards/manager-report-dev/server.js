@@ -146,13 +146,16 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const hasInvoice = !!d.UF_CRM_1753272713011;
     const isLost = LOST_STAGES.has(stage);
 
-    // Фильтр периода
+    // Фильтр периода — включаем переходящие сделки с прошлых периодов
     let inPeriod = true;
     if (isFiltered) {
       const dcOk = dc && dc >= fromDate && dc <= toDate;
       const payOk = pay && pay >= fromDate && pay <= toDate;
       const lostOk = isLost && loseDt && loseDt >= fromDate && loseDt <= toDate;
-      inPeriod = dcOk || payOk || lostOk;
+      // Сделка переходит с прошлого периода (создана до, не оплачена, не проиграна)
+      const wasInWork = dc && dc < fromDate && (cat === 0 || cat === 19) && !isAutoOrOzk;
+      const isCarryOver = wasInWork && (!pay || pay >= fromDate) && (!isLost || !loseDt || loseDt >= fromDate);
+      inPeriod = dcOk || payOk || lostOk || isCarryOver;
       if (!inPeriod) continue;
     }
 
@@ -169,10 +172,10 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // Условие для воронки: создана в 2026 / в периоде
+    // Условие для воронки: создана в 2026 (для YTD) или активна в периоде
     const inYear = dc && dc.getFullYear() === YEAR;
-    const inPeriodByDc = !isFiltered || (dc >= fromDate && dc <= toDate);
-    const inFunnel = inYear && inPeriodByDc && (!isAutoOrOzk || opp >= MIN_OPP);
+    const inPeriodByDc = !isFiltered || (dc && dc <= toDate); // все созданные ДО конца периода
+    const inFunnel = (!isFiltered ? inYear : inPeriodByDc) && (!isAutoOrOzk || opp >= MIN_OPP);
     if (!inFunnel) continue;
 
     const rank = getStageRank(stage, cat, opp, hasInvoice);
