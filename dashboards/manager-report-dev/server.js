@@ -112,8 +112,9 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     if (group !== 'hidden') m.group = group;
 
     // in_work_start — сделки в работе на начало периода (для любого периода)
+    // PreSale (кат 8) не входит — это квалификация, не у менеджеров
     const periodStart = isFiltered ? fromDate : YEAR_START;
-    if (dc && dc <= periodStart) {
+    if (dc && dc <= periodStart && (cat === 0 || cat === 19)) {
       const wasPaid = pay && pay < periodStart;
       const wasLost = sem === 'F' && cl && cl < periodStart;
       if (!wasPaid && !wasLost) {
