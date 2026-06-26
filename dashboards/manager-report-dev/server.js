@@ -176,7 +176,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       if (cat === 0) {
         if (!['NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'].includes(stage)) isMql = true;
       } else if (cat === 19) {
-        if (sem !== 'S' && sem !== 'F') isMql = true;
+        if (sem !== 'S') isMql = true;  // LOSE входит в MQL
       }
       if (isMql && (!isFiltered || (dc >= fromDate && dc <= toDate))) {
         m.mql++;

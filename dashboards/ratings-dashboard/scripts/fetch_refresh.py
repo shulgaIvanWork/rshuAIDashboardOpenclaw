@@ -36,9 +36,10 @@ def fetch_page(params):
         return json.loads(r.read().decode())
 
 def fetch_category_simple(cat_id):
-    """Простая пагинация: offset от 0 до MAX_OFFSET с шагом LIMIT."""
+    """Пагинация: offset от 0 с шагом LIMIT. Останавливается, когда 2 страницы подряд не дали новых ID."""
     all_deals = {}
     offset = 0
+    stale_pages = 0
     while offset <= MAX_OFFSET:
         params = [
             ('secret', SECRET),
@@ -67,10 +68,21 @@ def fetch_category_simple(cat_id):
             print(f"  [CAT {cat_id}] offset={offset} empty — done")
             break
         
+        before = len(all_deals)
         for d in items:
             all_deals[d["ID"]] = d
+        new = len(all_deals) - before
         
-        print(f"  [CAT {cat_id}] offset={offset}: {len(items)} items, total={len(all_deals)}")
+        print(f"  [CAT {cat_id}] offset={offset}: {len(items)} items, {new} new, total={len(all_deals)}")
+        
+        if new == 0:
+            stale_pages += 1
+            if stale_pages >= 2:
+                print(f"  [CAT {cat_id}] 2 пустых страницы подряд — стоп")
+                break
+        else:
+            stale_pages = 0
+        
         offset += LIMIT
         time.sleep(0.2)
     
