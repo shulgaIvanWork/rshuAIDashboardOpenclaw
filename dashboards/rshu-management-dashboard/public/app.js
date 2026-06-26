@@ -263,8 +263,8 @@ function buildFilteredData(orig, filteredWeeks) {
   var srcMk = { cnt: sumField('src_mkt_cnt'), sum: sumField('src_mkt_sum') };
   out.src_split_ytd = { period: 'YTD', internal: srcIt, marketing: srcMk };
 
-  // Регистрация — пересчитываем из понедельных (только те поля, что есть в неделях)
-  var regData = JSON.parse(JSON.stringify(orig.reg_data || {}));
+  // Регистрация — пересчитываем из понедельных
+  var regData = JSON.parse(JSON.stringify(orig.reg_ytd || {}));
   if (Object.keys(regData).length > 0) {
     var regTotal = sumField('reg_total');
     var regPaid = sumField('reg_paid');
@@ -280,12 +280,10 @@ function buildFilteredData(orig, filteredWeeks) {
     regData.invoice = regInv;
     regData.lose = regLose;
     regData.avg_check = regPaid > 0 ? Math.round(regPaidSum / regPaid) : 0;
-    regData.conv = regTotal > 0 ? (regPaid / regTotal * 100).toFixed(1) : '0.0';
-    regData.conv = parseFloat(regData.conv);
-    regData.lose_pct = regTotal > 0 ? (regLose / regTotal * 100).toFixed(1) : '0.0';
-    regData.lose_pct = parseFloat(regData.lose_pct);
+    regData.conv = regTotal > 0 ? parseFloat((regPaid / regTotal * 100).toFixed(1)) : 0;
+    regData.lose_pct = regTotal > 0 ? parseFloat((regLose / regTotal * 100).toFixed(1)) : 0;
   }
-  out.reg_data = regData;
+  out.reg_ytd = regData;
 
   // Тип обучения — пересчитываем из понедельных
   var eduNameMap = { pk: 'Повышение квалификации', pp: 'Проф. переподготовка', ko: 'Корпоративное обучение' };

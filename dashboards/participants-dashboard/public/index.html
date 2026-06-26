@@ -342,7 +342,7 @@ function renderPage(data) {
 
     <!-- Funnel -->
     <div class="card"><h2>Воронка MQL → SQL → Сделки по неделям</h2>
-      <div class="sub" style="margin:-8px 0 16px">MQL = новые в Pre Sale. SQL = WON в Pre Sale (передано в ОП). Сделки = оплачено по 1С.</div>
+      <div class="sub" style="margin:-8px 0 16px">MQL = новые в Pre Sale. SQL = Оплачен в Pre Sale (передано в ОП). Сделки = оплачено по 1С.</div>
       <div class="chartbox"><canvas id="ch_funnel"></canvas></div>
     </div>
 
@@ -354,7 +354,7 @@ function renderPage(data) {
 
     <!-- B2B + Formats -->
     <div class="twocol">
-      <div class="card"><h2>B2B vs B2C · WON vs LOSE</h2>
+      <div class="card"><h2>B2B vs B2C · Оплачен vs Отказы</h2>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="chartbox-sm"><canvas id="ch_b2b"></canvas></div>
           <div class="chartbox-sm"><canvas id="ch_wl"></canvas></div>
@@ -434,7 +434,7 @@ function renderPage(data) {
     <!-- Managers -->
     <div class="card"><h2>Менеджеры YTD <span style="font-size:13px;color:#888;font-weight:400">(основная воронка · лиды из CRM)</span></h2>
       <div class="scroll-x"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Менеджер</th><th class="sort" data-col="2">Лидов CRM</th><th class="sort" data-col="3">WON</th><th class="sort" data-col="4">Проигр</th><th class="sort" data-col="5">Конв.%</th><th class="sort" data-col="6">Ср. чек, ₽</th><th class="sort" data-col="7">Поступления, ₽</th></tr></thead>
+        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Менеджер</th><th class="sort" data-col="2">Лидов CRM</th><th class="sort" data-col="3">Оплачен</th><th class="sort" data-col="4">Проигр</th><th class="sort" data-col="5">Конв.%</th><th class="sort" data-col="6">Ср. чек, ₽</th><th class="sort" data-col="7">Поступления, ₽</th></tr></thead>
         <tbody>${(data.mgr_top || []).filter(m => m.leads > 0).map((m, i) =>
           `<tr><td>${i+1}</td><td>${m.name}</td><td>${m.leads}</td><td>${m.won}</td><td>${m.lost}</td><td>${m.conv_pct}%</td><td>${fmt(m.avg_check)} ₽</td><td><b>${fmt(m.postupleniya)}</b> ₽</td></tr>`
         ).join('')}</tbody>
@@ -443,12 +443,12 @@ function renderPage(data) {
 
     <!-- Charts row -->
     <div class="twocol">
-      <div class="card"><h2>Кол-во сделок: WON vs LOSE</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
+      <div class="card"><h2>Кол-во сделок: Оплачен vs Отказы</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
       <div class="card"><h2>Средний чек по неделям, ₽</h2><div class="chartbox"><canvas id="ch_avg"></canvas></div></div>
     </div>
 
     <div class="twocol">
-      <div class="card"><h2>Скорость закрытия WON, дн.</h2><div class="chartbox"><canvas id="ch_dur"></canvas></div></div>
+      <div class="card"><h2>Скорость закрытия, дн.</h2><div class="chartbox"><canvas id="ch_dur"></canvas></div></div>
       <div class="card"><h2>Скорость Pre Sale (MQL→SQL), дн.</h2><div class="chartbox"><canvas id="ch_presale"></canvas></div></div>
     </div>
 
@@ -646,17 +646,17 @@ async function renderPageMainNew(d) {
 
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
-    html += '<div class="card"><h2>WON / LOSE</h2><div class="chartbox-sm"><canvas id="newChWl"></canvas></div></div>';
+    html += '<div class="card"><h2>Оплачен / Отказы</h2><div class="chartbox-sm"><canvas id="newChWl"></canvas></div></div>';
     html += '</div>';
 
     // WON/LOSE stacked + avg check
     html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>WON vs LOSE по неделям</h2><div class="chartbox"><canvas id="newChCnt"></canvas></div></div>';
+    html += '<div class="card"><h2>Оплачен vs Отказы по неделям</h2><div class="chartbox"><canvas id="newChCnt"></canvas></div></div>';
     html += '<div class="card"><h2>Средний чек по неделям</h2><div class="chartbox"><canvas id="newChAvg"></canvas></div></div>';
     html += '</div>';
 
     html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Скорость WON, дн.</h2><div class="chartbox"><canvas id="newChDur"></canvas></div></div>';
+    html += '<div class="card"><h2>Скорость оплаты, дн.</h2><div class="chartbox"><canvas id="newChDur"></canvas></div></div>';
     html += '<div class="card"><h2>Скорость Pre Sale, дн.</h2><div class="chartbox"><canvas id="newChPreSale"></canvas></div></div>';
     html += '</div>';
 
@@ -761,10 +761,10 @@ async function renderPageMainNew(d) {
         } catch(e){}
         try {
           var wT=weeks.reduce(function(s,w){return s+(w.won_cnt||0);},0), lT=weeks.reduce(function(s,w){return s+(w.lost_cnt||0);},0);
-          if (document.getElementById('newChWl')) new Chart(document.getElementById('newChWl'),{type:'doughnut',data:{labels:['WON','LOSE'],datasets:[{data:[wT,lT],backgroundColor:['#2E7D32','#C62828']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+          if (document.getElementById('newChWl')) new Chart(document.getElementById('newChWl'),{type:'doughnut',data:{labels:['Оплачен','Отказы'],datasets:[{data:[wT,lT],backgroundColor:['#2E7D32','#C62828']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
         } catch(e){}
         try {
-          if (document.getElementById('newChCnt')) new Chart(document.getElementById('newChCnt'),{type:'bar',data:{labels:labels,datasets:[{label:'WON',data:weeks.map(function(w){return w.won_cnt||0;}),backgroundColor:'#2E7D32',borderRadius:4},{label:'LOSE',data:weeks.map(function(w){return w.lost_cnt||0;}),backgroundColor:'#C62828',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+          if (document.getElementById('newChCnt')) new Chart(document.getElementById('newChCnt'),{type:'bar',data:{labels:labels,datasets:[{label:'Оплачен',data:weeks.map(function(w){return w.won_cnt||0;}),backgroundColor:'#2E7D32',borderRadius:4},{label:'LOSE',data:weeks.map(function(w){return w.lost_cnt||0;}),backgroundColor:'#C62828',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
         } catch(e){}
         try {
           if (document.getElementById('newChAvg')) new Chart(document.getElementById('newChAvg'),{type:'line',data:{labels:labels,datasets:[{label:'Средний чек',data:weeks.map(function(w){return w.avg_check||0;}),borderColor:'#1976D2',backgroundColor:'rgba(25,118,210,.1)',tension:0.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
@@ -917,7 +917,7 @@ function drawCharts(data) {
   // Duration
   chartInstances.ch_dur = new Chart(document.getElementById('ch_dur'), {
     type: 'line',
-    data: { labels, datasets: [{ label: 'Сред.срок WON, дн.', data: dur, borderColor: navy, backgroundColor: 'rgba(31,42,68,.15)', tension: 0.3, fill: true, pointRadius: 3 }] },
+    data: { labels, datasets: [{ label: 'Сред.срок оплаты, дн.', data: dur, borderColor: navy, backgroundColor: 'rgba(31,42,68,.15)', tension: 0.3, fill: true, pointRadius: 3 }] },
     options: { ...common, plugins: { legend: { display: false }, tooltip: commonPlugin.tooltip, datalabels: { anchor: 'end', align: 'end', color: navy, font: { size: 8 }, formatter: v => v.toFixed(0) + 'дн' } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' дн.' } } } },
     plugins: [ChartDataLabels]
   });
@@ -1262,7 +1262,7 @@ async function loadArtifacts() {
     
     // WON без даты
     h += '<div style="background:#F3E5F5;border-radius:8px;padding:10px;border-left:4px solid #9C27B0">';
-    h += '<div style="font-size:12px;color:#9C27B0;font-weight:600">❓ WON без даты оплаты</div>';
+    h += '<div style="font-size:12px;color:#9C27B0;font-weight:600">❓ Оплачен без даты оплаты</div>';
     h += '<div style="font-size:20px;font-weight:700">' + fmt(s.wonNoPay.sum) + ' ₽</div>';
     h += '<div style="font-size:12px;color:#666">' + s.wonNoPay.cnt + ' сделок</div></div>';
     
@@ -1270,7 +1270,7 @@ async function loadArtifacts() {
     h += '<div style="background:#ECEFF1;border-radius:8px;padding:10px;border-left:4px solid #78909C">';
     h += '<div style="font-size:12px;color:#78909C;font-weight:600">⛔ Технические сделки (0₽)</div>';
     h += '<div style="font-size:20px;font-weight:700">' + fmt(s.tech.cnt) + ' шт</div>';
-    h += '<div style="font-size:12px;color:#666">WON с нулевой суммой</div></div>';
+    h += '<div style="font-size:12px;color:#666">Оплачен с нулевой суммой</div></div>';
     
     // Отрицательная длительность
     h += '<div style="background:#FFEBEE;border-radius:8px;padding:10px;border-left:4px solid #C62828">';
