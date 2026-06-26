@@ -80,6 +80,7 @@ let chartInstances = {};
 let dataCache = null;
 let dateFromCache = null;
 let dateToCache = null;
+let userRole = 'guest';
 
 // --- Date helpers ---
 function getWeekNumber(d) {
@@ -114,6 +115,24 @@ async function api(path) {
 }
 
 async function loadAll() {
+  // Fetch user role first
+  try {
+    var u = await safeFetch((window.BASE_PATH || '') + '/api/user');
+    if (u && u.role) userRole = u.role;
+  } catch(e) {}
+
+  // Create refresh button only for admins
+  var container = document.getElementById('refreshBtnContainer');
+  if (container) {
+    if (userRole === 'admin') {
+      var btn = document.createElement('button');
+      btn.id = 'refreshBtn';
+      btn.textContent = '🔄 Обновить данные';
+      btn.addEventListener('click', refreshButtonHandler);
+      container.appendChild(btn);
+    }
+  }
+
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
   try {
@@ -839,7 +858,7 @@ function drawCharts(data) {
 }
 
 // --- Refresh ---
-document.getElementById('refreshBtn').addEventListener('click', async function() {
+async function refreshButtonHandler() {
   this.disabled = true;
   this.textContent = '⏳ Обновление...';
   document.getElementById('loadingFill').style.width = '10%';
@@ -967,7 +986,5 @@ loadAll().catch(function(e) {
   var areaNew = document.getElementById('contentAreaNew');
   if (areaNew) areaNew.innerHTML = areaNew.innerHTML || '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
 });
-
-// Кнопка refreshBtn уже есть в HTML статически
 
 // --- Participants tab ---
