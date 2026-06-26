@@ -683,6 +683,9 @@ edu_cur  = edusplit(ws_cur_pay,  f"W{cur_w}")
 # === ТОП продуктов (80% выручки) ===
 prod_data = defaultdict(lambda: {
     "sql": 0, "deals": 0, "sum": 0.0, "durs": [],
+    "fmt_ochn": 0, "fmt_ochn_sum": 0.0,
+    "fmt_sdo": 0, "fmt_sdo_sum": 0.0,
+    "fmt_online": 0, "fmt_online_sum": 0.0,
 })
 
 for r in rows:
@@ -702,6 +705,16 @@ for r in rows:
             d = (r["PAY_DT"] - r["DC"]).days
             if d >= 0:
                 prod_data[key]["durs"].append(d)
+        fmt = r.get('FORMAT', '')
+        if fmt == 'ООМ (Очное)':
+            prod_data[key]["fmt_ochn"] += 1
+            prod_data[key]["fmt_ochn_sum"] += r["OPP"]
+        elif fmt == 'СДО':
+            prod_data[key]["fmt_sdo"] += 1
+            prod_data[key]["fmt_sdo_sum"] += r["OPP"]
+        elif fmt == 'ОМ (Онлайн)':
+            prod_data[key]["fmt_online"] += 1
+            prod_data[key]["fmt_online_sum"] += r["OPP"]
 
 def prod_item(name, d):
     avg_check = d["sum"] / d["deals"] if d["deals"] else 0
@@ -716,6 +729,12 @@ def prod_item(name, d):
         "avg_won_days": round(avg_dur, 1),
         "share": 0.0,
         "_durs": durs,
+        "fmt_ochn_cnt": d["fmt_ochn"],
+        "fmt_ochn_sum": d["fmt_ochn_sum"],
+        "fmt_sdo_cnt": d["fmt_sdo"],
+        "fmt_sdo_sum": d["fmt_sdo_sum"],
+        "fmt_online_cnt": d["fmt_online"],
+        "fmt_online_sum": d["fmt_online_sum"],
     }
 
 prod_list = sorted(
@@ -755,6 +774,10 @@ remaining_row = {
     "avg_check": round(rem_avg_check),
     "avg_won_days": round(rem_avg_dur, 1),
     "share": round(rem_sum / total_non_kom * 100, 1) if total_non_kom else 0,
+    "fmt_ochn_cnt": sum(p.get("fmt_ochn_cnt",0) for p in remaining),
+    "fmt_ochn_sum": sum(p.get("fmt_ochn_sum",0) for p in remaining),
+    "fmt_sdo_cnt": sum(p.get("fmt_sdo_cnt",0) for p in remaining),
+    "fmt_sdo_sum": sum(p.get("fmt_sdo_sum",0) for p in remaining),
 }
 
 top_products = selected + [remaining_row]
