@@ -1,3 +1,4 @@
+// ========== Helper functions ==========
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function fmt(n){return (n||0).toLocaleString('ru-RU');}
 function loadArtifacts(){
@@ -69,6 +70,7 @@ async function safeFetch(url, opts) {
   return JSON.parse(text);
 }
 
+// ========== Chart.js guard ==========
 // Защита от падения, если CDN с Chart.js не загрузился
 if (typeof Chart !== 'undefined' && Chart.register && typeof ChartDataLabels !== 'undefined') {
   try { Chart.register(ChartDataLabels); } catch(e) {}

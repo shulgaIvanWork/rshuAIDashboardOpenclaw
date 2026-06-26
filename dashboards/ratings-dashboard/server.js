@@ -162,6 +162,11 @@ app.set('etag', false); // отключаем ETag, чтобы браузер н
 app.use(express.json({ limit: '50mb' }));
 
 // Status
+// User info (role from auth middleware in clover-web)
+app.get('/api/user', (req, res) => {
+  res.json({ role: (req.user && req.user.role) || 'guest' });
+});
+
 app.get('/api/status', (req, res) => res.json(dataState));
 
 // Main data

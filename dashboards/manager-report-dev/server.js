@@ -31,8 +31,8 @@ const YEAR = 2026;
 const MGR_GROUPS = {
   '1': 'bond', '513': 'main', '527': 'autopay', '516': 'autopay',
   '528': 'main', '12482': 'main', '20588': 'hidden',
-  '21286': 'afanasyev', '27015': 'main', '19823': 'tech',
-  '26192': 'hidden', '27163': 'main', '27119': 'tech',
+  '21286': 'afanasyev', '27015': 'main', '19823': 'ozk',
+  '26192': 'hidden', '27163': 'main', '27119': 'ozk',
   '26343': 'hidden', '26161': 'hidden', '27158': 'main',
   '27157': 'hidden', '586': 'tech', '515': 'hidden',
   '517': 'hidden', '23840': 'hidden', '23715': 'hidden',
@@ -59,6 +59,7 @@ function getMgrKey(mgrId, mgrName) {
   const g = getGroup(mgrId);
   if (g === 'hidden') return { key: 'Прочие', group: 'other' };
   if (g === 'autopay') return { key: 'Автооплаты', group: g };
+  if (g === 'ozk') return { key: 'ОЗК', group: g };
   return { key: mgrName, group: g };
 }
 
@@ -277,6 +278,7 @@ router.get('/api/managers', (req, res) => {
   const groups = {
     main: all.filter(m => m.group === 'main'),
     autopay: all.filter(m => m.group === 'autopay'),
+    ozk: all.filter(m => m.group === 'ozk'),
     other: all.filter(m => m.group === 'other'),
     tech: all.filter(m => m.group === 'tech'),
     bond: all.filter(m => m.group === 'bond'),
@@ -284,7 +286,7 @@ router.get('/api/managers', (req, res) => {
   };
 
   res.json({
-    managers: [...groups.main, ...groups.autopay, ...groups.other, ...groups.tech],
+    managers: [...groups.main, ...groups.autopay, ...groups.ozk, ...groups.other, ...groups.tech],
     managersBond: groups.bond,
     managersAfanasyev: groups.afanasyev,
     managersTech: groups.tech,

@@ -8,11 +8,9 @@
   <meta http-equiv="Expires" content="0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Рейтинги 2026</title>
-  
+  <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-  
-  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="wrap">
@@ -20,7 +18,7 @@
   <p class="sub" id="sourceInfo">Топ-20 продуктов · Источники · Топ-20 компаний</p>
   <div class="loading-bar" id="loadingBar"><div class="fill" id="loadingFill"></div></div>
   <div class="toolbar">
-    <button id="refreshBtn">🔄 Обновить данные</button>
+    <div id="refreshBtnContainer"></div>
   </div>
   
   <div id="dateFilterBar" style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap;background:#fff;padding:12px 16px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
@@ -31,16 +29,11 @@
     <span id="filterInfo" style="font-size:12px;color:#888"></span>
   </div>
   
-
-  
   <div id="contentAreaNew">
     <div class="loading-state" id="loadingStateNew"><div class="spinner"></div><div>Загрузка данных…</div></div>
   </div>
-  
-  
 </div>
 
-
-  <script src="app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
