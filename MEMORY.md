@@ -125,6 +125,148 @@ all_ids = sorted(numeric_ids, key=int)
 Формат: Код | Название | Тип. Обновлён 2026-06-19 из выгрузки crm_fields_*.xlsx.
 Смотреть: [CRM_FIELDS_REFERENCE.md](CRM_FIELDS_REFERENCE.md)
 
+## 🎨 Стандарт оформления дашбордов (Design System)
+
+Все дашборды на uprav.tech должны быть визуально единообразны.
+За основу взят управленческий дашборд (`rshu-management-dashboard`).
+
+### Цветовая схема
+- **Фон страницы:** `#F7F8FA`
+- **Текст:** `#0F172A`
+- **Второстепенный текст:** `#475569`
+- **Акцент (кнопки, шапки таблиц):** `#093EB4`
+- **Hover акцента:** `#3079D2`
+- **Карточки (card):** `background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06)`
+- **KPI-карточки:** `background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06)`
+- **ООМ-акцент:** `#00bcd4`
+- **КОМ-акцент:** `#9C27B0`
+- **Зелёный (рост):** `#2E7D32`
+- **Красный (падение):** `#C62828`
+- **Оранжевый (стабильно):** `#F57C00`
+
+### Типографика
+- **Шрифт:** `-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+- **h1:** `font-size: 26px; font-weight: 700`
+- **h2 (в карточках):** `font-size: 16px; font-weight: 600`
+- **body:** `14px`
+- **.lbl (подписи KPI):** `font-size: 10px; text-transform: uppercase; letter-spacing: .3px; color: #475569`
+- **.sub:** `font-size: 13px; color: #475569`
+
+### Компоненты
+
+#### KPI-панель (`.kpis`)
+- `display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px`
+- `@media (max-width: 900px)` → `grid-template-columns: repeat(2, 1fr)`
+- KPI-карточка: класс `.kpi`
+- `.kpi .val` — крупное значение (18px, bold)
+- `.kpi .val-big` — ещё крупнее (21px, bold)
+- Цветовые модификаторы: `.kpi-total`, `.kpi-oom`, `.kpi-kom`, `.kpi-reg` (с фоном rgba)
+- Дельта: `.delta-up` (зелёный), `.delta-down` (красный), `.delta-flat` (серый)
+
+#### Карточка (`.card`)
+- `background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px`
+- `box-shadow: 0 1px 4px rgba(0,0,0,.06)`
+
+#### Таблицы
+- `th`: `background: #093EB4; color: #fff; padding: 10px 12px; font-weight: 600; white-space: nowrap; position: sticky; top: 0`
+- `td`: `padding: 8px 12px; border-bottom: 1px solid #E2E8F0`
+- `tr:hover td`: `background: #F1F3F6`
+- Сортировка: `th.sort { cursor: pointer }` + `::after { content: ' ⇅' }`
+
+#### Кнопки (`.toolbar button`)
+- `background: #093EB4; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500`
+- hover: `background: #3079D2`
+- disabled: `background: #475569; cursor: wait`
+
+#### Прогресс-бар загрузки
+- `.loading-bar`: `height: 3px; background: #e0e0e0; border-radius: 2px`
+- `.loading-bar .fill`: `height: 100%; background: #093EB4; transition: width .5s`
+
+#### Панель статуса обновления (`.refresh-panel`)
+- Белая карточка с шапкой (заголовок + таймер)
+- `.refresh-progress-bar`: `height: 8px; background: #E2E8F0; border-radius: 4px`
+- `.progress-fill`: `background: linear-gradient(90deg, #093EB4, #3079D2)`
+- Шаги: `.refresh-step` с иконками ✅/⏳/⬜
+- `.step-active .step-label` → синий жирный
+- `.step-done` → opacity 0.85
+- `.step-pending .step-label` → серый `#94A3B8`
+- `.step-error .step-label` → красный
+
+#### Адаптивность
+- `.twocol` на `max-width: 900px` → 1 колонка
+- `.kpis` на `max-width: 900px` → 2 колонки
+- `overflow-x: auto` для таблиц
+
+### Панель обновления данных (фронтенд)
+
+Каждый дашборд должен содержать:
+
+```javascript
+// В начале скрипта — переменные для панели
+var refreshStepsData = [
+  { key: 'fetch_rest',   label: 'REST API: выгрузка сделок',         weight: 40 },
+  { key: 'fetch_export', label: 'Export API: дополнение сделок',     weight: 10 },
+  { key: 'fetch_dicts',  label: 'Загрузка справочников',             weight: 10 },
+  { key: 'analyze_new',  label: 'Анализ данных',                     weight: 40 },
+];
+```
+
+**Примечание:** `refreshStepsData` — пример для управленческого дашборда. В каждом дашборде шаги могут отличаться в зависимости от источников данных (REST API, экспорт, Яндекс Метрика, Excel-файлы и т.д.). Важно сохранять структуру: `key`, `label`, `weight` (сумма weights = 100).
+
+```javascript
+var statusPanelHTML = '' +
+  '<div id="refreshStatusPanel" class="refresh-panel" style="display:none">' +
+    '<div class="refresh-header">' +
+      '<span class="refresh-title">🔄 Обновление данных</span>' +
+      '<span class="refresh-elapsed" id="statusElapsed">⏱ 0м 0с</span>' +
+    '</div>' +
+    '<div class="progress-bar refresh-progress-bar">' +
+      '<div class="progress-fill" id="statusProgressFill" style="width:0%"></div>' +
+    '</div>' +
+    '<div id="statusSteps" class="refresh-steps"></div>' +
+    '<div id="statusDealProgress" class="refresh-deal-progress"></div>' +
+  '</div>';
+
+function renderStepLines(curIdx, steps, progressPct) {
+  var h = '';
+  for (var i = 0; i < steps.length; i++) {
+    var s = steps[i];
+    var icon, cls, label;
+    if (i < curIdx) { icon = '✅'; cls = 'step-done'; label = s.label; }
+    else if (i === curIdx) { icon = '⏳'; cls = 'step-active'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
+    else { icon = '⬜'; cls = 'step-pending'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
+    h += '<div class="refresh-step ' + cls + '">' +
+      '<span class="step-icon">' + icon + '</span>' +
+      '<span class="step-label">' + label + '</span>' +
+    '</div>';
+  }
+  return h;
+}
+
+async function safeFetch(url, opts) {
+  var resp = await fetch(url, opts);
+  if (resp.redirected || resp.url.endsWith('/login')) { window.location.href = '/login'; throw new Error('redirect'); }
+  var text = await resp.text();
+  if (text.startsWith('<!DOCTYPE')) { window.location.href = '/login'; throw new Error('redirect'); }
+  return JSON.parse(text);
+}
+
+function initRefreshButton() {
+  var toolbar = document.querySelector('.toolbar');
+  if (!toolbar) return;
+  var btn = document.createElement('button');
+  btn.id = 'refreshBtn';
+  btn.textContent = '🔄 Обновить данные';
+  toolbar.appendChild(btn);
+  btn.addEventListener('click', async function() { /* ... polling logic ... */ });
+}
+```
+
+### Чего НЕ должно быть
+- ❌ Кнопка «Экспорт в Excel» — удалена, неактуальна
+- ❌ Библиотека xlsx / xlsx.full.min.js — удалена
+- ❌ Разноцветные стили у разных дашбордов — все должны быть одинаковыми
+
 ## 📋 Создание нового дашборда
 
 Когда кто-то просит создать новый дашборд (Иван, Ольга, Анастасия — все члены команды):
