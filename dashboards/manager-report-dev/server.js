@@ -94,6 +94,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const mgrName = users[mgrId] || mgrId;
     const { key, group } = getMgrKey(mgrId, mgrName);
     if (group === 'hidden' && !isFiltered) continue;
+    const isAutoOrOzk = group === 'autopay' || group === 'ozk';
     const dc = parseDT(d.DATE_CREATE);
     const pay = parseDT(d.UF_DATE_PAY_1C);
     const cl = parseDT(d.CLOSEDATE);
@@ -124,8 +125,8 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // created
-    if (dc && dc.getFullYear() === YEAR) {
+    // created — для Автооплат/ОЗК только с OPP≥11
+    if (dc && dc.getFullYear() === YEAR && (!isAutoOrOzk || opp >= MIN_OPP)) {
       if (!isFiltered || (dc >= fromDate && dc <= toDate)) {
         m.created++;
       }
@@ -173,8 +174,8 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // MQL — по is_qual_lead
-    if (dc && dc.getFullYear() === YEAR) {
+    // MQL — для Автооплат/ОЗК только с OPP≥11
+    if (dc && dc.getFullYear() === YEAR && (!isAutoOrOzk || opp >= MIN_OPP)) {
       let isMql = false;
       if (cat === 0) {
         if (!['NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'].includes(stage)) isMql = true;
@@ -186,8 +187,8 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // SQL
-    if (dc && dc.getFullYear() === YEAR) {
+    // SQL — для Автооплат/ОЗК только с OPP≥11
+    if (dc && dc.getFullYear() === YEAR && (!isAutoOrOzk || opp >= MIN_OPP)) {
       const hasInvoice = d.UF_CRM_1753272713011;
       let isSql = false;
       if (['DETAILS', 'PROPOSAL', '2', '6', 'WON'].includes(stage)) {
@@ -203,9 +204,9 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // invoice
+    // invoice — для Автооплат/ОЗК только с OPP≥11
     const invDt = parseDT(d.UF_CRM_1753272713011);
-    if (invDt && invDt.getFullYear() === YEAR && sem !== 'F') {
+    if (invDt && invDt.getFullYear() === YEAR && sem !== 'F' && (!isAutoOrOzk || opp >= MIN_OPP)) {
       if (!isFiltered || (invDt >= fromDate && invDt <= toDate)) {
         m.invoice_cnt++;
       }
