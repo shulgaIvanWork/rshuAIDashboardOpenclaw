@@ -447,6 +447,8 @@ for w in range(1, cur_w + 1):
         "reg_durs": [], "reg_inv_durs": [],
     }
 
+# Debug для Регистрации
+
 for r in rows:
     # created_cnt/created_sum — по дате создания
     if r["IS_OOM"]:
@@ -519,7 +521,7 @@ for r in rows:
                     weekly[wk][f"edu_{edu_key}_cnt"] += 1
                     weekly[wk][f"edu_{edu_key}_sum"] += r["OPP"]
             # Registration per week (SRC_ID = 79641902890)
-            if str(r.get("SRC_ID", "")) == '79641902890':
+            if str(r.get("SRC_ID", "")) == '79641902890' and wk and wk in weekly:
                 weekly[wk]["reg_total"] += 1
                 weekly[wk]["reg_paid"] += 1
                 weekly[wk]["reg_paid_sum"] += r["OPP"]
@@ -527,6 +529,7 @@ for r in rows:
                     d = (r["PAY_DT"] - r["DC"]).days
                     if d >= 0:
                         weekly[wk]["reg_durs"].append(d)
+
             if r["IS_KOM"]:
                 weekly[wk]["kom_chks"].append(r["OPP"])
             else:
@@ -541,6 +544,13 @@ for r in rows:
                     else:
                         weekly[wk]["oom_durs"].append(d)
 
+    # Registration: LOSE (вне pay_ytd)
+    if str(r.get("SRC_ID", "")) == '79641902890' and not r.get("PAY_DT") and r.get("CL") and r["SEM"] == "F":
+        lose_wk = r["CL"].date().isocalendar()[1]
+        if lose_wk in weekly:
+            weekly[lose_wk]["reg_total"] += 1
+            weekly[lose_wk]["reg_lose"] += 1
+            weekly[lose_wk]["reg_lose_sum"] += r["OPP"]
     # MQL = is_qual_lead (как в карточке 2), по DATE_CREATE
     if r["DC"] and r["DC"].year == YEAR and is_qual_lead_w(r):
         wk = r["DC"].date().isocalendar()[1]
