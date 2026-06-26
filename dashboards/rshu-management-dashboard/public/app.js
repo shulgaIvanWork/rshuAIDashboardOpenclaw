@@ -235,7 +235,15 @@ function buildFilteredData(orig, filteredWeeks) {
   kom_ytd.conv_deal_pct = (komPay + kom_ytd.lose_cnt) > 0 ? (komPay / (komPay + kom_ytd.lose_cnt)) * 100 : 0;
   out.kom_ytd = kom_ytd;
 
-  // Форматы - оставляем из оригинала (не перезаписываем, т.к. в неделях нет cnt)
+  // Форматы — пересчитываем из понедельных сумм
+  var fmt_ytd = {};
+  filteredWeeks.forEach(function(w) {
+    ['fmt_oom','fmt_om','fmt_sdo','fmt_kom'].forEach(function(f) {
+      if (!fmt_ytd[f]) fmt_ytd[f] = { cnt: 0, sum: 0 };
+      fmt_ytd[f].sum += w[f] || 0;
+    });
+  });
+  out.fmt_ytd = fmt_ytd;
 
   return out;
 }
@@ -841,6 +849,16 @@ async function renderPageMainNew(d) {
 
     // Load artifacts
     loadArtifacts();
+
+    // Destroy orphaned chart instances before creating new ones
+    if (window.Chart && Chart.instances) {
+      Object.keys(Chart.instances).forEach(function(k) {
+        var chart = Chart.instances[k];
+        if (chart.canvas && !document.contains(chart.canvas)) {
+          chart.destroy();
+        }
+      });
+    }
 
     // Charts (canvas elements now exist)
     setTimeout(function(){
