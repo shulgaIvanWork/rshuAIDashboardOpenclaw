@@ -163,7 +163,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const periodStart = isFiltered ? fromDate : YEAR_START;
     if (dc && dc <= periodStart && (cat === 0 || cat === 19) && !isAutoOrOzk) {
       const wasPaid = pay && pay <= periodStart;
-      const wasLost = isLost && loseDt && loseDt <= periodStart;
+      const wasLost = isLost && (loseDt ? loseDt <= periodStart : true);
       if (!wasPaid && !wasLost) {
         m.in_work_start++;
       }
