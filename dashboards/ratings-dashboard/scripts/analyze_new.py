@@ -11,12 +11,19 @@ from collections import defaultdict, Counter
 print("== Загружаем данные ==")
 deals_raw = json.load(open(config.CACHE_DIR + "/deals_NEW.json", encoding="utf-8"))
 dicts     = json.load(open(config.DICTS_JSON, encoding="utf-8"))
-cc        = json.load(open(config.CC_JSON,    encoding="utf-8"))
 
-# Компании
+# Связка сделка→компания (опционально, в сделках уже есть COMPANY_ID)
+cc = {}
+try:
+    cc = json.load(open(config.CC_JSON, encoding="utf-8"))
+except Exception as e:
+    print(f"  company_contact.json не найден: {e}")
+
+# Компании (названия + регионы из companies_ext.json, опционально)
 companies = {}
 try:
-    companies = json.load(open(os.path.join(config.CACHE_DIR, "companies.json"), encoding="utf-8"))
+    raw = json.load(open(os.path.join(config.CACHE_DIR, "companies_ext.json"), encoding="utf-8"))
+    companies = {k: v.get("title", "") for k, v in raw.items()}
     print(f"  Компаний: {len(companies)}")
 except Exception as e:
     print(f"  Компании не загружены: {e}")

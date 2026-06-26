@@ -1,8 +1,8 @@
 """
 run_full.py — ПОЛНАЯ пересборка с нуля.
 
-Выгружает сделки, компании, контакты, лиды, справочники,
-затем запускает анализ и сборку Excel.
+Выгружает сделки, справочники, компании, лиды,
+затем запускает анализ.
 
 Запуск:  python run_full.py
 
@@ -10,10 +10,8 @@ run_full.py — ПОЛНАЯ пересборка с нуля.
     1. fetch_refresh.py               — сделки через CRM Export API
     2. fetch_dicts.py                 — справочники
     3. fetch_companies_ext_batch.py   — компании (адреса, регионы)
-    4. fetch_contacts_batch.py        — контакты (расширенные данные)
-    5. fetch_leads.py                 — лиды
-    6. analyze_new.py                 — анализ → agg_new.json
-    7. build_xlsx.py                  — Excel-отчёт
+    4. fetch_leads.py                 — лиды
+    5. analyze_new.py                 — анализ → agg_new.json → agg.json
 """
 import subprocess, sys, os, time, shutil
 
@@ -35,8 +33,8 @@ def run(script, args=""):
 
 
 print("=" * 60)
-print("ПОЛНАЯ ВЫГРУЗКА — НОВАЯ ЛОГИКА")
-print("CRM Export API → analyze_new → Excel")
+print("ПОЛНАЯ ВЫГРУЗКА")
+print("fetch_refresh → fetch_dicts → companies_ext → leads → analyze")
 print("=" * 60)
 
 # --- Шаг 1: Сделки через CRM Export API ---
@@ -48,13 +46,10 @@ run("fetch_dicts.py")
 # --- Шаг 3: Компании ---
 run("fetch_companies_ext_batch.py")
 
-# --- Шаг 4: Контакты ---
-run("fetch_contacts_batch.py")
-
-# --- Шаг 5: Лиды ---
+# --- Шаг 4: Лиды ---
 run("fetch_leads.py")
 
-# --- Шаг 6: Анализ ---
+# --- Шаг 5: Анализ ---
 run("analyze_new.py")
 
 # --- Копируем agg_new.json → agg.json (сервер читает agg.json) ---
@@ -64,12 +59,7 @@ if os.path.exists(src):
     shutil.copy2(src, dst)
     print(f"✓  agg_new.json → agg.json (скопирован)")
 
-# --- Шаг 7: Excel ---
-run("build_xlsx.py")
-
 print("\n" + "=" * 60)
 print("✅  Полная выгрузка завершена!")
-import config
-print(f"    ag.json  обновлён")
-print(f"    Excel: {config.OUTPUT_DIR}/{config.XLSX_FILE}")
+print(f"    agg.json  обновлён")
 print("=" * 60)

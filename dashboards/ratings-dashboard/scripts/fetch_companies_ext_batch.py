@@ -23,7 +23,13 @@ def call_batch(commands):
     return r.get("result", {}).get("result", [])
 
 deals = json.load(open(config.DEALS_JSON, encoding="utf-8"))
-cc = json.load(open(config.CC_JSON, encoding="utf-8"))
+
+# Связка сделка→компания (опционально, у сделок уже есть COMPANY_ID)
+cc = {}
+try:
+    cc = json.load(open(config.CC_JSON, encoding="utf-8"))
+except Exception as e:
+    print(f"  company_contact.json не найден, используем COMPANY_ID из сделок: {e}")
 
 company_ids = set()
 for d in deals:
