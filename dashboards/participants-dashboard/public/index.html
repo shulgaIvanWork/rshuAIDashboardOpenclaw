@@ -170,7 +170,7 @@ async function safeFetch(url, opts) {
   
   <div id="participantsArea" style="display:block">
     <div class="card" id="participantsCard">
-      <h2 id="participantsTitle">👥 Участники ООМ / ОМ за прошлую неделю</h2>
+      <h2 id="participantsTitle">👥 Участники Очно / Онлайн за прошлую неделю</h2>
       <div class="sub" style="margin:-8px 0 14px">Тематика, программа, участник, компания, регион, сумма оплаты</div>
       <div id="participantsTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div></div>
     </div>
@@ -178,7 +178,7 @@ async function safeFetch(url, opts) {
   
   <div id="participantsCurArea" style="display:none">
     <div class="card" id="participantsCurCard">
-      <h2 id="participantsCurTitle">👥 Участники ООМ / ОМ за текущую неделю</h2>
+      <h2 id="participantsCurTitle">👥 Участники Очно / Онлайн за текущую неделю</h2>
       <div class="sub" style="margin:-8px 0 14px">Тематика, программа, участник, компания, регион, сумма оплаты</div>
       <div id="participantsCurTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div></div>
     </div>
@@ -1075,7 +1075,7 @@ async function loadParticipants() {
       return;
     }
     const title = document.getElementById('participantsTitle');
-    title.textContent = '👥 Участники ООМ / ОМ за ' + res.weekLabel + ' · всего ' + res.total + ' сделок';
+    title.textContent = '👥 Участники Очно / Онлайн за ' + res.weekLabel + ' · всего ' + res.total + ' сделок';
     
     let html = '<table class="sortable" id="participantsTable"><thead><tr>' +
       '<th class="sort" data-col="0">#</th>' +
@@ -1163,7 +1163,7 @@ async function loadParticipantsCurrent() {
       return;
     }
     const title = document.getElementById('participantsCurTitle');
-    title.textContent = '👥 Участники ООМ / ОМ за ' + res.weekLabel + ' · всего ' + res.total + ' сделок';
+    title.textContent = '👥 Участники Очно / Онлайн за ' + res.weekLabel + ' · всего ' + res.total + ' сделок';
     
     let html = '<table class="sortable" id="participantsCurTable"><thead><tr>' +
       '<th class="sort" data-col="0">#</th>' +
