@@ -417,7 +417,7 @@ for w in range(1, cur_w + 1):
         "week": w, "mon": mon.isoformat(), "sun": sun.isoformat(),
         "label": week_label(YEAR, w),
         "label_short": f"W{w:02d}",
-        "label_dates": f"{mon.strftime('%d.%m')}—{mon.strftime('%d.%m')}",
+        "label_dates": f"{mon.strftime('%d.%m')}—{sun.strftime('%d.%m')}",
         "created_cnt": 0, "created_sum": 0.0,
         "postupleniya": 0.0, "won_cnt": 0, "lost_cnt": 0,
         "leads": 0, "avg_check": 0, "durs": [], "chks": [],
