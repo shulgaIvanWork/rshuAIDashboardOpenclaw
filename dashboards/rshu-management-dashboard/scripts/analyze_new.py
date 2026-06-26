@@ -510,18 +510,13 @@ for r in rows:
                 weekly[wk]["src_mkt_sum"] += r["OPP"]
             # Education type per week
             if r["IS_OOM"] or r["IS_KOM"]:
-                edu = extract_edu_type(r.get("EDU_TYPE", ""))
-                if edu:
-                    edu_key = {
-                        'Повышение квалификации': 'pk',
-                        'Проф. переподготовка': 'pp',
-                        'Корпоративное обучение': 'ko',
-                    }.get(edu, None)
-                    if edu_key:
-                        weekly[wk][f"edu_{edu_key}_cnt"] += 1
-                        weekly[wk][f"edu_{edu_key}_sum"] += r["OPP"]
-            # Registration per week
-            if str(r.get("SRC_ID", "")) == REG_SRC_ID:
+                edu_val = str(r.get("EDU_TYPE", "")).strip()
+                edu_key = {'34699': 'pk', '34700': 'pp', '34765': 'ko'}.get(edu_val, None)
+                if edu_key:
+                    weekly[wk][f"edu_{edu_key}_cnt"] += 1
+                    weekly[wk][f"edu_{edu_key}_sum"] += r["OPP"]
+            # Registration per week (SRC_ID = 79641902890)
+            if str(r.get("SRC_ID", "")) == '79641902890':
                 weekly[wk]["reg_total"] += 1
                 weekly[wk]["reg_paid"] += 1
                 weekly[wk]["reg_paid_sum"] += r["OPP"]
