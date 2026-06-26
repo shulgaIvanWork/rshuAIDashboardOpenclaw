@@ -1025,21 +1025,43 @@ MBA_DIRECTION_IDS = {'1917', '35288'}
 
 def detect_mba_type(title):
     t = (title or '').lower()
+    # 1. Micro MBA
     if 'micro' in t or 'микро' in t:
-        return 'Микро (Micro MBA)'
+        return 'Micro MBA'
+    # 2. MBA Эксперт
     if 'эксперт' in t or 'expert' in t:
-        return 'MBA.Эксперт'
+        return 'MBA Эксперт'
+    # 3. MBA Лидер — "MBA Лидер: Продажи", "MBA Лидер: Финансы"
+    if ('лидер' in t or 'leader' in t) and ('mba' in t or 'mmba' in t):
+        return 'MBA Лидер'
+    # 4. Mini MBA: Классический — именно "Mini MBA: Классический"
+    if ('классический' in t or 'classic' in t) and ('mini' in t or 'mmba' in t or 'mba' in t):
+        return 'Mini MBA: Классический'
+    # 5. Mini MBA: Специализация — Mini MBA: {другие слова} (Продажи, Производство и т.п.)
+    if ('mini' in t) and ('mba' in t or 'mmba' in t):
+        return 'Mini MBA: Специализация'
     if 'специализация' in t or 'specialization' in t:
-        return 'MMBA.Специализация'
-    if 'mini' in t or 'классический' in t or 'classic' in t:
-        return 'Mini MBA.Классический'
+        return 'Mini MBA: Специализация'
+    # Артефакт
     if 'mba' in t or 'mmba' in t:
-        return 'MBA / MMBA'
+        return None
     return None
 
 def has_mba_in_title(title):
     t = (title or '').lower()
-    return 'mba' in t or 'mmba' in t or 'mini mba' in t
+    if 'micro' in t or 'микро' in t:
+        return True
+    if 'эксперт' in t or 'expert' in t:
+        return True
+    if ('лидер' in t or 'leader' in t) and ('mba' in t or 'mmba' in t):
+        return True
+    if ('классический' in t or 'classic' in t) and ('mini' in t or 'mmba' in t or 'mba' in t):
+        return True
+    if ('mini' in t) and ('mba' in t or 'mmba' in t):
+        return True
+    if 'специализация' in t or 'specialization' in t:
+        return True
+    return 'mba' in t or 'mmba' in t
 
 mba_rating = defaultdict(lambda: {'cnt': 0, 'sum': 0.0, 'deals': 0})
 for r in rows:
@@ -1053,7 +1075,10 @@ for r in rows:
         if not is_mba and has_mba_in_title(r['TITLE']):
             is_mba = True
         if is_mba:
-            mba_type = detect_mba_type(r['TITLE']) or 'MBA / MMBA'
+            mba_type = detect_mba_type(r['TITLE'])
+            if mba_type is None:
+                # Артефакт
+                continue
             mba_rating[mba_type]['cnt'] += 1
             mba_rating[mba_type]['sum'] += r['OPP']
             mba_rating[mba_type]['deals'] += 1
