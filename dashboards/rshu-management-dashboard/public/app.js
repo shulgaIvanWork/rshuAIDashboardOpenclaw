@@ -245,6 +245,47 @@ function buildFilteredData(orig, filteredWeeks) {
   });
   out.fmt_ytd = fmt_ytd;
 
+  // B2B/B2C — пересчитываем из понедельных
+  var btype = { B2B: { cnt: 0, sum: 0 }, B2C: { cnt: 0, sum: 0 } };
+  filteredWeeks.forEach(function(w) {
+    btype.B2B.cnt += w.btype_B2B_cnt || 0;
+    btype.B2B.sum += w.btype_B2B_sum || 0;
+    btype.B2C.cnt += w.btype_B2C_cnt || 0;
+    btype.B2C.sum += w.btype_B2C_sum || 0;
+  });
+  out.btype_ytd = Object.assign({ period: 'YTD' }, btype);
+
+  // Источники (внутренняя база vs маркетинг) — пересчитываем из понедельных
+  var srcIt = { cnt: 0, sum: 0 }, srcMk = { cnt: 0, sum: 0 };
+  filteredWeeks.forEach(function(w) {
+    srcIt.cnt += w.src_internal_cnt || 0;
+    srcIt.sum += w.src_internal_sum || 0;
+    srcMk.cnt += w.src_mkt_cnt || 0;
+    srcMk.sum += w.src_mkt_sum || 0;
+  });
+  out.src_split_ytd = { period: 'YTD', internal: srcIt, marketing: srcMk };
+
+  // Тип обучения — пересчитываем из понедельных
+  var edu_ytd = {};
+  filteredWeeks.forEach(function(w) {
+    ['pk','pp','ko'].forEach(function(k) {
+      var cnt = w['edu_' + k + '_cnt'] || 0;
+      var sum = w['edu_' + k + '_sum'] || 0;
+      if (cnt > 0 || sum > 0) {
+        if (!edu_ytd[k]) edu_ytd[k] = { cnt: 0, sum: 0 };
+        edu_ytd[k].cnt += cnt;
+        edu_ytd[k].sum += sum;
+      }
+    });
+  });
+  // Преобразуем ключи обратно в читаемые названия
+  var eduNameMap = { pk: 'Повышение квалификации', pp: 'Проф. переподготовка', ko: 'Корпоративное обучение' };
+  var eduOut = {};
+  Object.keys(edu_ytd).forEach(function(k) {
+    eduOut[eduNameMap[k] || k] = edu_ytd[k];
+  });
+  out.edu_ytd = Object.assign({ period: 'YTD' }, eduOut);
+
   return out;
 }
 

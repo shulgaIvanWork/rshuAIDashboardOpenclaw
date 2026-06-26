@@ -417,7 +417,7 @@ for w in range(1, cur_w + 1):
         "week": w, "mon": mon.isoformat(), "sun": sun.isoformat(),
         "label": week_label(YEAR, w),
         "label_short": f"W{w:02d}",
-        "label_dates": f"{mon.strftime('%d.%m')}—{sun.strftime('%d.%m')}",
+        "label_dates": f"{mon.strftime('%d.%m')}—{mon.strftime('%d.%m')}",
         "created_cnt": 0, "created_sum": 0.0,
         "postupleniya": 0.0, "won_cnt": 0, "lost_cnt": 0,
         "leads": 0, "avg_check": 0, "durs": [], "chks": [],
@@ -428,6 +428,22 @@ for w in range(1, cur_w + 1):
         "oom_postupleniya": 0.0, "oom_won_cnt": 0, "oom_leads": 0, "oom_mql": 0,
         "fmt_oom": 0.0, "fmt_om": 0.0, "fmt_sdo": 0.0, "fmt_kom": 0.0,
         "presale_durs": [],
+        # B2B/B2C per week
+        "btype_B2B_cnt": 0, "btype_B2B_sum": 0.0,
+        "btype_B2C_cnt": 0, "btype_B2C_sum": 0.0,
+        # Source split per week (internal vs marketing)
+        "src_internal_cnt": 0, "src_internal_sum": 0.0,
+        "src_mkt_cnt": 0, "src_mkt_sum": 0.0,
+        # Education type per week
+        "edu_pk_cnt": 0, "edu_pk_sum": 0.0,  # Повышение квалификации
+        "edu_pp_cnt": 0, "edu_pp_sum": 0.0,  # Проф. переподготовка
+        "edu_ko_cnt": 0, "edu_ko_sum": 0.0,  # Корпоративное обучение
+        # Registration per week
+        "reg_total": 0, "reg_sql": 0, "reg_sql_sum": 0.0,
+        "reg_invoice": 0, "reg_invoice_sum": 0.0,
+        "reg_paid": 0, "reg_paid_sum": 0.0,
+        "reg_lose": 0, "reg_lose_sum": 0.0,
+        "reg_durs": [], "reg_inv_durs": [],
     }
 
 for r in rows:
@@ -481,6 +497,38 @@ for r in rows:
             fmt_keys = {"Очный": "fmt_oom", "Онлайн": "fmt_om", "Видеокурс": "fmt_sdo", "Корпоративное обучение": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
                 weekly[wk][fmt_keys[r["FORMAT"]]] += r["OPP"]
+            # B2B/B2C per week
+            btype = r.get("BTYPE", "B2C")
+            weekly[wk][f"btype_{btype}_cnt"] += 1
+            weekly[wk][f"btype_{btype}_sum"] += r["OPP"]
+            # Source split per week (internal vs marketing)
+            if is_internal_source(r.get("SRC_ID", "")):
+                weekly[wk]["src_internal_cnt"] += 1
+                weekly[wk]["src_internal_sum"] += r["OPP"]
+            else:
+                weekly[wk]["src_mkt_cnt"] += 1
+                weekly[wk]["src_mkt_sum"] += r["OPP"]
+            # Education type per week
+            if r["IS_OOM"] or r["IS_KOM"]:
+                edu = extract_edu_type(r.get("EDU_TYPE", ""))
+                if edu:
+                    edu_key = {
+                        'Повышение квалификации': 'pk',
+                        'Проф. переподготовка': 'pp',
+                        'Корпоративное обучение': 'ko',
+                    }.get(edu, None)
+                    if edu_key:
+                        weekly[wk][f"edu_{edu_key}_cnt"] += 1
+                        weekly[wk][f"edu_{edu_key}_sum"] += r["OPP"]
+            # Registration per week
+            if str(r.get("SRC_ID", "")) == REG_SRC_ID:
+                weekly[wk]["reg_total"] += 1
+                weekly[wk]["reg_paid"] += 1
+                weekly[wk]["reg_paid_sum"] += r["OPP"]
+                if r["DC"] and r["PAY_DT"]:
+                    d = (r["PAY_DT"] - r["DC"]).days
+                    if d >= 0:
+                        weekly[wk]["reg_durs"].append(d)
             if r["IS_KOM"]:
                 weekly[wk]["kom_chks"].append(r["OPP"])
             else:

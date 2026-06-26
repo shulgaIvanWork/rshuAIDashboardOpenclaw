@@ -125,11 +125,12 @@ function app(mgrs, periodLabel) {
   mgrs = mgrs.filter(function(m){return m.paid||m.created||m.in_work_start;});
   var tot = {
     paid: sum(mgrs,'paid'),
-    lost: sum(mgrs,'lost'),
+    kval_lost: sum(mgrs,'kval_lost'),
+    nekval_lost: sum(mgrs,'nekval_lost'),
     created: sum(mgrs,'created'),
     post: sum(mgrs,'paid_sum'),
     dur: wavg(mgrs,'avg_dur','paid'),
-    conv: sum(mgrs,'paid')/(sum(mgrs,'paid')+sum(mgrs,'lost'))*100,
+    conv: sum(mgrs,'paid')/(sum(mgrs,'paid')+sum(mgrs,'kval_lost')+sum(mgrs,'nekval_lost'))*100,
     end: sum(mgrs,'in_work_end'),
   };
 
@@ -154,7 +155,8 @@ function app(mgrs, periodLabel) {
   html += card('💰 Поступления', n(tot.post)+' ₽');
   html += card('⏱ Средний цикл', tot.dur.toFixed(1)+' дн');
   html += card('📊 Конверсия', (tot.conv||0).toFixed(1)+'%');
-  html += card('❌ Проиграно', n(tot.lost));
+  html += card('❌ Квал отказы', n(tot.kval_lost));
+  html += card('❌ Не квал', n(tot.nekval_lost));
   html += '</div>';
 
   // Table 1
@@ -177,9 +179,9 @@ function app(mgrs, periodLabel) {
 
   // Менеджеры YTD
   html += '<div class=card><h2>Менеджеры YTD <span style="font-size:12px;color:#888;font-weight:400">(основная воронка · лиды из CRM)</span></h2><div class=scroll-x>';
-  html += '<table style="font-size:11px;white-space:nowrap"><tr><th>Менеджер</th><th>Лидов CRM</th><th>WON</th><th>Проигр</th><th>Конв.%</th><th>Ср.чек, ₽</th><th>Поступления, ₽</th></tr>';
+  html += '<table style="font-size:11px;white-space:nowrap"><tr><th>Менеджер</th><th>Лидов CRM</th><th>WON</th><th>Квал отк</th><th>Не квал</th><th>Конв.%</th><th>Ср.чек, ₽</th><th>Поступления, ₽</th></tr>';
   mgrs.filter(function(m){return m.leads > 0;}).forEach(function(m, i){
-    html += '<tr><td><b>'+e(m.name)+'</b></td><td>'+m.leads+'</td><td><b>'+m.paid+'</b></td><td>'+m.lost+'</td><td>'+(m.conv_pct||0).toFixed(1)+'%</td><td>'+n(m.avg_check)+' ₽</td><td><b>'+n(m.paid_sum)+'</b> ₽</td></tr>';
+    html += '<tr><td><b>'+e(m.name)+'</b></td><td>'+m.leads+'</td><td><b>'+m.paid+'</b></td><td>'+(m.kval_lost||0)+'</td><td>'+(m.nekval_lost||0)+'</td><td>'+(m.conv_pct||0).toFixed(1)+'%</td><td>'+n(m.avg_check)+' ₽</td><td><b>'+n(m.paid_sum)+'</b> ₽</td></tr>';
   });
   html += '</table></div></div>';
 
@@ -199,11 +201,13 @@ function tab1(mgrs) {
     {k:'name',l:'Менеджер'},
     {k:'in_work_start',l:'📦 В работе(н)'},
     {k:'created',l:'➕ Создано'},
-    {k:'mql',l:'🔍 MQL'},
-    {k:'sql',l:'🎯 SQL'},
+    {k:'na_kvalifikatsii',l:'🔍 На квал-и'},
+    {k:'mql',l:'🎯 MQL'},
+    {k:'sql',l:'📊 SQL'},
     {k:'invoice_cnt',l:'📄 Счёт'},
     {k:'paid',l:'✅ Оплачено'},
-    {k:'lost',l:'❌ Отказы'},
+    {k:'kval_lost',l:'❌ Квал отказы'},
+    {k:'nekval_lost',l:'❌ Не квал'},
     {k:'in_work_end',l:'🔄 В работе(к)'},
     {k:'paid_sum',l:'💰 Пост-я'},
     {k:'avg_check',l:'💵 Ср.чек'},
@@ -236,7 +240,7 @@ function tab1(mgrs) {
     if (c.k==='paid_sum') T[c.k]=sum(mgrs,'paid_sum');
     else if (c.k==='avg_check') T[c.k]=Math.round(sum(mgrs,'paid_sum')/(sum(mgrs,'paid')||1));
     else if (c.k==='avg_dur') T[c.k]=wavg(mgrs,'avg_dur','paid');
-    else if (c.k==='conv_pct') { var pd=sum(mgrs,'paid'),lo=sum(mgrs,'lost'); T[c.k]=pd/(pd+lo)*100; }
+    else if (c.k==='conv_pct') { var pd=sum(mgrs,'paid'),lo=sum(mgrs,'kval_lost')+sum(mgrs,'nekval_lost'); T[c.k]=pd/(pd+lo)*100; }
     else T[c.k]=sum(mgrs,c.k);
   });
   h += '<tr class=total><td><b>📊 ИТОГО</b></td>';
@@ -254,12 +258,13 @@ function tab1(mgrs) {
 }
 
 function tab2(mgrs) {
+  var allLost = sum(mgrs,'kval_lost')+sum(mgrs,'nekval_lost');
   var st = {
-    cl: sum(mgrs,'leads')?sum(mgrs,'mql')/sum(mgrs,'leads')*100:0,
+    cc: sum(mgrs,'created')?sum(mgrs,'mql')/sum(mgrs,'created')*100:0,
     cs: sum(mgrs,'mql')?sum(mgrs,'sql')/sum(mgrs,'mql')*100:0,
     ci: sum(mgrs,'sql')?sum(mgrs,'invoice_cnt')/sum(mgrs,'sql')*100:0,
     cp: sum(mgrs,'invoice_cnt')?sum(mgrs,'paid')/sum(mgrs,'invoice_cnt')*100:0,
-    conv: (sum(mgrs,'paid')+sum(mgrs,'lost'))?sum(mgrs,'paid')/(sum(mgrs,'paid')+sum(mgrs,'lost'))*100:0,
+    conv: (sum(mgrs,'paid')+allLost)?sum(mgrs,'paid')/(sum(mgrs,'paid')+allLost)*100:0,
     dur: wavg(mgrs,'avg_dur','paid'),
     chk: sum(mgrs,'paid')?sum(mgrs,'paid_sum')/sum(mgrs,'paid')||0:0,
     sum: sum(mgrs,'paid_sum'),
@@ -267,7 +272,7 @@ function tab2(mgrs) {
 
   var cols = [
     {k:'name',l:'Менеджер'},
-    {k:'conv_lead_mql',l:'📊 Лид→MQL',avg:st.cl,lo:10,hi:50},
+    {k:'conv_lead_mql',l:'📊 Создано→MQL',avg:st.cc,lo:30,hi:70},
     {k:'conv_mql_sql',l:'📊 MQL→SQL',avg:st.cs,lo:40,hi:80},
     {k:'conv_sql_inv',l:'📊 SQL→Счёт',avg:st.ci,lo:30,hi:70},
     {k:'conv_inv_paid',l:'📊 Счёт→Оплата',avg:st.cp,lo:50,hi:90},
@@ -306,7 +311,7 @@ function tab2(mgrs) {
   h += '<tr class=total><td><b>📊 СРЕДНЕЕ</b></td>';
   cols.forEach(function(c){
     if (c.k==='name') return;
-    h += '<td><b>'+fmtCell(c.k,st[c.k==='conv_lead_mql'?'cl':c.k==='conv_mql_sql'?'cs':c.k==='conv_sql_inv'?'ci':c.k==='conv_inv_paid'?'cp':c.k],st[c.k==='conv_lead_mql'?'cl':c.k==='conv_mql_sql'?'cs':c.k==='conv_sql_inv'?'ci':c.k==='conv_inv_paid'?'cp':c.k])+'</b></td>';
+    h += '<td><b>'+fmtCell(c.k,st[c.k==='conv_lead_mql'?'cc':c.k==='conv_mql_sql'?'cs':c.k==='conv_sql_inv'?'ci':c.k==='conv_inv_paid'?'cp':c.k],st[c.k==='conv_lead_mql'?'cc':c.k==='conv_mql_sql'?'cs':c.k==='conv_sql_inv'?'ci':c.k==='conv_inv_paid'?'cp':c.k])+'</b></td>';
   });
   h += '</tr></tbody></table>';
   return h;

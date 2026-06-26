@@ -17,17 +17,44 @@ function parseDT(s) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-// Очищает STAGE_ID от префикса категории (C0:, C19:, C8:) — export API
 function cleanStage(sid) {
   return (sid || '').replace(/^C\d+:/, '');
 }
 
-// === Логика analyze_new.py на JS (только для менеджеров) ===
 const MIN_OPP = 11;
 const VALID_CATS = new Set([0, 8, 19]);
 const YEAR = 2026;
 
-// Группы менеджеров (тот же словарь, что в analyze_new.py)
+// Ранги стадий для последовательной воронки (кат 0)
+const STAGE_RANK = {
+  'NEW': 0, 'UC_1YW3V2': 1, 'UC_STZB49': 2, 'UC_838R2R': 3,
+  'UC_4RJOR4': 4, // MQL
+  'DETAILS': 5, // SQL
+  'PROPOSAL': 6, // Счёт отправлен
+  '2': 7, // Постоплата
+  '6': 8, // Частично оплачен
+  'UC_W6SCHG': 9, // Следующий год
+  'UC_670ME2': 10, // Возвращен в работу (отказ)
+  'UC_F2YC3N': 11, // Предзакрытие в отказ
+  'WON': 12, // Счёт оплачен
+};
+
+// Все стадии отказа
+const LOST_STAGES = new Set(['LOSE', 'UC_670ME2', 'UC_F2YC3N']);
+// Стадии квалификации (Sale)
+const QUAL_STAGES = new Set(['NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R']);
+
+function getStageRank(stage, cat, opp, hasInvoice) {
+  if (cat === 8) return 0;
+  if (cat === 19) return 4; // КОМ — всегда квалифицированные
+  if (stage === 'LOSE') {
+    if (hasInvoice) return 6;
+    if (opp >= MIN_OPP) return 4;
+    return 3;
+  }
+  return STAGE_RANK[stage] ?? -1;
+}
+
 const MGR_GROUPS = {
   '1': 'bond', '513': 'main', '527': 'autopay', '516': 'autopay',
   '528': 'main', '12482': 'main', '20588': 'hidden',
@@ -47,10 +74,6 @@ function isPaid(d, opp) {
   return opp >= MIN_OPP && !!d.UF_DATE_PAY_1C;
 }
 
-function isPaidNoMin(d) {
-  return !!d.UF_DATE_PAY_1C;
-}
-
 function getGroup(mgrId) {
   return MGR_GROUPS[mgrId] || 'hidden';
 }
@@ -63,7 +86,7 @@ function getMgrKey(mgrId, mgrName) {
   return { key: mgrName, group: g };
 }
 
-// Рассчитать метрики для менеджеров за период (YTD если from/to не заданы)
+// === Новая последовательная воронка ===
 function calcManagers(deals, dicts, fromDate, toDate) {
   const users = dicts?.users || {};
   const mgrData = {};
@@ -72,9 +95,12 @@ function calcManagers(deals, dicts, fromDate, toDate) {
   function getMgr(name) {
     if (!mgrData[name]) {
       mgrData[name] = {
-        name, in_work_start: 0, created: 0, paid: 0, paid_sum: 0,
-        lost: 0, leads: 0, mql: 0, sql: 0, invoice_cnt: 0,
-        group: '', b2b_sum: 0, b2c_sum: 0,
+        name, in_work_start: 0, created: 0,
+        na_kvalifikatsii: 0, mql: 0, sql: 0, invoice_cnt: 0,
+        paid: 0, paid_sum: 0,
+        kval_lost: 0, nekval_lost: 0,
+        leads: 0, group: '',
+        b2b_sum: 0, b2c_sum: 0,
         src_int_sum: 0, src_mkt_sum: 0,
         fmt_oom_sum: 0, fmt_om_sum: 0, fmt_sdo_sum: 0,
         edu_pk_sum: 0, edu_pp_sum: 0, edu_kom_sum: 0,
@@ -98,15 +124,18 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const dc = parseDT(d.DATE_CREATE);
     const pay = parseDT(d.UF_DATE_PAY_1C);
     const cl = parseDT(d.CLOSEDATE);
-    const loseDt = parseDT(d.UF_CRM_1753341391806) || cl;  // Дата отказа (или CLOSEDATE как fallback)
+    const loseDt = parseDT(d.UF_CRM_1753341391806) || cl;
     const sem = d.STAGE_SEMANTIC_ID || '';
     const stage = cleanStage(d.STAGE_ID);
+    const hasInvoice = !!d.UF_CRM_1753272713011;
+    const isLost = LOST_STAGES.has(stage);
 
+    // Фильтр периода
     let inPeriod = true;
     if (isFiltered) {
       const dcOk = dc && dc >= fromDate && dc <= toDate;
       const payOk = pay && pay >= fromDate && pay <= toDate;
-      const lostOk = sem === 'F' && loseDt && loseDt >= fromDate && loseDt <= toDate;
+      const lostOk = isLost && loseDt && loseDt >= fromDate && loseDt <= toDate;
       inPeriod = dcOk || payOk || lostOk;
       if (!inPeriod) continue;
     }
@@ -114,25 +143,52 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const m = getMgr(key);
     if (group !== 'hidden') m.group = group;
 
-    // in_work_start — сделки в работе на начало периода (для любого периода)
-    // PreSale (кат 8) не входит; Автооплаты и ОЗК = 0 (всегда оплачиваются)
+    // === in_work_start ===
     const periodStart = isFiltered ? fromDate : YEAR_START;
-    if (dc && dc <= periodStart && (cat === 0 || cat === 19) && group !== 'autopay' && group !== 'ozk') {
-      const wasPaid = pay && pay < periodStart;
-      const wasLost = sem === 'F' && loseDt && loseDt < periodStart;
+    if (dc && dc <= periodStart && (cat === 0 || cat === 19) && !isAutoOrOzk) {
+      const wasPaid = pay && pay <= periodStart;
+      const wasLost = isLost && loseDt && loseDt <= periodStart;
       if (!wasPaid && !wasLost) {
         m.in_work_start++;
       }
     }
 
-    // created — для Автооплат/ОЗК только с OPP≥11
-    if (dc && dc.getFullYear() === YEAR && (!isAutoOrOzk || opp >= MIN_OPP)) {
-      if (!isFiltered || (dc >= fromDate && dc <= toDate)) {
-        m.created++;
-      }
+    // Условие для воронки: создана в 2026 / в периоде
+    const inYear = dc && dc.getFullYear() === YEAR;
+    const inPeriodByDc = !isFiltered || (dc >= fromDate && dc <= toDate);
+    const inFunnel = inYear && inPeriodByDc && (!isAutoOrOzk || opp >= MIN_OPP);
+    if (!inFunnel) continue;
+
+    const rank = getStageRank(stage, cat, opp, hasInvoice);
+
+    // === 1. Создано (без дублей WON в КОМ и PreSale) ===
+    if (!(stage === 'WON' && (cat === 8 || cat === 19))) {
+      m.created++;
     }
 
-    // paid
+    // === 2. На квалификации ===
+    if (cat === 8 && sem !== 'S' && sem !== 'F') {
+      m.na_kvalifikatsii++;
+    } else if (cat === 0 && QUAL_STAGES.has(stage)) {
+      m.na_kvalifikatsii++;
+    }
+
+    // === 3. MQL (прошли MQL+, без ушедших в отказ на MQL) ===
+    if (rank >= 4 && !isLost) {
+      m.mql++;
+    }
+
+    // === 4. SQL (прошли SQL+, без ушедших в отказ на SQL) ===
+    if (rank >= 5 && !isLost) {
+      m.sql++;
+    }
+
+    // === 5. Счёт отправлен (PROPOSAL+ с датой счёта, без ушедших в отказ на счёте) ===
+    if (rank >= 6 && hasInvoice && !isLost) {
+      m.invoice_cnt++;
+    }
+
+    // === 6. Оплачено ===
     const isP = isPaid(d, opp);
     if (isP && pay.getFullYear() === YEAR) {
       if (!isFiltered || (pay >= fromDate && pay <= toDate)) {
@@ -142,21 +198,16 @@ function calcManagers(deals, dicts, fromDate, toDate) {
           const dur = Math.round((pay - dc) / (1000*60*60*24));
           if (dur >= 0) { m.durs_sum += dur; m.durs_cnt++; }
         }
-        // slices
-        // B2B/B2C — по COMPANY_ID
         const companyId = String(d.COMPANY_ID || d['UF_CRM_1455718982'] || '0');
         if (companyId !== '0' && companyId !== 'null') m.b2b_sum += opp;
         else m.b2c_sum += opp;
-        // источники
         const srcId = String(d.SOURCE_ID || '');
         if (INTERNAL_SRC.includes(srcId)) m.src_int_sum += opp;
         else m.src_mkt_sum += opp;
-        // форматы
         const fmt = String(d.UF_FORMAT || '');
         if (fmt === '19042467') m.fmt_oom_sum += opp;
         else if (fmt === '19042468') m.fmt_om_sum += opp;
         else if (fmt === '19042469') m.fmt_sdo_sum += opp;
-        // тип обучения
         const edu = String(d.UF_CRM_1765896709800 || '');
         if (edu === '34699') m.edu_pk_sum += opp;
         else if (edu === '34700') m.edu_pp_sum += opp;
@@ -164,63 +215,28 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // lost — только кат 0 и 19 (без PreSale), по дате отказа
-    if (sem === 'F' && (cat === 0 || cat === 19)) {
-      const lostYear = loseDt ? loseDt.getFullYear() : 0;
-      if (!isFiltered && lostYear === YEAR) {
-        m.lost++;
-      } else if (isFiltered && loseDt && loseDt >= fromDate && loseDt <= toDate) {
-        m.lost++;
-      }
-    }
-
-    // MQL — для Автооплат/ОЗК только с OPP≥11
-    if (dc && dc.getFullYear() === YEAR && (!isAutoOrOzk || opp >= MIN_OPP)) {
-      let isMql = false;
-      if (cat === 0) {
-        if (!['NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R'].includes(stage)) isMql = true;
-      } else if (cat === 19) {
-        if (sem !== 'S') isMql = true;  // LOSE входит в MQL
-      }
-      if (isMql && (!isFiltered || (dc >= fromDate && dc <= toDate))) {
-        m.mql++;
-      }
-    }
-
-    // SQL — для Автооплат/ОЗК только с OPP≥11
-    if (dc && dc.getFullYear() === YEAR && (!isAutoOrOzk || opp >= MIN_OPP)) {
-      const hasInvoice = d.UF_CRM_1753272713011;
-      let isSql = false;
-      if (['DETAILS', 'PROPOSAL', '2', '6', 'WON'].includes(stage)) {
-        isSql = true;
-      } else if (cat === 19 && sem !== 'S') {
-        if (['EXECUTING', 'UC_C670BC', 'UC_I443UQ'].includes(stage)) isSql = true;
-        else if (hasInvoice && ['LOSE', 'UC_ALOZ6B', 'UC_W4ML6H'].includes(stage)) isSql = true;
-      } else if (hasInvoice && ['LOSE', 'UC_F2YC3N', 'UC_W6SCHG', 'UC_670ME2', 'UC_VKPN0N'].includes(stage)) {
-        isSql = true;
-      }
-      if (isSql && (!isFiltered || (dc >= fromDate && dc <= toDate))) {
-        m.sql++;
-      }
-    }
-
-    // invoice — для Автооплат/ОЗК только с OPP≥11
-    const invDt = parseDT(d.UF_CRM_1753272713011);
-    if (invDt && invDt.getFullYear() === YEAR && sem !== 'F' && (!isAutoOrOzk || opp >= MIN_OPP)) {
-      if (!isFiltered || (invDt >= fromDate && invDt <= toDate)) {
-        m.invoice_cnt++;
+    // === 7. Квал отказы / Не квал отказы ===
+    if (isLost) {
+      const lostInYear = loseDt ? loseDt.getFullYear() === YEAR : false;
+      const lostInPeriod = !isFiltered || (loseDt && loseDt >= fromDate && loseDt <= toDate);
+      if (lostInYear && lostInPeriod) {
+        if (cat === 19 || rank >= 4) {
+          m.kval_lost++;  // прошли MQL+ или КОМ
+        } else {
+          m.nekval_lost++;  // PreSale или Sale с рангом <4
+        }
       }
     }
   }
 
-  // Конвертируем в массив + считаем произвольные поля
+  // === Результат ===
   const result = Object.values(mgrData).map(m => {
-    const iwe = m.in_work_start + m.created - m.paid - m.lost;
+    const iwe = m.in_work_start + m.created - m.paid - m.kval_lost - m.nekval_lost;
     const avgCheck = m.paid ? Math.round(m.paid_sum / m.paid) : 0;
     const avgDur = m.durs_cnt ? Math.round(m.durs_sum / m.durs_cnt * 10) / 10 : 0;
-    const conv = (m.paid + m.lost) ? Math.round(m.paid / (m.paid + m.lost) * 1000) / 10 : 0;
-
-    const cl = m.mql ? Math.round(m.mql / (m.leads || 1) * 1000) / 10 : 0;
+    const allLost = m.kval_lost + m.nekval_lost;
+    const conv = (m.paid + allLost) ? Math.round(m.paid / (m.paid + allLost) * 1000) / 10 : 0;
+    const cl = m.created ? Math.round(m.mql / m.created * 1000) / 10 : 0;
     const cs = m.mql ? Math.round(m.sql / m.mql * 1000) / 10 : 0;
     const ci = m.sql ? Math.round(m.invoice_cnt / m.sql * 1000) / 10 : 0;
     const cp = m.invoice_cnt ? Math.round(m.paid / m.invoice_cnt * 1000) / 10 : 0;
@@ -228,9 +244,12 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     return {
       name: m.name, group: m.group || 'main',
       in_work_start: m.in_work_start, created: m.created,
-      paid: m.paid, paid_sum: Math.round(m.paid_sum), lost: m.lost,
+      na_kvalifikatsii: m.na_kvalifikatsii,
+      mql: m.mql, sql: m.sql, invoice_cnt: m.invoice_cnt,
+      paid: m.paid, paid_sum: Math.round(m.paid_sum),
+      kval_lost: m.kval_lost, nekval_lost: m.nekval_lost,
       in_work_end: Math.max(0, iwe),
-      leads: m.leads, mql: m.mql, sql: m.sql, invoice_cnt: m.invoice_cnt,
+      leads: m.leads,
       avg_check: avgCheck, avg_dur: avgDur, conv_pct: conv,
       conv_lead_mql: cl, conv_mql_sql: cs, conv_sql_inv: ci, conv_inv_paid: cp,
       b2b_sum: Math.round(m.b2b_sum), b2c_sum: Math.round(m.b2c_sum),
@@ -244,7 +263,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
   return result;
 }
 
-// Загрузка кэша
+// === Загрузка кэша ===
 async function loadCache() {
   try {
     const raw = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'agg.json'), 'utf-8'));
@@ -259,7 +278,6 @@ async function loadCache() {
 
 router.use(express.static(path.join(__dirname, 'public')));
 
-// API: manager data (с поддержкой фильтра по периоду)
 router.get('/api/managers', (req, res) => {
   if (!aggCache || !dealsCache) return res.json({ error: 'Нет данных' });
 
@@ -305,8 +323,7 @@ router.get('/api/funnel', async (req, res) => {
     const data = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'agg.json'), 'utf-8'));
     const weeks = (data.weeks || []).map(function(w) {
       return {
-        label_dates: w.label_dates,
-        week: w.week,
+        label_dates: w.label_dates, week: w.week,
         stack_rej_nq: w.stack_rej_nq || 0, stack_rej: w.stack_rej || 0,
         stack_nq: w.stack_nq || 0, stack_mql: w.stack_mql || 0,
         stack_sql: w.stack_sql || 0, stack_inv: w.stack_inv || 0,
