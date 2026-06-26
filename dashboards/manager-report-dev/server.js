@@ -45,8 +45,24 @@ const LOST_STAGES = new Set(['LOSE', 'UC_670ME2', 'UC_F2YC3N']);
 const QUAL_STAGES = new Set(['NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R']);
 
 function getStageRank(stage, cat, opp, hasInvoice) {
+  // PreSale — базовая
   if (cat === 8) return 0;
-  if (cat === 19) return 4; // КОМ — всегда квалифицированные
+  
+  // КОМ (кат 19): ранги по стадиям
+  if (cat === 19) {
+    const KOM_RANK = {
+      'NEW': 4, 'PREPARATION': 4, 'UC_ZI3P92': 4, 'UC_2F288T': 4,
+      'EXECUTING': 5, 'UC_C670BC': 5, 'UC_I443UQ': 5,
+      'WON': 6,
+    };
+    // Для LOSE/UC_ALOZ6B/UC_W4ML6H: если есть invoice → ранк 6, иначе 4
+    if (stage === 'LOSE' && hasInvoice) return 6;
+    if (['UC_ALOZ6B', 'UC_W4ML6H'].includes(stage) && hasInvoice) return 6;
+    if (stage === 'LOSE') return 4;
+    return KOM_RANK[stage] ?? 4;
+  }
+  
+  // Sale (кат 0)
   if (stage === 'LOSE') {
     if (hasInvoice) return 6;
     if (opp >= MIN_OPP) return 4;
@@ -173,18 +189,18 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       m.na_kvalifikatsii++;
     }
 
-    // === 3. MQL (прошли MQL+, без ушедших в отказ на MQL) ===
-    if (rank >= 4 && !isLost) {
+    // === 3. MQL (прошли MQL+, включая ушедших в отказ после MQL) ===
+    if (rank >= 4) {
       m.mql++;
     }
 
-    // === 4. SQL (прошли SQL+, без ушедших в отказ на SQL) ===
-    if (rank >= 5 && !isLost) {
+    // === 4. SQL (прошли SQL+, включая ушедших в отказ после SQL) ===
+    if (rank >= 5) {
       m.sql++;
     }
 
-    // === 5. Счёт отправлен (PROPOSAL+ с датой счёта, без ушедших в отказ на счёте) ===
-    if (rank >= 6 && hasInvoice && !isLost) {
+    // === 5. Счёт отправлен (PROPOSAL+ с датой счёта, включая ушедших в отказ после) ===
+    if (rank >= 6 && hasInvoice) {
       m.invoice_cnt++;
     }
 
