@@ -236,7 +236,7 @@ function buildFilteredData(orig, filteredWeeks) {
   out.kom_ytd = kom_ytd;
 
   // Форматы — пересчитываем из понедельных
-  var fmtNameMap = { fmt_oom: 'Очный', fmt_om: 'Онлайн', fmt_sdo: 'Видеокурс', fmt_kom: 'Корпоративное обучение' };
+  var fmtNameMap = { fmt_oom: 'Очный', fmt_om: 'Онлайн', fmt_sdo: 'Дистанционный', fmt_kom: 'Корпоративное обучение' };
   var fmt_ytd = {};
   filteredWeeks.forEach(function(w) {
     Object.keys(fmtNameMap).forEach(function(fk) {
@@ -336,7 +336,7 @@ function renderPage(data) {
   // Formats table
   const fmtData = Object.entries(data.fmt_ytd || {}).filter(([k]) => k !== 'period').sort((a,b) => b[1].sum - a[1].sum);
   const totFmt = fmtData.reduce((s, [,v]) => s + v.sum, 0) || 1;
-  const fmtColors = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#00bcd4", "СДО": "#F57C00", "КОМ": "#9C27B0" };
+  const fmtColors = { "Очный": "#2E7D32", "Онлайн": "#1976D2", "Дистанционный": "#F57C00", "Корпоративное обучение": "#9C27B0" };
 
   // Sources (with full analytics)
   const srcTop = data.src_rating || [];
@@ -915,7 +915,7 @@ async function renderPageMainNew(d) {
           if (document.getElementById('ch_funnel_new_qual')) new Chart(document.getElementById('ch_funnel_new_qual'), {type:'bar', data:{labels:labels,datasets:[{label:'MQL',data:weeks.map(function(w){return w.mql||0;}),backgroundColor:'#3079D2',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.sql||0;}),backgroundColor:'#9A7B3F',borderRadius:4},{label:'Оплачено',data:weeks.map(function(w){return w.oplata||0;}),backgroundColor:'#2E7D32',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
           if (document.getElementById('ch_conv_new_qual')) new Chart(document.getElementById('ch_conv_new_qual'), {type:'line', data:{labels:labels,datasets:[{label:'MQL→SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL→Сделки %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
           try {
-          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtShort=function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtShort(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#1976D2','#43A047','#FFD54F','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
+          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtShort=function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtShort(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#2E7D32','#1976D2','#F57C00','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
           // Тип обучения: пончик
           var eduData = d.edu_ytd||{}; var eduFl=[], eduFv=[], eduFsn=[];
           for(var ek in eduData){if(ek==='period')continue;eduFl.push(ek);eduFsn.push(ek);eduFv.push(eduData[ek].sum||0);}

@@ -153,14 +153,14 @@ def detect_format(title, uf_format):
     """Формат: приоритет UF_FORMAT, fallback по названию."""
     fmt_map = {
         '19042467': 'Очный', '19042468': 'Онлайн',
-        '19042469': 'Видеокурс', '19042498': 'Корпоративное обучение',
+        '19042469': 'Дистанционный', '19042498': 'Корпоративное обучение',
         '19042495': 'MMBA', '19042497': 'Вечерний', '19042496': 'ГК',
     }
     if uf_format and str(uf_format) in fmt_map:
         return fmt_map[str(uf_format)]
     t = (title or "").lower()
     if "(сдо)" in t or " сдо" in t or t.endswith("сдо"):
-        return "Видеокурс"
+        return "Дистанционный"
     if "онлайн" in t:
         return "Онлайн"
     if "в г." in t or "москва" in t:
@@ -224,7 +224,7 @@ for x in deals_raw:
         "CAT_ID":    int(x.get("CATEGORY_ID", 0)),
         "SRC":       sources_map.get(x.get("SOURCE_ID") or "", x.get("SOURCE_ID") or "—"),
         "SRC_ID":    x.get("SOURCE_ID", ""),
-        "FORMAT":    (lambda f: "Видеокурс" if str(x.get("ID", "")) in ("321458", "321895") else f)(detect_format(x.get("TITLE", ""), x.get("UF_FORMAT", ""))),
+        "FORMAT":    (lambda f: "Дистанционный" if str(x.get("ID", "")) in ("321458", "321895") else f)(detect_format(x.get("TITLE", ""), x.get("UF_FORMAT", ""))),
         "UF_FORMAT": str(x.get("UF_FORMAT", "")),
         "COMPANY_ID": str(x.get("COMPANY_ID", "0")),
         "BTYPE":     detect_b2b(x),  # передаём всю сделку для COMPANY_ID + CATEGORY_ID
@@ -497,7 +497,7 @@ for r in rows:
                 weekly[wk]["chks"].append(r["OPP"])
             weekly[wk]["oplata"] += 1  # все оплаты (ООМ + КОМ)
             # По форматам
-            fmt_keys = {"Очный": "fmt_oom", "Онлайн": "fmt_om", "Видеокурс": "fmt_sdo", "Корпоративное обучение": "fmt_kom"}
+            fmt_keys = {"Очный": "fmt_oom", "Онлайн": "fmt_om", "Дистанционный": "fmt_sdo", "Корпоративное обучение": "fmt_kom"}
             if r["FORMAT"] in fmt_keys:
                 fk = fmt_keys[r["FORMAT"]]
                 weekly[wk][fk] += r["OPP"]
