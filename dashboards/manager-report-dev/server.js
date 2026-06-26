@@ -172,36 +172,35 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // Условие для воронки: только сделки, созданные в отчётном периоде
-    const inYear = dc && dc.getFullYear() === YEAR;
-    const inPeriodByDc = !isFiltered || (dc >= fromDate && dc <= toDate);
-    const inFunnel = inYear && inPeriodByDc && (!isAutoOrOzk || opp >= MIN_OPP);
+    // Условие для воронки: все сделки, активные в периоде (созданные + переходящие)
+    const inFunnel = (!isAutoOrOzk || opp >= MIN_OPP);
     if (!inFunnel) continue;
 
     const rank = getStageRank(stage, cat, opp, hasInvoice);
     // Без дублирующих WON в КОМ (кат 19) и PreSale (кат 8)
     const isWonDub = stage === 'WON' && (cat === 8 || cat === 19);
 
+    // === Воронка: все активные сделки (созданные + переходящие) ===
+    // Создано (все сделки в периоде, без дублей WON КОМ/PreSale)
     if (!isWonDub) {
-      // === 1. Создано ===
       m.created++;
-
-      // === 2. На квалификации ===
-      if (cat === 8 && sem !== 'S' && sem !== 'F') {
-        m.na_kvalifikatsii++;
-      } else if (cat === 0 && QUAL_STAGES.has(stage)) {
-        m.na_kvalifikatsii++;
-      }
-
-      // === 3. MQL (прошли MQL+, включая ушедших в отказ после MQL) ===
-      if (rank >= 4) m.mql++;
-
-      // === 4. SQL (прошли SQL+, включая ушедших в отказ после SQL) ===
-      if (rank >= 5) m.sql++;
-
-      // === 5. Счёт отправлен (PROPOSAL+ с датой счёта, включая ушедших в отказ после) ===
-      if (rank >= 6 && hasInvoice) m.invoice_cnt++;
     }
+
+    // На квалификации
+    if (cat === 8 && sem !== 'S' && sem !== 'F') {
+      m.na_kvalifikatsii++;
+    } else if (cat === 0 && QUAL_STAGES.has(stage)) {
+      m.na_kvalifikatsii++;
+    }
+
+    // MQL (прошли MQL+, включая ушедших в отказ после MQL)
+    if (rank >= 4) m.mql++;
+
+    // SQL (прошли SQL+, включая ушедших в отказ после SQL)
+    if (rank >= 5) m.sql++;
+
+    // Счёт отправлен (PROPOSAL+ с датой счёта, включая ушедших в отказ после)
+    if (rank >= 6 && hasInvoice) m.invoice_cnt++;
 
     // === 6. Оплачено ===
     const isP = isPaid(d, opp);
