@@ -1099,11 +1099,11 @@ async function loadParticipants() {
       const fmtColor = p.format === 'Онлайн' ? '#1976D2' : '#2E7D32';
       const fmtLabel = p.format === 'Онлайн' ? '<span class="dot" style="background:#1976D2"></span>Онлайн' : '<span class="dot" style="background:#2E7D32"></span>Очно';
       const regionLabel = p.region ? escapeHtml(p.region) : '—';
-      let stageColor = '#2E7D32';
-      if (p.stage === 'Счёт отправлен') stageColor = '#FF9800';
-      else if (p.stage === 'Постоплата') stageColor = '#9C27B0';
-      else if (p.stage === 'Частично оплачен') stageColor = '#2196F3';
-      else if (p.stage === 'WON') stageColor = '#2E7D32';
+      let stageColor = '#2E7D32';  // Счёт оплачен
+      if (p.stage === 'Счёт отправлен') stageColor = '#9C27B0';
+      else if (p.stage === 'Постоплата') stageColor = '#1B5E20';
+      else if (p.stage === 'Частично оплачен') stageColor = '#FF9800';
+      
       html += '<tr' + rowClass + '>' +
         '<td>' + (i + 1) + '</td>' +
         '<td class="tdleft"><b>' + escapeHtml(p.program) + '</b></td>' +
@@ -1188,11 +1188,11 @@ async function loadParticipantsCurrent() {
       const fmtColor = p.format === 'Онлайн' ? '#1976D2' : '#2E7D32';
       const fmtLabel = p.format === 'Онлайн' ? '<span class="dot" style="background:#1976D2"></span>Онлайн' : '<span class="dot" style="background:#2E7D32"></span>Очно';
       const regionLabel = p.region ? escapeHtml(p.region) : '—';
-      let stageColor = '#2E7D32';
-      if (p.stage === 'Счёт отправлен') stageColor = '#FF9800';
-      else if (p.stage === 'Постоплата') stageColor = '#9C27B0';
-      else if (p.stage === 'Частично оплачен') stageColor = '#2196F3';
-      else if (p.stage === 'WON') stageColor = '#2E7D32';
+      let stageColor = '#2E7D32';  // Счёт оплачен
+      if (p.stage === 'Счёт отправлен') stageColor = '#9C27B0';
+      else if (p.stage === 'Постоплата') stageColor = '#1B5E20';
+      else if (p.stage === 'Частично оплачен') stageColor = '#FF9800';
+      
       html += '<tr' + rowClass + '>' +
         '<td>' + (i + 1) + '</td>' +
         '<td class="tdleft"><b>' + escapeHtml(p.program) + '</b></td>' +

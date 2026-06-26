@@ -535,11 +535,11 @@ async function buildParticipants(weekIndex) {
     }
 
     // Стадия для отображения
-    const stageLabel = d.STAGE_ID === 'WON' || d.STAGE_ID === 'C0:WON' ? 'WON'
+    const stageLabel = d.STAGE_ID === 'WON' || d.STAGE_ID === 'C0:WON' ? 'Счёт оплачен'
       : d.STAGE_ID === 'PROPOSAL' || d.STAGE_ID === 'C0:PROPOSAL' ? 'Счёт отправлен'
       : d.STAGE_ID === '2' || d.STAGE_ID === 'C0:2' ? 'Постоплата'
       : d.STAGE_ID === '6' || d.STAGE_ID === 'C0:6' ? 'Частично оплачен'
-      : d.STAGE_SEMANTIC_ID === 'S' ? 'WON'
+      : d.STAGE_SEMANTIC_ID === 'S' ? 'Счёт оплачен'
       : d.STAGE_SEMANTIC_ID === 'F' ? 'LOSE' : 'В работе';
 
     const isPaid = d.STAGE_SEMANTIC_ID === 'S' || d.STAGE_ID === 'WON' || d.STAGE_ID === 'C0:WON';
