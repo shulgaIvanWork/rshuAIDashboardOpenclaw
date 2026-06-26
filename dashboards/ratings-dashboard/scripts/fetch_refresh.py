@@ -2,12 +2,9 @@
 fetch_refresh.py — Выгрузка сделок через Bitrix24 REST API (crm.deal.list).
 
 Загружает сделки категорий 0, 8, 19 за 2025-2026 через вебхук.
+Использует пагинацию через next (без batch — batch не гарантирует
+корректную пагинацию для crm.deal.list).
 Сохраняет deals_NEW.json + deals_2026.json (для совместимости).
-
-Преимущества перед Export API:
-- ✅ Возвращает UF_* поля (UF_DATE_PAY_1C и др.)
-- ✅ Возвращает STAGE_SEMANTIC_ID
-- ✅ Работает через batch до 50 команд за запрос
 """
 import urllib.request, urllib.parse, json, os, sys, time
 sys.path.insert(0, os.path.dirname(__file__))
@@ -16,9 +13,7 @@ import config
 BASE = config.BASE
 CATEGORIES = [0, 8, 19]
 LIMIT = 50
-YEAR = 2026
 
-# Поля, которые нужны для анализа
 SELECT = [
     "ID", "TITLE", "STAGE_ID", "STAGE_SEMANTIC_ID", "CATEGORY_ID",
     "OPPORTUNITY", "CURRENCY_ID", "DATE_CREATE", "DATE_MODIFY",
@@ -32,81 +27,60 @@ SELECT = [
     "UF_CRM_DATE_START_LEARN", "UF_CRM_DATE_END_LEARN",
 ]
 
-def call(method, params=None):
+def call(method, params):
     """Одиночный вызов REST API."""
-    body = urllib.parse.urlencode(params or {}, doseq=True).encode()
+    body = urllib.parse.urlencode(params, doseq=True).encode()
     req = urllib.request.Request(BASE + method + ".json", data=body, method="POST")
     req.timeout = 90
     with urllib.request.urlopen(req, timeout=90) as r:
         return json.loads(r.read().decode())
 
-def call_batch(commands):
-    """Пакетный вызов (до 50 команд)."""
-    params = {'halt': 0}
-    for i, cmd in enumerate(commands):
-        params[f'cmd[{i}]'] = cmd
-    r = call('batch', params)
-    return r.get("result", {}).get("result", [])
-
 
 def fetch_category(cat_id):
-    """Загружает все сделки категории cat_id за YEAR через batch API."""
+    """Загружает все сделки категории cat_id последовательно через next."""
     print(f"\n--- Категория {cat_id} ---")
     all_deals = {}
     start = 0
-    stale = 0
+    page = 0
 
     while True:
-        # Формируем команды batch (до 50 страниц по LIMIT сделок)
-        cmds = []
-        offsets = []
-        for i in range(LIMIT):
-            offset = start + i * LIMIT
-            filters = [
-                f'filter[CATEGORY_ID]={cat_id}',
-                f'filter[>OPPORTUNITY]=0',
-                f'filter[>=DATE_CREATE]={YEAR - 1}-01-01',
-                f'filter[<DATE_CREATE]={YEAR + 1}-01-01',
-                f'start={offset}',
-            ]
-            sel = '&'.join(f'select[{j}]={f}' for j, f in enumerate(SELECT))
-            cmd = f'crm.deal.list?{"&".join(filters)}&{sel}'
-            cmds.append(cmd)
-            offsets.append(offset)
+        params = {
+            'filter[CATEGORY_ID]': cat_id,
+            'filter[>OPPORTUNITY]': 0,
+            'filter[>=DATE_CREATE]': '2025-01-01',
+        }
+        for j, field in enumerate(SELECT):
+            params[f'select[{j}]'] = field
+        if start:
+            params['start'] = start
 
         try:
-            results = call_batch(cmds)
+            resp = call('crm.deal.list', params)
         except Exception as e:
             print(f"  error at start={start}: {e}")
             break
 
-        any_new = False
-        total_pages = 0
-        for idx, res in enumerate(results):
-            items = res if isinstance(res, list) else res.get("result", []) if isinstance(res, dict) else []
-            if not items:
-                continue
-            total_pages += 1
-            before = len(all_deals)
-            for d in items:
-                all_deals[d["ID"]] = d
-            if len(all_deals) > before:
-                any_new = True
+        items = resp.get("result", [])
+        if not items:
+            print(f"  page {page}: empty — done")
+            break
 
-        print(f"  start={start}: {total_pages} pages with data, total={len(all_deals)}")
+        for d in items:
+            all_deals[d["ID"]] = d
 
-        if not any_new:
-            stale += 1
-            if stale >= 2:
-                print(f"  2 пустых batch подряд — стоп")
-                break
+        page += 1
+        if page % 20 == 0:
+            print(f"  page {page}: +{len(items)} => total={len(all_deals)}")
+
+        next_start = resp.get("next")
+        if next_start:
+            start = next_start
         else:
-            stale = 0
+            break
 
-        start += LIMIT * LIMIT  # 50 страниц × 50 сделок = 2500 за batch
-        time.sleep(0.3)
+        time.sleep(0.15)
 
-    print(f"  ✅ {len(all_deals)} сделок")
+    print(f"  ✅ Категория {cat_id}: {len(all_deals)} сделок ({page} страниц)")
     return list(all_deals.values())
 
 
@@ -118,7 +92,7 @@ if __name__ == "__main__":
     all_deals = []
     for cat_id in CATEGORIES:
         deals = fetch_category(cat_id)
-        print(f"  Категория {cat_id}: {len(deals)} сделок")
+        print(f"  Итого категория {cat_id}: {len(deals)} сделок")
         all_deals.extend(deals)
 
     print(f"\n{'='*60}")
@@ -130,9 +104,10 @@ if __name__ == "__main__":
     # Сохраняем как deals_NEW.json (основной файл для аналитики)
     new_path = os.path.join(config.CACHE_DIR, 'deals_NEW.json')
     json.dump(all_deals, open(new_path, 'w', encoding='utf-8'), ensure_ascii=False)
-    print(f"✅ deals_NEW.json — {len(all_deals)} сделок ({os.path.getsize(new_path)/1024/1024:.1f} MB)")
+    size_mb = os.path.getsize(new_path) / 1024 / 1024
+    print(f"✅ deals_NEW.json — {len(all_deals)} сделок ({size_mb:.1f} MB)")
 
-    # Копия как deals_2026.json (для совместимости с другими скриптами)
+    # Копия как deals_2026.json (для совместимости)
     deals_path = os.path.join(config.CACHE_DIR, 'deals_2026.json')
     json.dump(all_deals, open(deals_path, 'w', encoding='utf-8'), ensure_ascii=False)
     print(f"✅ deals_2026.json — сохранён")

@@ -248,11 +248,9 @@ async function loadAll() {
     document.getElementById('loadingFill').style.width = '100%';
     dataCache = d;
     
-    // Устанавливаем dateFrom/dateTo по умолчанию: с первой недели до today
-    var firstWeek = d.weeks && d.weeks[0];
-    if (firstWeek && firstWeek.mon) {
-      document.getElementById('dateFrom').value = firstWeek.mon;
-    }
+    // Устанавливаем dateFrom/dateTo по умолчанию: с 01.01.2026 до today
+    var dateFromDefault = '2026-01-01';
+    document.getElementById('dateFrom').value = dateFromDefault;
     var todayStr = new Date().toISOString().substring(0, 10);
     document.getElementById('dateTo').value = todayStr;
     dateFromCache = document.getElementById('dateFrom').value;
@@ -500,7 +498,7 @@ function renderPage(data) {
     <!-- Sources → улучшенный блок с разделением -->
     <div class="card"><h2>Рейтинг источников поступлений</h2>
       <div class="sub" style="margin:-8px 0 14px">🟠 Входящий трафик · 🔵 Внутренняя база · первая строка — итог</div>
-      <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
+      <div class="scroll-x"><table class="sortable">
         <thead><tr>
           <th class="sort" data-col="0">#</th><th class="sort" data-col="1">Тип</th><th class="sort" data-col="2">Источник</th><th class="sort" data-col="3">📥 Всего</th><th class="sort" data-col="4">✅ Оплачено</th><th class="sort" data-col="5">💰 Поступления, ₽</th><th class="sort" data-col="6">💵 Ср.чек</th><th class="sort" data-col="7">⏱ Цикл,дн</th><th class="sort" data-col="8">📊 Конв.%</th><th class="sort" data-col="9">🔄 В работе</th><th class="sort" data-col="10">❌ Отказы</th>
         </tr></thead>
@@ -532,7 +530,7 @@ function renderPage(data) {
     <!-- Top products (80% revenue) -->
     <div class="card"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2>
       <div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div>
-      <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
+      <div class="scroll-x"><table class="sortable">
         <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">📥 Всего</th><th class="sort" data-col="3">✅ Оплачено</th><th class="sort" data-col="4">💰 Поступления, ₽</th><th class="sort" data-col="5">💵 Ср.чек, ₽</th><th class="sort" data-col="6">⏱ Цикл,дн</th><th class="sort" data-col="7">📊 Конв.%</th><th class="sort" data-col="8">📈 Доля</th></tr></thead>
         <tbody>${(data.top_products || []).map((p, i) => {
           const isRem = (p.name || '').includes('Остальные');
@@ -576,7 +574,8 @@ function renderPage(data) {
 
     <!-- Week detail table -->
     <div class="card"><h2>Детализация по неделям</h2>
-      <div style="max-height:520px;overflow:auto"><table class="sortable">
+      <div class="sub" style="margin:-8px 0 14px">Сводные данные с начала года · первая строка — итог · клик по заголовку для сортировки</div>
+      <div style="overflow-x:auto"><table class="sortable">
         <thead><tr>
           <th class="sort" data-col="0">Неделя</th><th class="sort" data-col="1">📥 Лиды</th><th class="sort" data-col="2">🔍 MQL</th><th class="sort" data-col="3">🎯 SQL</th><th class="sort" data-col="4">📄 Счёт</th><th class="sort" data-col="5">✅ Оплачено</th><th class="sort" data-col="6">💰 Поступления, ₽</th><th class="sort" data-col="7">💵 Ср.чек, ₽</th><th class="sort" data-col="8">⏱ Цикл,дн</th><th class="sort" data-col="9">📊 Лиды→MQL</th><th class="sort" data-col="10">📊 MQL→SQL</th><th class="sort" data-col="11">📊 SQL→Счёт</th><th class="sort" data-col="12">📊 Счёт→Оплата</th>
         </tr></thead>
@@ -730,9 +729,9 @@ async function renderPageMainNew(d) {
     html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
 
     // Топ-20 продуктов
-    html += '<div class="card" style="margin-top:8px"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto;max-height:520px;overflow-y:auto"><div id="newProductsTable"></div></div></div>';
+    html += '<div class="card" style="margin-top:8px"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
     // Источники
-    html += '<div class="card"><h2>Рейтинг источников поступлений</h2><div class="sub" style="margin:-8px 0 14px">Сводные данные с начала года · первая строка — итог · клик по заголовку для сортировки</div><div style="overflow-x:auto;max-height:520px;overflow-y:auto"><div id="newSrcTable"></div></div></div>';
+    html += '<div class="card"><h2>Рейтинг источников поступлений</h2><div class="sub" style="margin:-8px 0 14px">Сводные данные с начала года · первая строка — итог · клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newSrcTable"></div></div></div>';
     html += '<div class="card"><h2>Топ-20 компаний</h2><div id="newCompaniesTable"></div></div>';
 
     areaNew.innerHTML = html;
