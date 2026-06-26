@@ -400,18 +400,18 @@ async function buildParticipants(weekIndex) {
 
   function detectFormat(title, catName, dealId) {
     const ufFmt = dealId && dealsFormat ? dealsFormat[dealId] : null;
-    if (ufFmt === '19042468') return 'ОМ (Онлайн)';
+    if (ufFmt === '19042468' || ufFmt === '19042467') return ufFmt === '19042467' ? 'Очно' : 'Онлайн';
     if (ufFmt === '19042498') return 'КОМ';
     if (KOM_CATS.includes(catName)) return 'КОМ';
     const t = (title || '').toLowerCase();
     if (/(сдо)/.test(t) || t.endsWith('сдо') || / сдо /.test(t)) return 'СДО';
-    if (/онлайн/.test(t) || /дистанц/.test(t)) return 'ОМ (Онлайн)';
+    if (/онлайн/.test(t) || /дистанц/.test(t)) return 'Онлайн';
     const cityMarkers = ['в г.', 'москв', 'тюмен', 'санкт-петербург', 'екатеринбург',
       'новосиб', 'казан', 'краснодар', 'владивосток', 'хабаровск', 'самар', 'перм'];
     for (const m of cityMarkers) {
-      if (t.includes(m)) return 'ООМ (Очное)';
+      if (t.includes(m)) return 'Очно';
     }
-    return 'ОМ (Онлайн)';
+    return 'Онлайн';
   }
 
   const weeks = aggCache.weeks || [];
@@ -482,7 +482,7 @@ async function buildParticipants(weekIndex) {
     // Фильтр по формату
     const catName = cats[String(d.CATEGORY_ID || '0')];
     const fmt = detectFormat(d.TITLE, catName, d.ID);
-    if (fmt !== 'ООМ (Очное)' && fmt !== 'ОМ (Онлайн)') return false;
+    if (fmt !== 'Очно' && fmt !== 'Онлайн') return false;
     // Проверяем сумму: реальные сделки с суммой или учебные
     const opp = parseFloat(d.OPPORTUNITY || 0);
     if (opp > 0) return true;
