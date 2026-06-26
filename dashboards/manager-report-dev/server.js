@@ -172,39 +172,35 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // Условие для воронки: создана в 2026 (для YTD) или активна в периоде
+    // Условие для воронки: только сделки, созданные в отчётном периоде
     const inYear = dc && dc.getFullYear() === YEAR;
-    const inPeriodByDc = !isFiltered || (dc && dc <= toDate); // все созданные ДО конца периода
-    const inFunnel = (!isFiltered ? inYear : inPeriodByDc) && (!isAutoOrOzk || opp >= MIN_OPP);
+    const inPeriodByDc = !isFiltered || (dc >= fromDate && dc <= toDate);
+    const inFunnel = inYear && inPeriodByDc && (!isAutoOrOzk || opp >= MIN_OPP);
     if (!inFunnel) continue;
 
     const rank = getStageRank(stage, cat, opp, hasInvoice);
+    // Без дублирующих WON в КОМ (кат 19) и PreSale (кат 8)
+    const isWonDub = stage === 'WON' && (cat === 8 || cat === 19);
 
-    // === 1. Создано (без дублей WON в КОМ и PreSale) ===
-    if (!(stage === 'WON' && (cat === 8 || cat === 19))) {
+    if (!isWonDub) {
+      // === 1. Создано ===
       m.created++;
-    }
 
-    // === 2. На квалификации ===
-    if (cat === 8 && sem !== 'S' && sem !== 'F') {
-      m.na_kvalifikatsii++;
-    } else if (cat === 0 && QUAL_STAGES.has(stage)) {
-      m.na_kvalifikatsii++;
-    }
+      // === 2. На квалификации ===
+      if (cat === 8 && sem !== 'S' && sem !== 'F') {
+        m.na_kvalifikatsii++;
+      } else if (cat === 0 && QUAL_STAGES.has(stage)) {
+        m.na_kvalifikatsii++;
+      }
 
-    // === 3. MQL (прошли MQL+, включая ушедших в отказ после MQL) ===
-    if (rank >= 4) {
-      m.mql++;
-    }
+      // === 3. MQL (прошли MQL+, включая ушедших в отказ после MQL) ===
+      if (rank >= 4) m.mql++;
 
-    // === 4. SQL (прошли SQL+, включая ушедших в отказ после SQL) ===
-    if (rank >= 5) {
-      m.sql++;
-    }
+      // === 4. SQL (прошли SQL+, включая ушедших в отказ после SQL) ===
+      if (rank >= 5) m.sql++;
 
-    // === 5. Счёт отправлен (PROPOSAL+ с датой счёта, включая ушедших в отказ после) ===
-    if (rank >= 6 && hasInvoice) {
-      m.invoice_cnt++;
+      // === 5. Счёт отправлен (PROPOSAL+ с датой счёта, включая ушедших в отказ после) ===
+      if (rank >= 6 && hasInvoice) m.invoice_cnt++;
     }
 
     // === 6. Оплачено ===
