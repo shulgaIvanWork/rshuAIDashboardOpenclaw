@@ -1075,7 +1075,8 @@ async function loadParticipants() {
       return;
     }
     const title = document.getElementById('participantsTitle');
-    title.textContent = '👥 Участники Очно / Онлайн за ' + res.weekLabel + ' · всего ' + res.total + ' сделок';
+    var m = res.weekLabel.match(/W(\d+) \((.*?)\)/); var weekName = m ? m[1] + ' неделю (' + m[2] + ')' : res.weekLabel;
+    title.textContent = '👥 Участники Очно / Онлайн за ' + weekName + ' · всего ' + res.total + ' сделок';
     
     let html = '<table class="sortable" id="participantsTable"><thead><tr>' +
       '<th class="sort" data-col="0">#</th>' +
@@ -1163,7 +1164,8 @@ async function loadParticipantsCurrent() {
       return;
     }
     const title = document.getElementById('participantsCurTitle');
-    title.textContent = '👥 Участники Очно / Онлайн за ' + res.weekLabel + ' · всего ' + res.total + ' сделок';
+    var m = res.weekLabel.match(/W(\d+) \((.*?)\)/); var weekName = m ? m[1] + ' неделю (' + m[2] + ')' : res.weekLabel;
+    title.textContent = '👥 Участники Очно / Онлайн за ' + weekName + ' · всего ' + res.total + ' сделок';
     
     let html = '<table class="sortable" id="participantsCurTable"><thead><tr>' +
       '<th class="sort" data-col="0">#</th>' +
