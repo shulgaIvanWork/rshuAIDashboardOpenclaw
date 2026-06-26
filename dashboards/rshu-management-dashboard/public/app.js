@@ -235,15 +235,18 @@ function buildFilteredData(orig, filteredWeeks) {
   kom_ytd.conv_deal_pct = (komPay + kom_ytd.lose_cnt) > 0 ? (komPay / (komPay + kom_ytd.lose_cnt)) * 100 : 0;
   out.kom_ytd = kom_ytd;
 
-  // Форматы — пересчитываем из понедельных сумм
+  // Форматы — пересчитываем из понедельных
+  var fmtNameMap = { fmt_oom: 'Очный', fmt_om: 'Онлайн', fmt_sdo: 'Видеокурс', fmt_kom: 'Корпоративное обучение' };
   var fmt_ytd = {};
   filteredWeeks.forEach(function(w) {
-    ['fmt_oom','fmt_om','fmt_sdo','fmt_kom'].forEach(function(f) {
-      if (!fmt_ytd[f]) fmt_ytd[f] = { cnt: 0, sum: 0 };
-      fmt_ytd[f].sum += w[f] || 0;
+    Object.keys(fmtNameMap).forEach(function(fk) {
+      var name = fmtNameMap[fk];
+      if (!fmt_ytd[name]) fmt_ytd[name] = { cnt: 0, sum: 0 };
+      fmt_ytd[name].sum += w[fk] || 0;
+      fmt_ytd[name].cnt += w[fk + '_cnt'] || 0;
     });
   });
-  out.fmt_ytd = fmt_ytd;
+  out.fmt_ytd = Object.assign({ period: 'YTD' }, fmt_ytd);
 
   // B2B/B2C — пересчитываем из понедельных
   var btype = { B2B: { cnt: 0, sum: 0 }, B2C: { cnt: 0, sum: 0 } };
@@ -256,35 +259,45 @@ function buildFilteredData(orig, filteredWeeks) {
   out.btype_ytd = Object.assign({ period: 'YTD' }, btype);
 
   // Источники (внутренняя база vs маркетинг) — пересчитываем из понедельных
-  var srcIt = { cnt: 0, sum: 0 }, srcMk = { cnt: 0, sum: 0 };
-  filteredWeeks.forEach(function(w) {
-    srcIt.cnt += w.src_internal_cnt || 0;
-    srcIt.sum += w.src_internal_sum || 0;
-    srcMk.cnt += w.src_mkt_cnt || 0;
-    srcMk.sum += w.src_mkt_sum || 0;
-  });
+  var srcIt = { cnt: sumField('src_internal_cnt'), sum: sumField('src_internal_sum') };
+  var srcMk = { cnt: sumField('src_mkt_cnt'), sum: sumField('src_mkt_sum') };
   out.src_split_ytd = { period: 'YTD', internal: srcIt, marketing: srcMk };
 
+  // Регистрация — пересчитываем из понедельных (только те поля, что есть в неделях)
+  var regData = JSON.parse(JSON.stringify(orig.reg_data || {}));
+  if (Object.keys(regData).length > 0) {
+    var regTotal = sumField('reg_total');
+    var regPaid = sumField('reg_paid');
+    var regPaidSum = sumField('reg_paid_sum');
+    var regSql = sumField('reg_sql');
+    var regInv = sumField('reg_invoice');
+    var regLose = sumField('reg_lose');
+    regData.total = regTotal;
+    regData.paid = regPaid;
+    regData.total_paid = regPaid;
+    regData.total_paid_sum = regPaidSum;
+    regData.sql = regSql;
+    regData.invoice = regInv;
+    regData.lose = regLose;
+    regData.avg_check = regPaid > 0 ? Math.round(regPaidSum / regPaid) : 0;
+    regData.conv = regTotal > 0 ? (regPaid / regTotal * 100).toFixed(1) : '0.0';
+    regData.conv = parseFloat(regData.conv);
+    regData.lose_pct = regTotal > 0 ? (regLose / regTotal * 100).toFixed(1) : '0.0';
+    regData.lose_pct = parseFloat(regData.lose_pct);
+  }
+  out.reg_data = regData;
+
   // Тип обучения — пересчитываем из понедельных
-  var edu_ytd = {};
-  filteredWeeks.forEach(function(w) {
-    ['pk','pp','ko'].forEach(function(k) {
-      var cnt = w['edu_' + k + '_cnt'] || 0;
-      var sum = w['edu_' + k + '_sum'] || 0;
-      if (cnt > 0 || sum > 0) {
-        if (!edu_ytd[k]) edu_ytd[k] = { cnt: 0, sum: 0 };
-        edu_ytd[k].cnt += cnt;
-        edu_ytd[k].sum += sum;
-      }
-    });
-  });
-  // Преобразуем ключи обратно в читаемые названия
   var eduNameMap = { pk: 'Повышение квалификации', pp: 'Проф. переподготовка', ko: 'Корпоративное обучение' };
-  var eduOut = {};
-  Object.keys(edu_ytd).forEach(function(k) {
-    eduOut[eduNameMap[k] || k] = edu_ytd[k];
+  var edu_ytd = {};
+  Object.keys(eduNameMap).forEach(function(nk) {
+    var name = eduNameMap[nk];
+    var cnt = sumField('edu_' + nk + '_cnt');
+    var sum = sumField('edu_' + nk + '_sum');
+    if (cnt > 0 || sum > 0) edu_ytd[name] = { cnt: cnt, sum: sum };
+    else edu_ytd[name] = { cnt: 0, sum: 0 };
   });
-  out.edu_ytd = Object.assign({ period: 'YTD' }, eduOut);
+  out.edu_ytd = Object.assign({ period: 'YTD' }, edu_ytd);
 
   return out;
 }
