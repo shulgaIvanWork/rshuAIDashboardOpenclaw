@@ -232,9 +232,10 @@ function buildFilteredData(orig, filteredWeeks) {
       var name = fmtKeyMap[f];
       if (!fmt_ytd[name]) fmt_ytd[name] = { cnt: 0, sum: 0 };
       fmt_ytd[name].sum += w[f] || 0;
+      fmt_ytd[name].cnt += w[f + '_cnt'] || 0;
     });
   });
-  out.fmt_ytd = fmt_ytd;
+  out.fmt_ytd = Object.assign({ period: 'YTD' }, fmt_ytd);
 
   // B2B/B2C — пересчитываем из понедельных
   var btype = { B2B: { cnt: 0, sum: 0 }, B2C: { cnt: 0, sum: 0 } };
@@ -247,35 +248,31 @@ function buildFilteredData(orig, filteredWeeks) {
   out.btype_ytd = Object.assign({ period: 'YTD' }, btype);
 
   // Источники (внутренняя база vs маркетинг) — пересчитываем из понедельных
-  var srcIt = { cnt: 0, sum: 0 }, srcMk = { cnt: 0, sum: 0 };
-  filteredWeeks.forEach(function(w) {
-    srcIt.cnt += w.src_internal_cnt || 0;
-    srcIt.sum += w.src_internal_sum || 0;
-    srcMk.cnt += w.src_mkt_cnt || 0;
-    srcMk.sum += w.src_mkt_sum || 0;
-  });
+  var srcIt = { cnt: sumField('src_internal_cnt'), sum: sumField('src_internal_sum') };
+  var srcMk = { cnt: sumField('src_mkt_cnt'), sum: sumField('src_mkt_sum') };
   out.src_split_ytd = { period: 'YTD', internal: srcIt, marketing: srcMk };
 
+  // Регистрация — готовые данные из calc_reg_funnel, без пересчёта через недели
+  var regData = JSON.parse(JSON.stringify(orig.reg_ytd || {}));
+  if (Object.keys(regData).length > 0) {
+    // Поля уже заполнены calc_reg_funnel, используем как есть
+    regData.avg_check = regData.total_paid > 0 ? Math.round(regData.total_paid_sum / regData.total_paid) : 0;
+    regData.conv = regData.total > 0 ? parseFloat((regData.total_paid / regData.total * 100).toFixed(1)) : 0;
+    regData.lose_pct = regData.total > 0 ? parseFloat((regData.lose / regData.total * 100).toFixed(1)) : 0;
+  }
+  out.reg_ytd = regData;
+
   // Тип обучения — пересчитываем из понедельных
-  var edu_ytd = {};
-  filteredWeeks.forEach(function(w) {
-    ['pk','pp','ko'].forEach(function(k) {
-      var cnt = w['edu_' + k + '_cnt'] || 0;
-      var sum = w['edu_' + k + '_sum'] || 0;
-      if (cnt > 0 || sum > 0) {
-        if (!edu_ytd[k]) edu_ytd[k] = { cnt: 0, sum: 0 };
-        edu_ytd[k].cnt += cnt;
-        edu_ytd[k].sum += sum;
-      }
-    });
-  });
-  // Преобразуем ключи обратно в читаемые названия
   var eduNameMap = { pk: 'Повышение квалификации', pp: 'Проф. переподготовка', ko: 'Корпоративное обучение' };
-  var eduOut = {};
-  Object.keys(edu_ytd).forEach(function(k) {
-    eduOut[eduNameMap[k] || k] = edu_ytd[k];
+  var edu_ytd = {};
+  Object.keys(eduNameMap).forEach(function(nk) {
+    var name = eduNameMap[nk];
+    var cnt = sumField('edu_' + nk + '_cnt');
+    var sum = sumField('edu_' + nk + '_sum');
+    if (cnt > 0 || sum > 0) edu_ytd[name] = { cnt: cnt, sum: sum };
+    else edu_ytd[name] = { cnt: 0, sum: 0 };
   });
-  out.edu_ytd = Object.assign({ period: 'YTD' }, eduOut);
+  out.edu_ytd = Object.assign({ period: 'YTD' }, edu_ytd);
 
   return out;
 }
@@ -290,6 +287,301 @@ function fmtPct(n) {
   return Number(n).toFixed(1);
 }
 
+function renderPage(data) {
+  const area = document.getElementById('contentArea');
+  const ytd = data.ytd;
+  const prev = data.prev;
+  const cur = data.cur;
+  const kom = data.kom_ytd;
+  const kom_prev = data.kom_prev;
+  const kom_cur = data.kom_cur;
+  const weeks = data.weeks || [];
+  const last = weeks[weeks.length - 1] || {};
+  const prevWeek = weeks[weeks.length - 2] || {};
+  const pw = data.prev_week;
+  const cw = data.cur_week;
+
+  const delta = prevWeek.postupleniya ? ((last.postupleniya - prevWeek.postupleniya) / prevWeek.postupleniya * 100) : 0;
+
+  // B2B/B2C table
+  const b2b = data.btype_ytd?.B2B || { cnt: 0, sum: 0 };
+  const b2c = data.btype_ytd?.B2C || { cnt: 0, sum: 0 };
+  const b2b_prev = data.btype_prev?.B2B || { cnt: 0, sum: 0 };
+  const b2c_prev = data.btype_prev?.B2C || { cnt: 0, sum: 0 };
+  const totB2b = b2b.sum + b2c.sum || 1;
+  const b2b_cur = data.btype_cur?.B2B || { cnt: 0, sum: 0 };
+  const b2c_cur = data.btype_cur?.B2C || { cnt: 0, sum: 0 };
+  const totCur = b2b_cur.sum + b2c_cur.sum || 1;
+
+  function b2bRow(period, b, c, tot) {
+    return `<tr><td>${period}</td>
+      <td><span class="dot" style="background:#3079D2"></span>B2B</td>
+      <td>${b.cnt}</td><td><b>${fmt(b.sum)}</b> ₽</td><td>${(b.sum/tot*100).toFixed(1)}%</td></tr>
+      <tr><td></td>
+      <td><span class="dot" style="background:#F57C00"></span>B2C</td>
+      <td>${c.cnt}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${(c.sum/tot*100).toFixed(1)}%</td></tr>`;
+  }
+
+  // Formats table
+  const fmtData = Object.entries(data.fmt_ytd || {}).filter(([k]) => k !== 'period').sort((a,b) => b[1].sum - a[1].sum);
+  const totFmt = fmtData.reduce((s, [,v]) => s + v.sum, 0) || 1;
+  const fmtColors = { "Очный": "#2E7D32", "Онлайн": "#1976D2", "Дистанционный": "#F57C00", "Корпоративное обучение": "#9C27B0" };
+
+  // Sources (with full analytics)
+  const srcTop = data.src_rating || [];
+
+  // КОМ table
+  function komRow(label, a, b, c, money=true, suf='') {
+    function f(v) {
+      if (money) return fmt(v) + ' ₽';
+      if (typeof v === 'number' && !Number.isInteger(v)) return v.toFixed(1) + suf;
+      return fmt(v) + suf;
+    }
+    return `<tr><td>${label}</td><td>${f(a)}</td><td>${f(b)}</td><td>${f(c)}</td></tr>`;
+  }
+
+  area.innerHTML = `
+    <div id="kpiContainer">
+      <!-- ========== Ряд 1: ОБЩАЯ (ООМ + КОМ) ========== -->
+      <div style="margin:0 0 4px"><span style="font-size:15px;font-weight:700;color:#1f2a44">ОБЩАЯ (ООМ + КОМ)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
+      <div class="kpis">
+        <div class="kpi"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(ytd.postupleniya)} ₽</div><div class="sub">${ytd.won_relevant_cnt} сделок</div></div>
+        <div class="kpi"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.qual_lead_ytd)}</b> · конв. ${data.qual_lead_ytd && data.leads_ytd ? (data.qual_lead_ytd/data.leads_ytd*100).toFixed(1) : 0}%</div></div>
+        <div class="kpi"><div class="lbl">📈 Конверсия YTD</div><div class="val">${ytd.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
+        <div class="kpi"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(ytd.avg_check)} ₽</div><div class="sub">медиана ${fmt(ytd.median_check)} ₽</div></div>
+        <div class="kpi"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${ytd.avg_close_days_won.toFixed(1)}</div><div class="sub">ср.взв. ${(ytd.avg_close_days_won_weighted || ytd.avg_close_days_won).toFixed(1)} · мед. ${ytd.median_close_days_won} дн.</div></div>
+        <div class="kpi"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(cur.postupleniya)} ₽</div><div class="sub">${cur.won_relevant_cnt} сд.</div></div>
+        <div class="kpi"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.leads_cur)}</div><div class="sub">${data.leads_prev > 0 ? ((data.leads_cur - data.leads_prev) > 0 ? '🟩' : (data.leads_cur - data.leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.leads_cur - data.leads_prev) / data.leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
+      </div>
+
+      <!-- ========== Ряд 2: ООМ ========== -->
+      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#00bcd4">Открытое обучение (очное, онлайн и видеокурсы)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
+      <div class="kpis">
+        <div class="kpi oom"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(oom_ytd.postupleniya)} ₽</div><div class="sub">${oom_ytd.won_relevant_cnt} сделок</div></div>
+        <div class="kpi oom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.oom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.oom_qual_lead_ytd)}</b> · конв. ${data.oom_qual_lead_ytd && data.oom_leads_ytd ? (data.oom_qual_lead_ytd/data.oom_leads_ytd*100).toFixed(1) : 0}%</div></div>
+        <div class="kpi oom"><div class="lbl">📈 Конверсия YTD</div><div class="val">${oom_ytd.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
+        <div class="kpi oom"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(oom_ytd.avg_check)} ₽</div><div class="sub">медиана ${fmt(oom_ytd.median_check)} ₽</div></div>
+        <div class="kpi oom"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${oom_ytd.avg_close_days_won.toFixed(1)}</div><div class="sub">ср.взв. ${(oom_ytd.avg_close_days_won_weighted || oom_ytd.avg_close_days_won).toFixed(1)} · мед. ${oom_ytd.median_close_days_won} дн.</div></div>
+        <div class="kpi oom"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(oom_cur.postupleniya)} ₽</div><div class="sub">${oom_cur.won_relevant_cnt} сд.</div></div>
+        <div class="kpi oom"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.oom_leads_cur)}</div><div class="sub">${data.oom_leads_prev > 0 ? ((data.oom_leads_cur - data.oom_leads_prev) > 0 ? '🟩' : (data.oom_leads_cur - data.oom_leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.oom_leads_cur - data.oom_leads_prev) / data.oom_leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
+      </div>
+
+      <!-- ========== Ряд 3: КОМ ========== -->
+      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#9C27B0">Корпоративное обучение (КОМ)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
+      <div class="kpis">
+        <div class="kpi kom"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(kom.postupleniya)} ₽</div><div class="sub">${kom.won_relevant_cnt} сделок</div></div>
+        <div class="kpi kom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.kom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.kom_qual_lead_ytd)}</b></div></div>
+        <div class="kpi kom"><div class="lbl">📈 Конверсия YTD</div><div class="val">${kom.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
+        <div class="kpi kom"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(kom.avg_check)} ₽</div><div class="sub">макс ${fmt(kom.max_check)} ₽</div></div>
+        <div class="kpi kom"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${kom.avg_close_days_won.toFixed(1)}</div><div class="sub">медиана ${kom.median_close_days_won} дн.</div></div>
+        <div class="kpi kom"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(kom_cur.postupleniya)} ₽</div><div class="sub">${kom_cur.won_relevant_cnt} сд.</div></div>
+        <div class="kpi kom"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.kom_leads_cur)}</div><div class="sub">${data.kom_leads_prev > 0 ? ((data.kom_leads_cur - data.kom_leads_prev) > 0 ? '🟩' : (data.kom_leads_cur - data.kom_leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.kom_leads_cur - data.kom_leads_prev) / data.kom_leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
+      </div>
+    </div>
+
+    <!-- Funnel -->
+    <div class="card"><h2>Воронка MQL → SQL → Сделки по неделям</h2>
+      <div class="sub" style="margin:-8px 0 16px">MQL = новые в Pre Sale. SQL = WON в Pre Sale (передано в ОП). Сделки = оплачено по 1С.</div>
+      <div class="twocol">
+      <div class="card"><h2>📥 Воронка продаж</h2><div class="sub" style="margin:-8px 0 16px">Все лиды → MQL → SQL → Счёт → Оплачено</div><div class="chartbox-sm"><canvas id="ch_funnel"></canvas></div></div>
+      <div class="card"><h2>🔍 Воронка (квал. лиды)</h2><div class="sub" style="margin:-8px 0 16px">MQL → SQL → Счёт → Оплачено</div><div class="chartbox-sm"><canvas id="ch_funnel_qual"></canvas></div></div>
+    </div>
+    <div class="twocol">
+      <div class="card"><h2>📈 Конверсии воронки, %</h2><div class="chartbox-sm"><canvas id="ch_conv"></canvas></div></div>
+      <div class="card"><h2>📈 Конверсии (квал. лиды), %</h2><div class="chartbox-sm"><canvas id="ch_conv_qual"></canvas></div></div>
+    </div>
+    <div class="twocol">
+      <div class="card"><h2>📊 Поступления по неделям, ₽</h2><div class="chartbox"><canvas id="ch_pos"></canvas></div></div>
+
+    <!-- B2B + Formats -->
+    <div class="twocol">
+      <div class="card"><h2>B2B vs B2C · Оплаты vs Отказы</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="chartbox-sm"><canvas id="ch_b2b"></canvas></div>
+          <div class="chartbox-sm"><canvas id="ch_wl"></canvas></div>
+        </div>
+        <table style="margin-top:14px"><thead><tr><th>Период</th><th>Тип</th><th>Сделок</th><th>Поступления, ₽</th><th>Доля</th></tr></thead>
+        <tbody>${b2bRow('YTD', b2b, b2c, totB2b)}${b2bRow(`W${cw}`, b2b_cur, b2c_cur, totCur)}</tbody></table>
+      </div>
+      <div class="card"><h2>Форматы обучения понедельно</h2>
+        <div class="chartbox"><canvas id="ch_fmt"></canvas></div>
+        <div style="margin-top:14px"><table><thead><tr><th>Формат</th><th>Сделок</th><th>Поступления, ₽</th><th>Доля</th></tr></thead>
+        <tbody>${fmtData.map(([k, v]) =>
+          `<tr><td><span class="dot" style="background:${fmtColors[k] || '#999'}"></span>${k}</td><td>${v.cnt}</td><td><b>${fmt(v.sum)}</b> ₽</td><td>${(v.sum/totFmt*100).toFixed(1)}%</td></tr>`
+        ).join('')}</tbody></table></div>
+      </div>
+    </div>
+
+    <!-- Sources → улучшенный блок с разделением -->
+    <div class="card"><h2>Рейтинг источников поступлений</h2>
+      <div class="sub" style="margin:-8px 0 14px">🟠 Входящий трафик · 🔵 Внутренняя база · первая строка - итог</div>
+      <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
+        <thead><tr>
+          <th class="sort" data-col="0">#</th><th class="sort" data-col="1">Тип</th><th class="sort" data-col="2">Источник</th><th class="sort" data-col="3">📥 Всего</th><th class="sort" data-col="4">✅ Оплачено</th><th class="sort" data-col="5">💰 Поступления в периоде, ₽</th><th class="sort" data-col="6">💵 Ср.чек</th><th class="sort" data-col="7">⏱ Цикл,дн</th><th class="sort" data-col="8">📊 Конв.%</th><th class="sort" data-col="9">🔄 В работе</th><th class="sort" data-col="10">❌ Отказы</th>
+        </tr></thead>
+        <tbody>${srcTop.map((s, i) => {
+          const isTotal = i === 0;
+          var srcName = (s.name || '').toLowerCase();
+          var isInternal = ['аккаунтинг','repeat','upsale','реанимаци','холодн','accounting'].some(function(kw){return srcName.includes(kw);});
+          var typeColor = isTotal ? '' : (isInternal ? '#3079D2' : '#F57C00');
+          var typeLabel = isTotal ? '' : (isInternal ? '🔵' : '🟠');
+          var inWork = s.leads - s.deals - 0;
+          var losses = 0;
+          return `<tr${isTotal ? " style='background:#F1F3F6;font-weight:700'" : ""}>
+            <td>${isTotal ? '' : i}</td>
+            <td>${typeLabel ? '<span style="color:'+typeColor+'">'+typeLabel+'</span>' : ''}</td>
+            <td>${s.name || '-'}</td>
+            <td>${s.leads}</td>
+            <td><b>${s.deals}</b></td>
+            <td><b>${fmt(s.postupleniya)}</b> ₽</td>
+            <td>${fmt(s.avg_check)}</td>
+            <td>${s.avg_won_days.toFixed(1)}</td>
+            <td>${s.conv_lead_deals.toFixed(1)}%</td>
+            <td>${Math.max(0, inWork)}</td>
+            <td>0</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>
+
+    <!-- Top products (80% revenue) -->
+    <div class="card"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#475569;font-weight:400">без КОМ · по доле в поступлениях</span></h2>
+      <div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div>
+      <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
+        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">📥 Всего</th><th class="sort" data-col="3">✅ Оплачено</th><th class="sort" data-col="4">💰 Поступления в периоде, ₽</th><th class="sort" data-col="5">💵 Ср.чек, ₽</th><th class="sort" data-col="6">⏱ Цикл,дн</th><th class="sort" data-col="7">📊 Конв.%</th><th class="sort" data-col="8">📈 Доля</th></tr></thead>
+        <tbody>${(data.top_products || []).map((p, i) => {
+          const isRem = (p.name || '').includes('Остальные');
+          var conv = p.sql > 0 ? (p.deals / p.sql * 100) : 0;
+          return `<tr${isRem ? " style='background:#F1F3F6;font-weight:700'" : ""}>
+            <td>${isRem ? '' : i+1}</td>
+            <td style='max-width:260px;white-space:normal'>${(p.name || '').substring(0, 100)}</td>
+            <td>${p.sql}</td>
+            <td><b>${p.deals}</b></td>
+            <td><b>${fmt(p.sum)}</b> ₽</td>
+            <td>${fmt(p.avg_check)}</td>
+            <td>${p.avg_won_days.toFixed(1)}</td>
+            <td>${conv.toFixed(1)}%</td>
+            <td><b>${p.share.toFixed(1)}%</b></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>
+
+    <!-- Top companies -->
+    <div class="card"><h2>ТОП-20 компаний по поступлениям</h2>
+      <div class="scroll-x" style="max-height:400px;overflow:auto"><table class="sortable">
+        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления в периоде, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📅 Последняя покупка</th></tr></thead>
+        <tbody>${(data.top_companies || []).map((c, i) =>
+          `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${c.name || '-'}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${c.last_date || '-'}</td></tr>`
+        ).join('')}</tbody>
+      </table></div>
+    </div>
+
+    <!-- Managers -->
+    <div class="card"><h2>Менеджеры YTD <span style="font-size:13px;color:#475569;font-weight:400">(основная воронка · лиды из CRM)</span></h2>
+      <div class="scroll-x"><table class="sortable">
+        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Менеджер</th><th class="sort" data-col="2">Лидов CRM</th><th class="sort" data-col="3">WON</th><th class="sort" data-col="4">Проигр</th><th class="sort" data-col="5">Конв.%</th><th class="sort" data-col="6">Ср. чек, ₽</th><th class="sort" data-col="7">Поступления, ₽</th></tr></thead>
+        <tbody>${(data.mgr_top || []).filter(m => m.leads > 0).map((m, i) =>
+          `<tr><td>${i+1}</td><td>${m.name}</td><td>${m.leads}</td><td>${m.won}</td><td>${m.lost}</td><td>${m.conv_pct}%</td><td>${fmt(m.avg_check)} ₽</td><td><b>${fmt(m.postupleniya)}</b> ₽</td></tr>`
+        ).join('')}</tbody>
+      </table></div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="twocol">
+      <div class="card"><h2>Кол-во сделок: Оплаты vs Отказы</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
+      <div class="card"><h2>Средний чек по неделям, ₽</h2><div class="chartbox"><canvas id="ch_avg"></canvas></div></div>
+    </div>
+
+    <div class="twocol">
+      <div class="card"><h2>Скорость закрытия WON, дн.</h2><div class="chartbox"><canvas id="ch_dur"></canvas></div></div>
+      <div class="card"><h2>Скорость Pre Sale (MQL→SQL), дн.</h2><div class="chartbox"><canvas id="ch_presale"></canvas></div></div>
+    </div>
+
+    <!-- Week detail table -->
+    <div class="card"><h2>Детализация по неделям</h2>
+      <div style="max-height:520px;overflow:auto"><table class="sortable">
+        <thead><tr>
+          <th class="sort" data-col="0">Неделя</th><th class="sort" data-col="1">📥 Лиды</th><th class="sort" data-col="2">🔍 MQL</th><th class="sort" data-col="3">🎯 SQL</th><th class="sort" data-col="4">📄 Счёт</th><th class="sort" data-col="5">✅ Оплачено</th><th class="sort" data-col="6">💰 Поступления в периоде, ₽</th><th class="sort" data-col="7">💵 Ср.чек, ₽</th><th class="sort" data-col="8">⏱ Цикл,дн</th><th class="sort" data-col="9">📊 Лиды→MQL</th><th class="sort" data-col="10">📊 MQL→SQL</th><th class="sort" data-col="11">📊 SQL→Счёт</th><th class="sort" data-col="12">📊 Счёт→Оплата</th>
+        </tr></thead>
+        <tbody>${(() => {
+          const total = weeks.reduce((a, w) => {
+            a.mql += w.mql; a.sql += w.sql; a.invoice_cnt += w.invoice_cnt || 0; a.oplata += w.oplata;
+            a.postupleniya += w.postupleniya; a.leads += w.leads;
+            a.lost_cnt += w.lost_cnt;
+            return a;
+          }, { mql:0, sql:0, invoice_cnt:0, oplata:0, postupleniya:0, leads:0, lost_cnt:0 });
+          const totAvg = total.oplata ? fmt(total.postupleniya / total.oplata) : '0';
+          const totLm = total.leads ? (total.mql / total.leads * 100).toFixed(1) : '0.0';
+          const totMs = total.mql ? (total.sql / total.mql * 100).toFixed(1) : '0.0';
+          const totSi = total.sql ? (total.invoice_cnt / total.sql * 100).toFixed(1) : '0.0';
+          const totIo = total.invoice_cnt ? (total.oplata / total.invoice_cnt * 100).toFixed(1) : '0.0';
+          const totalRow =
+            `<tr class="total-row" style="background:#F1F3F6;font-weight:700">
+              <td><b>📊 ИТОГО YTD</b></td>
+              <td>${total.leads}</td>
+              <td>${total.mql}</td>
+              <td>${total.sql}</td>
+              <td><b>${total.invoice_cnt}</b></td>
+              <td><b>${total.oplata}</b></td>
+              <td><b>${fmt(total.postupleniya)}</b></td>
+              <td>${totAvg}</td>
+              <td>-</td>
+              <td>${totLm}%</td>
+              <td>${totMs}%</td>
+              <td>${totSi}%</td>
+              <td>${totIo}%</td>
+            </tr>`;
+          return totalRow + weeks.map(w => renderWeekRow(w, w === last)).join('');
+        })()}</tbody>
+      </table></div>
+    </div>
+
+
+  <!-- Инсайты и рекомендации -->
+  <div class="card" style="background:linear-gradient(135deg,#f8f9ff,#eef1f8)">
+    <h2>📋 Ключевые выводы</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">
+      <div>
+        <b>📊 Общая картина YTD:</b>
+        <ul style="margin:6px 0 0 18px;color:#444">
+          <li>Поступления: <b>${fmt(ytd.postupleniya)} ₽</b> (${ytd.won_relevant_cnt} сделок)</li>
+          <li>Средний чек: <b>${fmt(ytd.avg_check)} ₽</b></li>
+          <li>Цикл сделки: простой <b>${ytd.avg_close_days_won.toFixed(1)} дн.</b> · взвешенный <b>${(ytd.avg_close_days_won_weighted || ytd.avg_close_days_won).toFixed(1)} дн.</b></li>
+          <li>Лидов: <b>${fmt(data.leads_ytd)}</b> · MQL <b>${fmt(data.qual_lead_ytd)}</b> · конв. ${data.qual_lead_ytd && data.leads_ytd ? (data.qual_lead_ytd/data.leads_ytd*100).toFixed(1) : 0}%</li>
+        </ul>
+      </div>
+      <div>
+        <b>📈 Неделя W${cw}:</b>
+        <ul style="margin:6px 0 0 18px;color:#444">
+          <li>Поступления: <b>${fmt(last.postupleniya)} ₽</b> ${delta > 0 ? '📈 +' : '📉 '}${Math.abs(delta).toFixed(1)}% к прошлой</li>
+          <li>Сделок: <b>${last.won_cnt}</b></li>
+          <li>Лидов: <b>${fmt(data.leads_cur)}</b> (прошлая: ${fmt(data.leads_prev)})</li>
+        </ul>
+      </div>
+      <div>
+        <b>🏆 Лидеры:</b>
+        <ul style="margin:6px 0 0 18px;color:#444">
+          <li>Источник: <b>${srcTop.length > 1 ? srcTop[1].name : '-'}</b> (${fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)} ₽)</li>
+          <li>Формат: <b>${fmtData.length > 0 ? fmtData[0][0] : '-'}</b> (${fmtData.length > 0 ? fmt(fmtData[0][1].sum) : 0} ₽)</li>
+          <li>${data.mgr_top && data.mgr_top.length > 0 ? 'Менеджер: <b>' + data.mgr_top[0].name + '</b> (' + fmt(data.mgr_top[0].postupleniya) + ' ₽)' : ''}</li>
+        </ul>
+      </div>
+      <div>
+        <b>💡 Рекомендации:</b>
+        <ul style="margin:6px 0 0 18px;color:#444">
+          ${delta > 5 ? '<li>🚦 <b style="color:#2E7D32">🟢 Рост</b> поступлений +' + Math.abs(delta).toFixed(1) + '% к прошлой неделе</li>' : delta < -5 ? '<li>🚦 <b style="color:#C62828">🔴 Падение</b> поступлений ' + delta.toFixed(1) + '% к прошлой неделе</li>' : '<li>🚦 <b style="color:#F57C00">🟡 Стабильно</b> поступлений</li>'}
+          ${last.won_cnt === 0 && last.postupleniya === 0 ? '<li>⚠️ Текущая неделя без оплат - возможна задержка 1С</li>' : ''}
+          ${(srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка - поработать с качеством лидов</li>' : ''}
+          ${ytd.median_close_days_won > 60 ? '<li>⏱ Медленная скорость закрытия (' + ytd.median_close_days_won + ' дн. медиана) - ускорить обработку</li>' : '<li>⏱ Скорость закрытия: ' + ytd.median_close_days_won + ' дн. (медиана) ✅</li>'}
+          <li>📌 Средняя скорость закрытия: ${ytd.median_close_days_won} дн. (медиана)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  `;
+  initTableSort();
+}
 
 // === Сортировка таблиц (как в Excel) ===
 function initTableSort() {
@@ -584,7 +876,7 @@ async function renderPageMainNew(d) {
           if (document.getElementById('ch_funnel_new_qual')) new Chart(document.getElementById('ch_funnel_new_qual'), {type:'bar', data:{labels:labels,datasets:[{label:'MQL',data:weeks.map(function(w){return w.mql||0;}),backgroundColor:'#3079D2',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.sql||0;}),backgroundColor:'#9A7B3F',borderRadius:4},{label:'Оплачено',data:weeks.map(function(w){return w.oplata||0;}),backgroundColor:'#2E7D32',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
           if (document.getElementById('ch_conv_new_qual')) new Chart(document.getElementById('ch_conv_new_qual'), {type:'line', data:{labels:labels,datasets:[{label:'MQL→SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL→Сделки %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
           try {
-          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtShort=function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtShort(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#1976D2','#43A047','#FFD54F','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
+          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtShort=function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtShort(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#2E7D32','#1976D2','#F57C00','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
           // Тип обучения: пончик
           var eduData = d.edu_ytd||{}; var eduFl=[], eduFv=[], eduFsn=[];
           for(var ek in eduData){if(ek==='period')continue;eduFl.push(ek);eduFsn.push(ek);eduFv.push(eduData[ek].sum||0);}
