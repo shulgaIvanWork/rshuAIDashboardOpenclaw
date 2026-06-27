@@ -342,7 +342,6 @@ function detectMbaType(title) {
 export async function analyze(onProgress) {
   const emit = (msg) => {
     if (onProgress) onProgress(msg);
-    process.stdout.write(`###PROGRESS:${JSON.stringify(msg)}\n`);
   };
 
   emit({ type: 'step_start', idx: 0 });

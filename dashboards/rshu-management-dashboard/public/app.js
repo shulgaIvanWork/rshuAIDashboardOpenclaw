@@ -1,38 +1,42 @@
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-function loadArtifacts(){
-  fetch(window.BASE_PATH+'/api/artifacts').then(function(r){return r.json();}).then(function(d){
-    var el=document.getElementById('newArtifactsBlock');
-    if(!el)return;
-    var s=d&&d.summary;
-    if(!s||(!s.returns.cnt&&!s.inProgressPaid.cnt&&!s.wonNoPay.cnt&&!s.negativeDuration.cnt&&!s.otherCatPaid.cnt&&!s.nextYear.cnt&&(!s.formatRule2||!s.formatRule2.cnt)&&(!s.oldActive||!s.oldActive.cnt)&&(!s.mmbaDeals||!s.mmbaDeals.cnt)&&(!s.noTypeEdu||!s.noTypeEdu.cnt)&&(!s.autopayDeals||!s.autopayDeals.cnt))){
-      el.innerHTML='<div style="padding:8px;color:#475569;font-size:12px">Аномалий не обнаружено</div>';return;
-    }
-    var h='<div style="font-size:12px;background:#F1F3F6;border-radius:8px;padding:12px;margin:8px 0">';
-    h+='<b>⚠ Аномалии данных</b><table style="width:100%;margin-top:8px;font-size:12px;border-collapse:collapse">';
-    if(s.returns.cnt) h+='<tr><td>🔙 Возвраты (LOSE+PAY)</td><td style="text-align:right">'+s.returns.cnt+' шт.</td><td style="text-align:right;color:#C62828">'+fmt(s.returns.sum)+' ₽</td></tr>';
-    if(s.inProgressPaid.cnt) h+='<tr><td>📌 В работе + оплата</td><td style="text-align:right">'+s.inProgressPaid.cnt+' шт.</td><td style="text-align:right;color:#E65100">'+fmt(s.inProgressPaid.sum)+' ₽</td></tr>';
-    if(s.wonNoPay.cnt) h+='<tr><td>✅ WON без даты оплаты</td><td style="text-align:right">'+s.wonNoPay.cnt+' шт.</td><td style="text-align:right;color:#1565C0">'+fmt(s.wonNoPay.sum)+' ₽</td></tr>';
-    if(s.negativeDuration.cnt) h+='<tr><td>⏪ Оплата раньше создания</td><td style="text-align:right">'+s.negativeDuration.cnt+' шт.</td><td style="text-align:right;color:#6A1B9A">'+fmt(s.negativeDuration.sum)+' ₽</td></tr>';
-    if(s.otherCatPaid.cnt) h+='<tr><td>📂 Др.категории с оплатой</td><td style="text-align:right">'+s.otherCatPaid.cnt+' шт.</td><td style="text-align:right">'+fmt(s.otherCatPaid.sum)+' ₽</td></tr>';
-    if(s.nextYear.cnt) h+='<tr><td>📅 «Следующий год»</td><td style="text-align:right">'+s.nextYear.cnt+' шт.</td><td style="text-align:right">0 ₽</td></tr>';
-    if(s.formatRule2.cnt) h+='<tr><td>🏷 Формат без UF_FORMAT</td><td style="text-align:right">'+s.formatRule2.cnt+' шт.</td><td style="text-align:right;color:#FF8A65">'+fmt(s.formatRule2.sum)+' ₽</td></tr>';
-    if(s.oldActive && s.oldActive.cnt) h+='<tr><td>⏳ Старые сделки Sale в работе</td><td style="text-align:right">'+s.oldActive.cnt+' шт.</td><td style="text-align:right;color:#E65100">'+fmt(s.oldActive.sum)+' ₽</td></tr>';
-    if(s.mmbaDeals && s.mmbaDeals.cnt) h+='<tr><td>📋 MMBA→СДО (Личная эффективность)</td><td style="text-align:right">'+s.mmbaDeals.cnt+' шт.</td><td style="text-align:right;color:#9C27B0">'+fmt(s.mmbaDeals.sum)+' ₽</td></tr>';
-    if(s.noTypeEdu && s.noTypeEdu.cnt) h+='<tr><td>📝 Без типа обучения</td><td style="text-align:right">'+s.noTypeEdu.cnt+' шт.</td><td style="text-align:right;color:#00bcd4">'+fmt(s.noTypeEdu.sum)+' ₽</td></tr>';
-    if(s.autopayDeals && s.autopayDeals.cnt) h+='<tr><td>🔄 Автооплаты (без даты счёта)</td><td style="text-align:right">'+s.autopayDeals.cnt+' шт.</td><td style="text-align:right;color:#3079D2">'+fmt(s.autopayDeals.sum)+' ₽</td></tr>';
-    h+='</table></div>';
-    el.innerHTML=h;
-  }).catch(function(){});
-}
 
+function loadArtifacts() {
+  fetch((window.BASE_PATH || '') + '/api/artifacts').then(function(r) {
+    if (r.status === 403) return null;
+    return r.json();
+  }).then(function(d) {
+    var el = document.getElementById('newArtifactsBlock');
+    if (!el || !d) return;
+    var s = d.summary || {};
+    var hasAny = s.returns?.cnt || s.inProgressPaid?.cnt || s.wonNoPay?.cnt || s.negativeDuration?.cnt ||
+      s.otherCatPaid?.cnt || s.nextYear?.cnt || s.formatRule2?.cnt || s.oldActive?.cnt ||
+      s.mmbaDeals?.cnt || s.noTypeEdu?.cnt || s.autopayDeals?.cnt;
+    if (!hasAny) {
+      el.innerHTML = '<div style="padding:8px;color:#475569;font-size:12px">Аномалий не обнаружено ✅</div>';
+      return;
+    }
+    var h = '<div style="font-size:12px;background:#F1F3F6;border-radius:8px;padding:12px;margin:8px 0">';
+    h += '<b>⚠ Аномалии данных</b><table style="width:100%;margin-top:8px;font-size:12px;border-collapse:collapse">';
+    if (s.returns?.cnt)        h += '<tr><td>🔙 Возвраты (LOSE+PAY)</td><td style="text-align:right">'+s.returns.cnt+' шт.</td><td style="text-align:right;color:#C62828">'+fmt(s.returns.sum)+' ₽</td></tr>';
+    if (s.inProgressPaid?.cnt) h += '<tr><td>📌 В работе + оплата</td><td style="text-align:right">'+s.inProgressPaid.cnt+' шт.</td><td style="text-align:right;color:#E65100">'+fmt(s.inProgressPaid.sum)+' ₽</td></tr>';
+    if (s.wonNoPay?.cnt)       h += '<tr><td>✅ WON без даты оплаты</td><td style="text-align:right">'+s.wonNoPay.cnt+' шт.</td><td style="text-align:right;color:#1565C0">'+fmt(s.wonNoPay.sum)+' ₽</td></tr>';
+    if (s.negativeDuration?.cnt) h += '<tr><td>⏪ Оплата раньше создания</td><td style="text-align:right">'+s.negativeDuration.cnt+' шт.</td><td style="text-align:right;color:#6A1B9A">'+fmt(s.negativeDuration.sum)+' ₽</td></tr>';
+    if (s.otherCatPaid?.cnt)   h += '<tr><td>📂 Др. категории с оплатой</td><td style="text-align:right">'+s.otherCatPaid.cnt+' шт.</td><td style="text-align:right">'+fmt(s.otherCatPaid.sum)+' ₽</td></tr>';
+    if (s.nextYear?.cnt)       h += '<tr><td>📅 «Следующий год»</td><td style="text-align:right">'+s.nextYear.cnt+' шт.</td><td style="text-align:right">'+fmt(s.nextYear.sum)+' ₽</td></tr>';
+    if (s.formatRule2?.cnt)    h += '<tr><td>🏷 Формат без UF_FORMAT</td><td style="text-align:right">'+s.formatRule2.cnt+' шт.</td><td style="text-align:right;color:#FF8A65">'+fmt(s.formatRule2.sum)+' ₽</td></tr>';
+    if (s.oldActive?.cnt)      h += '<tr><td>⏳ Старые сделки Sale в работе</td><td style="text-align:right">'+s.oldActive.cnt+' шт.</td><td style="text-align:right;color:#E65100">'+fmt(s.oldActive.sum)+' ₽</td></tr>';
+    if (s.mmbaDeals?.cnt)      h += '<tr><td>📋 MMBA→СДО</td><td style="text-align:right">'+s.mmbaDeals.cnt+' шт.</td><td style="text-align:right;color:#9C27B0">'+fmt(s.mmbaDeals.sum)+' ₽</td></tr>';
+    if (s.noTypeEdu?.cnt)      h += '<tr><td>📝 Без типа обучения</td><td style="text-align:right">'+s.noTypeEdu.cnt+' шт.</td><td style="text-align:right;color:#00bcd4">'+fmt(s.noTypeEdu.sum)+' ₽</td></tr>';
+    if (s.autopayDeals?.cnt)   h += '<tr><td>🔄 Автооплаты (без даты счёта)</td><td style="text-align:right">'+s.autopayDeals.cnt+' шт.</td><td style="text-align:right;color:#3079D2">'+fmt(s.autopayDeals.sum)+' ₽</td></tr>';
+    h += '</table></div>';
+    el.innerHTML = h;
+  }).catch(function() {});
+}
 
 // Автоопределение пути - работает и самостоятельным сайтом, и как sub-app
 var _p = window.location.pathname;
 var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
 window.BASE_PATH = _m ? '/' + _m[1] : '';
-
-let userRole = 'guest';
-
 
 // Защита от падения, если CDN с Chart.js не загрузился
 if (typeof Chart !== 'undefined' && Chart.register && typeof ChartDataLabels !== 'undefined') {
@@ -77,22 +81,11 @@ async function api(path) {
 }
 
 async function loadAll() {
-  // Fetch user role first
-  try {
-    var u = await safeFetch((window.BASE_PATH || '') + '/api/user');
-    if (u && u.role) userRole = u.role;
-  } catch(e) {}
-
-  // Create refresh button only for admins
-  if (userRole === 'admin') {
-    initRefreshButton();
-  }
-
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
 
   try {
-    const d = await api('/api/data/new');
+    const d = await api('/api/data');
     if (!d || !d.ytd) return;
     var _lf=document.getElementById('loadingFill');if(_lf)_lf.style.width='100%';
     dataCache = d;
@@ -102,11 +95,9 @@ async function loadAll() {
     if (dateEl && d._loadedAt) {
       var dt = new Date(d._loadedAt);
       var dtStr = dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-      dateEl.textContent = '(Данные на: ' + dtStr + ' MSK)';
+      dateEl.textContent = '(Данные на: ' + dtStr + ')';
     }
 
-    // Устанавливаем dateFrom/dateTo по умолчанию: с первой недели до today
-    // По умолчанию: с 1 января текущего года
     document.getElementById('dateFrom').value = '2026-01-01';
     var todayStr = new Date().toISOString().substring(0, 10);
     document.getElementById('dateTo').value = todayStr;
@@ -114,11 +105,9 @@ async function loadAll() {
     dateToCache = document.getElementById('dateTo').value;
 
     renderFilteredData();
-
-    
   } catch (e) {
     console.error('loadAll error:', e);
-    if (areaNew) areaNew.innerHTML = '<div class="error-state">❌ Ошибка загрузки: '+escapeHtml(e.message)+'<br>Нажмите «🔄 Обновить данные»</div>';
+    if (areaNew) areaNew.innerHTML = '<div class="error-state">❌ Ошибка загрузки: '+escapeHtml(e.message)+'</div>';
   }
 }
 
@@ -236,11 +225,13 @@ function buildFilteredData(orig, filteredWeeks) {
   out.kom_ytd = kom_ytd;
 
   // Форматы — пересчитываем из понедельных сумм
+  var fmtKeyMap = { fmt_oom: 'ООМ (Очное)', fmt_om: 'ОМ (Онлайн)', fmt_sdo: 'СДО', fmt_kom: 'КОМ' };
   var fmt_ytd = {};
   filteredWeeks.forEach(function(w) {
-    ['fmt_oom','fmt_om','fmt_sdo','fmt_kom'].forEach(function(f) {
-      if (!fmt_ytd[f]) fmt_ytd[f] = { cnt: 0, sum: 0 };
-      fmt_ytd[f].sum += w[f] || 0;
+    Object.keys(fmtKeyMap).forEach(function(f) {
+      var name = fmtKeyMap[f];
+      if (!fmt_ytd[name]) fmt_ytd[name] = { cnt: 0, sum: 0 };
+      fmt_ytd[name].sum += w[f] || 0;
     });
   });
   out.fmt_ytd = fmt_ytd;
@@ -299,301 +290,6 @@ function fmtPct(n) {
   return Number(n).toFixed(1);
 }
 
-function renderPage(data) {
-  const area = document.getElementById('contentArea');
-  const ytd = data.ytd;
-  const prev = data.prev;
-  const cur = data.cur;
-  const kom = data.kom_ytd;
-  const kom_prev = data.kom_prev;
-  const kom_cur = data.kom_cur;
-  const weeks = data.weeks || [];
-  const last = weeks[weeks.length - 1] || {};
-  const prevWeek = weeks[weeks.length - 2] || {};
-  const pw = data.prev_week;
-  const cw = data.cur_week;
-
-  const delta = prevWeek.postupleniya ? ((last.postupleniya - prevWeek.postupleniya) / prevWeek.postupleniya * 100) : 0;
-
-  // B2B/B2C table
-  const b2b = data.btype_ytd?.B2B || { cnt: 0, sum: 0 };
-  const b2c = data.btype_ytd?.B2C || { cnt: 0, sum: 0 };
-  const b2b_prev = data.btype_prev?.B2B || { cnt: 0, sum: 0 };
-  const b2c_prev = data.btype_prev?.B2C || { cnt: 0, sum: 0 };
-  const totB2b = b2b.sum + b2c.sum || 1;
-  const b2b_cur = data.btype_cur?.B2B || { cnt: 0, sum: 0 };
-  const b2c_cur = data.btype_cur?.B2C || { cnt: 0, sum: 0 };
-  const totCur = b2b_cur.sum + b2c_cur.sum || 1;
-
-  function b2bRow(period, b, c, tot) {
-    return `<tr><td>${period}</td>
-      <td><span class="dot" style="background:#3079D2"></span>B2B</td>
-      <td>${b.cnt}</td><td><b>${fmt(b.sum)}</b> ₽</td><td>${(b.sum/tot*100).toFixed(1)}%</td></tr>
-      <tr><td></td>
-      <td><span class="dot" style="background:#F57C00"></span>B2C</td>
-      <td>${c.cnt}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${(c.sum/tot*100).toFixed(1)}%</td></tr>`;
-  }
-
-  // Formats table
-  const fmtData = Object.entries(data.fmt_ytd || {}).filter(([k]) => k !== 'period').sort((a,b) => b[1].sum - a[1].sum);
-  const totFmt = fmtData.reduce((s, [,v]) => s + v.sum, 0) || 1;
-  const fmtColors = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#00bcd4", "СДО": "#F57C00", "КОМ": "#9C27B0" };
-
-  // Sources (with full analytics)
-  const srcTop = data.src_rating || [];
-
-  // КОМ table
-  function komRow(label, a, b, c, money=true, suf='') {
-    function f(v) {
-      if (money) return fmt(v) + ' ₽';
-      if (typeof v === 'number' && !Number.isInteger(v)) return v.toFixed(1) + suf;
-      return fmt(v) + suf;
-    }
-    return `<tr><td>${label}</td><td>${f(a)}</td><td>${f(b)}</td><td>${f(c)}</td></tr>`;
-  }
-
-  area.innerHTML = `
-    <div id="kpiContainer">
-      <!-- ========== Ряд 1: ОБЩАЯ (ООМ + КОМ) ========== -->
-      <div style="margin:0 0 4px"><span style="font-size:15px;font-weight:700;color:#1f2a44">ОБЩАЯ (ООМ + КОМ)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
-      <div class="kpis">
-        <div class="kpi"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(ytd.postupleniya)} ₽</div><div class="sub">${ytd.won_relevant_cnt} сделок</div></div>
-        <div class="kpi"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.qual_lead_ytd)}</b> · конв. ${data.qual_lead_ytd && data.leads_ytd ? (data.qual_lead_ytd/data.leads_ytd*100).toFixed(1) : 0}%</div></div>
-        <div class="kpi"><div class="lbl">📈 Конверсия YTD</div><div class="val">${ytd.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
-        <div class="kpi"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(ytd.avg_check)} ₽</div><div class="sub">медиана ${fmt(ytd.median_check)} ₽</div></div>
-        <div class="kpi"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${ytd.avg_close_days_won.toFixed(1)}</div><div class="sub">ср.взв. ${(ytd.avg_close_days_won_weighted || ytd.avg_close_days_won).toFixed(1)} · мед. ${ytd.median_close_days_won} дн.</div></div>
-        <div class="kpi"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(cur.postupleniya)} ₽</div><div class="sub">${cur.won_relevant_cnt} сд.</div></div>
-        <div class="kpi"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.leads_cur)}</div><div class="sub">${data.leads_prev > 0 ? ((data.leads_cur - data.leads_prev) > 0 ? '🟩' : (data.leads_cur - data.leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.leads_cur - data.leads_prev) / data.leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
-      </div>
-
-      <!-- ========== Ряд 2: ООМ ========== -->
-      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#00bcd4">Открытое обучение (очное, онлайн и видеокурсы)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
-      <div class="kpis">
-        <div class="kpi oom"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(oom_ytd.postupleniya)} ₽</div><div class="sub">${oom_ytd.won_relevant_cnt} сделок</div></div>
-        <div class="kpi oom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.oom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.oom_qual_lead_ytd)}</b> · конв. ${data.oom_qual_lead_ytd && data.oom_leads_ytd ? (data.oom_qual_lead_ytd/data.oom_leads_ytd*100).toFixed(1) : 0}%</div></div>
-        <div class="kpi oom"><div class="lbl">📈 Конверсия YTD</div><div class="val">${oom_ytd.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
-        <div class="kpi oom"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(oom_ytd.avg_check)} ₽</div><div class="sub">медиана ${fmt(oom_ytd.median_check)} ₽</div></div>
-        <div class="kpi oom"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${oom_ytd.avg_close_days_won.toFixed(1)}</div><div class="sub">ср.взв. ${(oom_ytd.avg_close_days_won_weighted || oom_ytd.avg_close_days_won).toFixed(1)} · мед. ${oom_ytd.median_close_days_won} дн.</div></div>
-        <div class="kpi oom"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(oom_cur.postupleniya)} ₽</div><div class="sub">${oom_cur.won_relevant_cnt} сд.</div></div>
-        <div class="kpi oom"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.oom_leads_cur)}</div><div class="sub">${data.oom_leads_prev > 0 ? ((data.oom_leads_cur - data.oom_leads_prev) > 0 ? '🟩' : (data.oom_leads_cur - data.oom_leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.oom_leads_cur - data.oom_leads_prev) / data.oom_leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
-      </div>
-
-      <!-- ========== Ряд 3: КОМ ========== -->
-      <div style="margin:12px 0 4px"><span style="font-size:15px;font-weight:700;color:#9C27B0">Корпоративное обучение (КОМ)</span> <span style="font-size:11px;color:#888">· ${data.cur_week_label}</span></div>
-      <div class="kpis">
-        <div class="kpi kom"><div class="lbl">📊 Поступления YTD</div><div class="val">${fmt(kom.postupleniya)} ₽</div><div class="sub">${kom.won_relevant_cnt} сделок</div></div>
-        <div class="kpi kom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.kom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.kom_qual_lead_ytd)}</b></div></div>
-        <div class="kpi kom"><div class="lbl">📈 Конверсия YTD</div><div class="val">${kom.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
-        <div class="kpi kom"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(kom.avg_check)} ₽</div><div class="sub">макс ${fmt(kom.max_check)} ₽</div></div>
-        <div class="kpi kom"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${kom.avg_close_days_won.toFixed(1)}</div><div class="sub">медиана ${kom.median_close_days_won} дн.</div></div>
-        <div class="kpi kom"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(kom_cur.postupleniya)} ₽</div><div class="sub">${kom_cur.won_relevant_cnt} сд.</div></div>
-        <div class="kpi kom"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.kom_leads_cur)}</div><div class="sub">${data.kom_leads_prev > 0 ? ((data.kom_leads_cur - data.kom_leads_prev) > 0 ? '🟩' : (data.kom_leads_cur - data.kom_leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.kom_leads_cur - data.kom_leads_prev) / data.kom_leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
-      </div>
-    </div>
-
-    <!-- Funnel -->
-    <div class="card"><h2>Воронка MQL → SQL → Сделки по неделям</h2>
-      <div class="sub" style="margin:-8px 0 16px">MQL = новые в Pre Sale. SQL = WON в Pre Sale (передано в ОП). Сделки = оплачено по 1С.</div>
-      <div class="twocol">
-      <div class="card"><h2>📥 Воронка продаж</h2><div class="sub" style="margin:-8px 0 16px">Все лиды → MQL → SQL → Счёт → Оплачено</div><div class="chartbox-sm"><canvas id="ch_funnel"></canvas></div></div>
-      <div class="card"><h2>🔍 Воронка (квал. лиды)</h2><div class="sub" style="margin:-8px 0 16px">MQL → SQL → Счёт → Оплачено</div><div class="chartbox-sm"><canvas id="ch_funnel_qual"></canvas></div></div>
-    </div>
-    <div class="twocol">
-      <div class="card"><h2>📈 Конверсии воронки, %</h2><div class="chartbox-sm"><canvas id="ch_conv"></canvas></div></div>
-      <div class="card"><h2>📈 Конверсии (квал. лиды), %</h2><div class="chartbox-sm"><canvas id="ch_conv_qual"></canvas></div></div>
-    </div>
-    <div class="twocol">
-      <div class="card"><h2>📊 Поступления по неделям, ₽</h2><div class="chartbox"><canvas id="ch_pos"></canvas></div></div>
-
-    <!-- B2B + Formats -->
-    <div class="twocol">
-      <div class="card"><h2>B2B vs B2C · Оплаты vs Отказы</h2>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div class="chartbox-sm"><canvas id="ch_b2b"></canvas></div>
-          <div class="chartbox-sm"><canvas id="ch_wl"></canvas></div>
-        </div>
-        <table style="margin-top:14px"><thead><tr><th>Период</th><th>Тип</th><th>Сделок</th><th>Поступления, ₽</th><th>Доля</th></tr></thead>
-        <tbody>${b2bRow('YTD', b2b, b2c, totB2b)}${b2bRow(`W${cw}`, b2b_cur, b2c_cur, totCur)}</tbody></table>
-      </div>
-      <div class="card"><h2>Форматы обучения понедельно</h2>
-        <div class="chartbox"><canvas id="ch_fmt"></canvas></div>
-        <div style="margin-top:14px"><table><thead><tr><th>Формат</th><th>Сделок</th><th>Поступления, ₽</th><th>Доля</th></tr></thead>
-        <tbody>${fmtData.map(([k, v]) =>
-          `<tr><td><span class="dot" style="background:${fmtColors[k] || '#999'}"></span>${k}</td><td>${v.cnt}</td><td><b>${fmt(v.sum)}</b> ₽</td><td>${(v.sum/totFmt*100).toFixed(1)}%</td></tr>`
-        ).join('')}</tbody></table></div>
-      </div>
-    </div>
-
-    <!-- Sources → улучшенный блок с разделением -->
-    <div class="card"><h2>Рейтинг источников поступлений</h2>
-      <div class="sub" style="margin:-8px 0 14px">🟠 Входящий трафик · 🔵 Внутренняя база · первая строка - итог</div>
-      <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
-        <thead><tr>
-          <th class="sort" data-col="0">#</th><th class="sort" data-col="1">Тип</th><th class="sort" data-col="2">Источник</th><th class="sort" data-col="3">📥 Всего</th><th class="sort" data-col="4">✅ Оплачено</th><th class="sort" data-col="5">💰 Поступления в периоде, ₽</th><th class="sort" data-col="6">💵 Ср.чек</th><th class="sort" data-col="7">⏱ Цикл,дн</th><th class="sort" data-col="8">📊 Конв.%</th><th class="sort" data-col="9">🔄 В работе</th><th class="sort" data-col="10">❌ Отказы</th>
-        </tr></thead>
-        <tbody>${srcTop.map((s, i) => {
-          const isTotal = i === 0;
-          var srcName = (s.name || '').toLowerCase();
-          var isInternal = ['аккаунтинг','repeat','upsale','реанимаци','холодн','accounting'].some(function(kw){return srcName.includes(kw);});
-          var typeColor = isTotal ? '' : (isInternal ? '#3079D2' : '#F57C00');
-          var typeLabel = isTotal ? '' : (isInternal ? '🔵' : '🟠');
-          var inWork = s.leads - s.deals - 0;
-          var losses = 0;
-          return `<tr${isTotal ? " style='background:#F1F3F6;font-weight:700'" : ""}>
-            <td>${isTotal ? '' : i}</td>
-            <td>${typeLabel ? '<span style="color:'+typeColor+'">'+typeLabel+'</span>' : ''}</td>
-            <td>${s.name || '-'}</td>
-            <td>${s.leads}</td>
-            <td><b>${s.deals}</b></td>
-            <td><b>${fmt(s.postupleniya)}</b> ₽</td>
-            <td>${fmt(s.avg_check)}</td>
-            <td>${s.avg_won_days.toFixed(1)}</td>
-            <td>${s.conv_lead_deals.toFixed(1)}%</td>
-            <td>${Math.max(0, inWork)}</td>
-            <td>0</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>
-
-    <!-- Top products (80% revenue) -->
-    <div class="card"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#475569;font-weight:400">без КОМ · по доле в поступлениях</span></h2>
-      <div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div>
-      <div class="scroll-x" style="max-height:520px;overflow:auto"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">📥 Всего</th><th class="sort" data-col="3">✅ Оплачено</th><th class="sort" data-col="4">💰 Поступления в периоде, ₽</th><th class="sort" data-col="5">💵 Ср.чек, ₽</th><th class="sort" data-col="6">⏱ Цикл,дн</th><th class="sort" data-col="7">📊 Конв.%</th><th class="sort" data-col="8">📈 Доля</th></tr></thead>
-        <tbody>${(data.top_products || []).map((p, i) => {
-          const isRem = (p.name || '').includes('Остальные');
-          var conv = p.sql > 0 ? (p.deals / p.sql * 100) : 0;
-          return `<tr${isRem ? " style='background:#F1F3F6;font-weight:700'" : ""}>
-            <td>${isRem ? '' : i+1}</td>
-            <td style='max-width:260px;white-space:normal'>${(p.name || '').substring(0, 100)}</td>
-            <td>${p.sql}</td>
-            <td><b>${p.deals}</b></td>
-            <td><b>${fmt(p.sum)}</b> ₽</td>
-            <td>${fmt(p.avg_check)}</td>
-            <td>${p.avg_won_days.toFixed(1)}</td>
-            <td>${conv.toFixed(1)}%</td>
-            <td><b>${p.share.toFixed(1)}%</b></td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table></div>
-    </div>
-
-    <!-- Top companies -->
-    <div class="card"><h2>ТОП-20 компаний по поступлениям</h2>
-      <div class="scroll-x" style="max-height:400px;overflow:auto"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления в периоде, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📅 Последняя покупка</th></tr></thead>
-        <tbody>${(data.top_companies || []).map((c, i) =>
-          `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${c.name || '-'}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${c.last_date || '-'}</td></tr>`
-        ).join('')}</tbody>
-      </table></div>
-    </div>
-
-    <!-- Managers -->
-    <div class="card"><h2>Менеджеры YTD <span style="font-size:13px;color:#475569;font-weight:400">(основная воронка · лиды из CRM)</span></h2>
-      <div class="scroll-x"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Менеджер</th><th class="sort" data-col="2">Лидов CRM</th><th class="sort" data-col="3">WON</th><th class="sort" data-col="4">Проигр</th><th class="sort" data-col="5">Конв.%</th><th class="sort" data-col="6">Ср. чек, ₽</th><th class="sort" data-col="7">Поступления, ₽</th></tr></thead>
-        <tbody>${(data.mgr_top || []).filter(m => m.leads > 0).map((m, i) =>
-          `<tr><td>${i+1}</td><td>${m.name}</td><td>${m.leads}</td><td>${m.won}</td><td>${m.lost}</td><td>${m.conv_pct}%</td><td>${fmt(m.avg_check)} ₽</td><td><b>${fmt(m.postupleniya)}</b> ₽</td></tr>`
-        ).join('')}</tbody>
-      </table></div>
-    </div>
-
-    <!-- Charts row -->
-    <div class="twocol">
-      <div class="card"><h2>Кол-во сделок: Оплаты vs Отказы</h2><div class="chartbox"><canvas id="ch_cnt"></canvas></div></div>
-      <div class="card"><h2>Средний чек по неделям, ₽</h2><div class="chartbox"><canvas id="ch_avg"></canvas></div></div>
-    </div>
-
-    <div class="twocol">
-      <div class="card"><h2>Скорость закрытия WON, дн.</h2><div class="chartbox"><canvas id="ch_dur"></canvas></div></div>
-      <div class="card"><h2>Скорость Pre Sale (MQL→SQL), дн.</h2><div class="chartbox"><canvas id="ch_presale"></canvas></div></div>
-    </div>
-
-    <!-- Week detail table -->
-    <div class="card"><h2>Детализация по неделям</h2>
-      <div style="max-height:520px;overflow:auto"><table class="sortable">
-        <thead><tr>
-          <th class="sort" data-col="0">Неделя</th><th class="sort" data-col="1">📥 Лиды</th><th class="sort" data-col="2">🔍 MQL</th><th class="sort" data-col="3">🎯 SQL</th><th class="sort" data-col="4">📄 Счёт</th><th class="sort" data-col="5">✅ Оплачено</th><th class="sort" data-col="6">💰 Поступления в периоде, ₽</th><th class="sort" data-col="7">💵 Ср.чек, ₽</th><th class="sort" data-col="8">⏱ Цикл,дн</th><th class="sort" data-col="9">📊 Лиды→MQL</th><th class="sort" data-col="10">📊 MQL→SQL</th><th class="sort" data-col="11">📊 SQL→Счёт</th><th class="sort" data-col="12">📊 Счёт→Оплата</th>
-        </tr></thead>
-        <tbody>${(() => {
-          const total = weeks.reduce((a, w) => {
-            a.mql += w.mql; a.sql += w.sql; a.invoice_cnt += w.invoice_cnt || 0; a.oplata += w.oplata;
-            a.postupleniya += w.postupleniya; a.leads += w.leads;
-            a.lost_cnt += w.lost_cnt;
-            return a;
-          }, { mql:0, sql:0, invoice_cnt:0, oplata:0, postupleniya:0, leads:0, lost_cnt:0 });
-          const totAvg = total.oplata ? fmt(total.postupleniya / total.oplata) : '0';
-          const totLm = total.leads ? (total.mql / total.leads * 100).toFixed(1) : '0.0';
-          const totMs = total.mql ? (total.sql / total.mql * 100).toFixed(1) : '0.0';
-          const totSi = total.sql ? (total.invoice_cnt / total.sql * 100).toFixed(1) : '0.0';
-          const totIo = total.invoice_cnt ? (total.oplata / total.invoice_cnt * 100).toFixed(1) : '0.0';
-          const totalRow =
-            `<tr class="total-row" style="background:#F1F3F6;font-weight:700">
-              <td><b>📊 ИТОГО YTD</b></td>
-              <td>${total.leads}</td>
-              <td>${total.mql}</td>
-              <td>${total.sql}</td>
-              <td><b>${total.invoice_cnt}</b></td>
-              <td><b>${total.oplata}</b></td>
-              <td><b>${fmt(total.postupleniya)}</b></td>
-              <td>${totAvg}</td>
-              <td>-</td>
-              <td>${totLm}%</td>
-              <td>${totMs}%</td>
-              <td>${totSi}%</td>
-              <td>${totIo}%</td>
-            </tr>`;
-          return totalRow + weeks.map(w => renderWeekRow(w, w === last)).join('');
-        })()}</tbody>
-      </table></div>
-    </div>
-
-
-  <!-- Инсайты и рекомендации -->
-  <div class="card" style="background:linear-gradient(135deg,#f8f9ff,#eef1f8)">
-    <h2>📋 Ключевые выводы</h2>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">
-      <div>
-        <b>📊 Общая картина YTD:</b>
-        <ul style="margin:6px 0 0 18px;color:#444">
-          <li>Поступления: <b>${fmt(ytd.postupleniya)} ₽</b> (${ytd.won_relevant_cnt} сделок)</li>
-          <li>Средний чек: <b>${fmt(ytd.avg_check)} ₽</b></li>
-          <li>Цикл сделки: простой <b>${ytd.avg_close_days_won.toFixed(1)} дн.</b> · взвешенный <b>${(ytd.avg_close_days_won_weighted || ytd.avg_close_days_won).toFixed(1)} дн.</b></li>
-          <li>Лидов: <b>${fmt(data.leads_ytd)}</b> · MQL <b>${fmt(data.qual_lead_ytd)}</b> · конв. ${data.qual_lead_ytd && data.leads_ytd ? (data.qual_lead_ytd/data.leads_ytd*100).toFixed(1) : 0}%</li>
-        </ul>
-      </div>
-      <div>
-        <b>📈 Неделя W${cw}:</b>
-        <ul style="margin:6px 0 0 18px;color:#444">
-          <li>Поступления: <b>${fmt(last.postupleniya)} ₽</b> ${delta > 0 ? '📈 +' : '📉 '}${Math.abs(delta).toFixed(1)}% к прошлой</li>
-          <li>Сделок: <b>${last.won_cnt}</b></li>
-          <li>Лидов: <b>${fmt(data.leads_cur)}</b> (прошлая: ${fmt(data.leads_prev)})</li>
-        </ul>
-      </div>
-      <div>
-        <b>🏆 Лидеры:</b>
-        <ul style="margin:6px 0 0 18px;color:#444">
-          <li>Источник: <b>${srcTop.length > 1 ? srcTop[1].name : '-'}</b> (${fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)} ₽)</li>
-          <li>Формат: <b>${fmtData.length > 0 ? fmtData[0][0] : '-'}</b> (${fmtData.length > 0 ? fmt(fmtData[0][1].sum) : 0} ₽)</li>
-          <li>${data.mgr_top && data.mgr_top.length > 0 ? 'Менеджер: <b>' + data.mgr_top[0].name + '</b> (' + fmt(data.mgr_top[0].postupleniya) + ' ₽)' : ''}</li>
-        </ul>
-      </div>
-      <div>
-        <b>💡 Рекомендации:</b>
-        <ul style="margin:6px 0 0 18px;color:#444">
-          ${delta > 5 ? '<li>🚦 <b style="color:#2E7D32">🟢 Рост</b> поступлений +' + Math.abs(delta).toFixed(1) + '% к прошлой неделе</li>' : delta < -5 ? '<li>🚦 <b style="color:#C62828">🔴 Падение</b> поступлений ' + delta.toFixed(1) + '% к прошлой неделе</li>' : '<li>🚦 <b style="color:#F57C00">🟡 Стабильно</b> поступлений</li>'}
-          ${last.won_cnt === 0 && last.postupleniya === 0 ? '<li>⚠️ Текущая неделя без оплат - возможна задержка 1С</li>' : ''}
-          ${(srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка - поработать с качеством лидов</li>' : ''}
-          ${ytd.median_close_days_won > 60 ? '<li>⏱ Медленная скорость закрытия (' + ytd.median_close_days_won + ' дн. медиана) - ускорить обработку</li>' : '<li>⏱ Скорость закрытия: ' + ytd.median_close_days_won + ' дн. (медиана) ✅</li>'}
-          <li>📌 Средняя скорость закрытия: ${ytd.median_close_days_won} дн. (медиана)</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-  `;
-  initTableSort();
-}
 
 // === Сортировка таблиц (как в Excel) ===
 function initTableSort() {
@@ -626,38 +322,11 @@ function initTableSort() {
   });
 }
 
-async function renderPageNewLogic() {
-  const area = document.getElementById("contentAreaNew");
-  area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка новой логики...</div></div>';
-  try {
-    const data = await api("/api/data/new");
-    if (!data.ytd) { area.innerHTML = '<div class="error-state">❌ Нет данных</div>'; return; }
-    function fmt(n) { return (n===undefined||n===null||n===0)?'0':Number(n).toLocaleString('ru-RU',{maximumFractionDigits:0}); }
-    function kpi(l,v,s,c) { return '<div class=kpi'+(c?' '+c:'')+'><div class=lbl>'+l+'</div><div class=val>'+v+'</div><div class=sub>'+s+'</div></div>'; }
-    var w=data.weeks||[], lst=w[w.length-1]||{}, prv=w[w.length-2]||{}, cw=data.cur_week||0;
-    function rw(t,ytd,cur,kom) {
-      var h='<div class=kpis><div style="grid-column:1/-1;font-size:15px;font-weight:700;margin:4px 0;color:'+(kom?'#9C27B0':'#1f2a44')+'">'+t+'</div>';
-      h+=kpi('Поступления',fmt(ytd.postupleniya)+' руб',ytd.won_relevant_cnt+'сд.');
-      h+=kpi('Лиды',fmt(ytd.created_cnt),'в работе '+(ytd.created_cnt-ytd.won_relevant_cnt-ytd.lose_cnt));
-      h+=kpi('Конверсия',(ytd.conv_deal_pct||0).toFixed(1)+'%','');
-      h+=kpi('Ср.чек',fmt(ytd.avg_check)+' руб','');
-      h+=kpi('Цикл сделки, дней',ytd.avg_close_days_won.toFixed(1)+' дн.','');
-      var d=prv.postupleniya?((lst.postupleniya-prv.postupleniya)/prv.postupleniya*100):0;
-      h+=kpi('W'+cw+': поступления',fmt(lst.postupleniya)+' руб',(d>=0?'+':'-')+Math.abs(d).toFixed(1)+'%');
-      h+=kpi('W'+cw+': лиды',fmt(lst.leads||''),'');
-      h+='</div>'; return h;
-    }
-    var html = rw('Общая (ООМ+КОМ)',data.ytd,data.cur);
-    html += rw('Открытое обучение (очное, онлайн и видеокурсы)',data.oom_ytd,data.oom_cur);
-    html += rw('Корпоративное обучение (КОМ)',data.kom_ytd,data.kom_cur,true);
-    area.innerHTML = html + '<div class="twocol" style="margin-top:16px"><div class="card"><h2>Воронка по неделям</h2><div class="chartbox"><canvas id="ch_funnel_new"></canvas></div></div><div class="card"><h2>Воронка (квал. лиды)</h2><div class="chartbox"><canvas id="ch_funnel_new_qual"></canvas></div></div></div><div class="twocol" style="margin-top:16px"><div class="card"><h2>Конверсии</h2><div class="chartbox"><canvas id="ch_conv_new"></canvas></div></div><div class="card"><h2>Конверсии (квал. лиды)</h2><div class="chartbox"><canvas id="ch_conv_new_qual"></canvas></div></div></div>';
-  } catch(e) { area.innerHTML = '<div class=error-state>Ошибка: '+escapeHtml(e.message)+'</div>'; }
-}
 async function renderPageMainNew(d) {
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
   try {
-    if (!d) d = await api('/api/data/new');
+    if (!d) d = await api('/api/data');
     if (!d || !d.ytd) { areaNew.innerHTML = '<div class="error-state">Нет данных</div>'; return; }
 
         function kpi(label, val, sub, cls) {
@@ -821,12 +490,14 @@ async function renderPageMainNew(d) {
     html += '</ul></div>';
     html += '</div></div>';
 
-    if (userRole === 'admin') {
-      html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка...</div></div></div></div>';
-    }
+    // Блок артефактов — виден только admin (403 для остальных обрабатывается внутри loadArtifacts)
+    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка...</div></div></div></div>';
 
     // Batch update all at once
     areaNew.innerHTML = html;
+
+    // Артефакты грузятся параллельно — не блокируют рендер
+    loadArtifacts();
 
     // Now fill in table data (elements exist now)
     var fmtData = d.fmt_ytd||{};
@@ -887,9 +558,6 @@ async function renderPageMainNew(d) {
     el = document.getElementById('newWeekTable'); if(el) el.innerHTML = weekStr;
 
 
-
-    // Load artifacts
-    loadArtifacts();
 
     // Destroy orphaned chart instances before creating new ones
     if (window.Chart && Chart.instances) {
@@ -962,339 +630,8 @@ async function renderPageMainNew(d) {
   }
 }
 
-function renderWeekRow(w, isCurrent) {
-  return `<tr${isCurrent ? " class='cur'" : ''}>
-    <td><b>Неделя ${String(w.week).padStart(2, '0')} (${w.label_dates || ''})</b></td>
-    <td>${w.leads}</td>
-    <td>${w.mql}</td>
-    <td>${w.sql}</td>
-    <td><b>${w.invoice_cnt || 0}</b></td>
-    <td><b>${w.oplata}</b></td>
-    <td><b>${fmt(w.postupleniya)}</b></td>
-    <td>${fmt(w.avg_check)}</td>
-    <td>${(w.avg_dur || 0).toFixed(1)}</td>
-    <td>${(w.conv_lead_mql || 0).toFixed(1)}%</td>
-    <td>${(w.conv_mql_sql || 0).toFixed(1)}%</td>
-    <td>${(w.conv_sql_invoice || 0).toFixed(1)}%</td>
-    <td>${(w.conv_invoice_oplata || 0).toFixed(1)}%</td>
-  </tr>`;
-}
 
-// ===== Charts =====
-function drawCharts(data) {
-  const weeks = data.weeks || [];
-  const labels = weeks.map(w => w.label_dates || w.label_short || 'W'+String(w.week).padStart(2,'0'));
-  const Lfull = weeks.map(w => w.label);
 
-  Object.keys(chartInstances).forEach(id => {
-    if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
-  });
-
-  const common = { responsive: true, maintainAspectRatio: false };
-  const commonPlugin = { tooltip: { callbacks: { title: items => Lfull[items[0].dataIndex] } } };
-  const navy = '#093EB4', gold = '#9A7B3F', red = '#C62828', green = '#2E7D32', orange = '#F57C00', blue = '#3079D2';
-
-  const mql = weeks.map(w => w.mql);
-  const sql = weeks.map(w => w.sql);
-  const opl = weeks.map(w => w.oplata);
-  const pos = weeks.map(w => w.postupleniya);
-  const cms = weeks.map(w => w.conv_mql_sql);
-  const cso = weeks.map(w => w.conv_sql_oplata);
-  const won_n = weeks.map(w => w.won_cnt);
-  const lost_n = weeks.map(w => w.lost_cnt);
-  const avg = weeks.map(w => w.avg_check);
-  const dur = weeks.map(w => w.avg_dur);
-  const presale = weeks.map(w => w.avg_presale_dur);
-
-  // Funnel
-  chartInstances.ch_funnel = new Chart(document.getElementById('ch_funnel'), {
-    type: 'bar',
-    data: { labels, datasets: [
-      { label: 'MQL', data: mql, backgroundColor: blue, borderRadius: 4 },
-      { label: 'SQL', data: sql, backgroundColor: gold, borderRadius: 4 },
-      { label: 'Сделки', data: opl, backgroundColor: green, borderRadius: 4 }
-    ]},
-    options: { ...common, plugins: { ...commonPlugin, legend: { position: 'top' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
-
-  // Conversion
-  chartInstances.ch_conv = new Chart(document.getElementById('ch_conv'), {
-    type: 'line',
-    data: { labels, datasets: [
-      { label: 'MQL→SQL, %', data: cms, borderColor: blue, backgroundColor: 'rgba(48,121,210,.1)', tension: 0.3, fill: true },
-      { label: 'SQL→Сделки, %', data: cso, borderColor: green, backgroundColor: 'rgba(46,125,50,.1)', tension: 0.3, fill: true }
-    ]},
-    options: { ...common, plugins: { ...commonPlugin, legend: { position: 'top' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true, max: 180 } } }
-  });
-
-  // Funnel (qual)
-  chartInstances.ch_funnel_qual = new Chart(document.getElementById('ch_funnel_qual'), {
-    type: 'bar',
-    data: { labels, datasets: [
-      { label: 'MQL (квал)', data: mql, backgroundColor: blue, borderRadius: 4 },
-      { label: 'SQL', data: sql, backgroundColor: gold, borderRadius: 4 },
-      { label: 'Сделки', data: opl, backgroundColor: green, borderRadius: 4 }
-    ]},
-    options: { ...common, plugins: { ...commonPlugin, legend: { position: 'top' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
-
-  // Conversion (qual)
-  chartInstances.ch_conv_qual = new Chart(document.getElementById('ch_conv_qual'), {
-    type: 'line',
-    data: { labels, datasets: [
-      { label: 'MQL→SQL, %', data: cms, borderColor: '#3079D2', backgroundColor: 'rgba(48,121,210,.1)', tension: 0.3, fill: true },
-      { label: 'SQL→Сделки, %', data: cso, borderColor: '#2E7D32', backgroundColor: 'rgba(46,125,50,.1)', tension: 0.3, fill: true }
-    ]},
-    options: { ...common, plugins: { ...commonPlugin, legend: { position: 'top' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true, max: 180 } } }
-  });
-
-  // Won sum
-  chartInstances.ch_pos = new Chart(document.getElementById('ch_pos'), {
-    type: 'bar',
-    data: { labels, datasets: [{ label: 'Поступления, ₽', data: pos, backgroundColor: navy, borderRadius: 4 }] },
-    options: { ...common, plugins: { legend: { display: false }, tooltip: { callbacks: { title: items => Lfull[items[0].dataIndex], label: c => Number(c.parsed.y).toLocaleString('ru-RU') + ' ₽' } }, datalabels: { anchor: 'end', align: 'end', color: navy, font: { size: 8, weight: 'bold' }, formatter: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? Math.round(v/1000)+'k' : v } }, scales: { y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString('ru-RU') } } } },
-    plugins: [ChartDataLabels]
-  });
-
-  // B2B doughnut
-  const b2bData = data.btype_ytd || {};
-  const b2bSum = (b2bData.B2B?.sum || 0) + (b2bData.B2C?.sum || 0);
-  chartInstances.ch_b2b = new Chart(document.getElementById('ch_b2b'), {
-    type: 'doughnut',
-    data: { labels: ['B2B', 'B2C'], datasets: [{ data: [b2bData.B2B?.sum || 0, b2bData.B2C?.sum || 0], backgroundColor: [blue, orange] }] },
-    options: { ...common, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.label + ': ' + Number(c.parsed).toLocaleString('ru-RU') + ' ₽ (доля: ' + (c.parsed/b2bSum*100).toFixed(1) + '%)' } } } },
-    plugins: [ChartDataLabels]
-  });
-
-  // WON vs LOSE doughnut
-  const wonTotal = won_n.reduce((a, b) => a + b, 0);
-  const lostTotal = lost_n.reduce((a, b) => a + b, 0);
-  chartInstances.ch_wl = new Chart(document.getElementById('ch_wl'), {
-    type: 'doughnut',
-    data: { labels: ['Оплаты', 'Отказы'], datasets: [{ data: [wonTotal, lostTotal], backgroundColor: [green, red] }] },
-    options: { ...common, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.label + ': ' + Number(c.parsed).toLocaleString('ru-RU') + ' (доля: ' + (c.parsed/(wonTotal+lostTotal)*100).toFixed(1) + '%)' } } } },
-    plugins: [ChartDataLabels]
-  });
-
-  // Formats stacked bar (weekly)
-  const fmtColorsArr = { "ОМ (Онлайн)": "#43A047", "ООМ (Очное)": "#00bcd4", "СДО": "#F57C00", "КОМ": "#9C27B0" };
-  const fmtKeys = ["ООМ (Очное)", "СДО", "ОМ (Онлайн)", "КОМ"];
-  const fmt_week = {
-    "ООМ (Очное)": weeks.map(w => w.fmt_oom || 0),
-    "СДО":         weeks.map(w => w.fmt_sdo || 0),
-    "ОМ (Онлайн)": weeks.map(w => w.fmt_om || 0),
-    "КОМ":         weeks.map(w => w.fmt_kom || 0),
-  };
-  chartInstances.ch_fmt = new Chart(document.getElementById('ch_fmt'), {
-    type: 'bar',
-    data: { labels, datasets: fmtKeys.map(k => ({
-      label: k,
-      data: fmt_week[k],
-      backgroundColor: fmtColorsArr[k] || '#999',
-      borderRadius: 2
-    })) },
-    options: { ...common, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { title: items => Lfull[items[0].dataIndex], label: c => c.dataset.label + ': ' + Number(c.parsed.y).toLocaleString('ru-RU') + ' ₽' } }, datalabels: { display: false } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString('ru-RU') } } } },
-    plugins: [ChartDataLabels]
-  });
-
-  // Won vs Lose
-  chartInstances.ch_cnt = new Chart(document.getElementById('ch_cnt'), {
-    type: 'bar',
-    data: { labels, datasets: [
-      { label: 'Оплаты', data: won_n, backgroundColor: green, borderRadius: 4 },
-      { label: 'Отказы', data: lost_n, backgroundColor: red, borderRadius: 4 }
-    ]},
-    options: { ...common, plugins: { ...commonPlugin, legend: { position: 'top' }, datalabels: { display: false } }, scales: { y: { beginAtZero: true } } }
-  });
-
-  // Avg check
-  chartInstances.ch_avg = new Chart(document.getElementById('ch_avg'), {
-    type: 'line',
-    data: { labels, datasets: [{ label: 'Сред.чек, ₽', data: avg, borderColor: gold, backgroundColor: 'rgba(200,164,92,.15)', tension: 0.3, fill: true, pointRadius: 3 }] },
-    options: { ...common, plugins: { legend: { display: false }, tooltip: { callbacks: { title: items => Lfull[items[0].dataIndex], label: c => Number(c.parsed.y).toLocaleString('ru-RU') + ' ₽' } }, datalabels: { anchor: 'end', align: 'end', color: gold, font: { size: 8 }, formatter: v => v >= 1000 ? Math.round(v/1000) + 'k' : v } }, scales: { y: { beginAtZero: true, ticks: { callback: v => Number(v).toLocaleString('ru-RU') } } } },
-    plugins: [ChartDataLabels]
-  });
-
-  // Duration
-  chartInstances.ch_dur = new Chart(document.getElementById('ch_dur'), {
-    type: 'line',
-    data: { labels, datasets: [{ label: 'Сред.срок WON, дн.', data: dur, borderColor: navy, backgroundColor: 'rgba(31,42,68,.15)', tension: 0.3, fill: true, pointRadius: 3 }] },
-    options: { ...common, plugins: { legend: { display: false }, tooltip: commonPlugin.tooltip, datalabels: { anchor: 'end', align: 'end', color: navy, font: { size: 8 }, formatter: v => v.toFixed(0) + 'дн' } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' дн.' } } } },
-    plugins: [ChartDataLabels]
-  });
-
-  // Pre sale duration
-  chartInstances.ch_presale = new Chart(document.getElementById('ch_presale'), {
-    type: 'line',
-    data: { labels, datasets: [{ label: 'Pre Sale, дн.', data: presale, borderColor: blue, backgroundColor: 'rgba(48,121,210,.15)', tension: 0.3, fill: true, pointRadius: 3 }] },
-    options: { ...common, plugins: { legend: { display: false }, tooltip: commonPlugin.tooltip, datalabels: { anchor: 'end', align: 'end', color: blue, font: { size: 8 }, formatter: v => v.toFixed(0) + 'дн' } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' дн.' } } } },
-    plugins: [ChartDataLabels]
-  });
-}
-
-// --- Refresh Panel ---
-var refreshStepsData = [
-  { key: 'fetch_rest',   label: 'REST API: выгрузка сделок',         weight: 40 },
-  { key: 'fetch_export', label: 'Export API: дополнение сделок',     weight: 10 },
-  { key: 'fetch_dicts',  label: 'Загрузка справочников',             weight: 10 },
-  { key: 'analyze_new',  label: 'Анализ данных',                     weight: 40 },
-];
-
-var statusPanelHTML = '' +
-  '<div id="refreshStatusPanel" class="refresh-panel" style="display:none">' +
-    '<div class="refresh-header">' +
-      '<span class="refresh-title">🔄 Обновление данных</span>' +
-      '<span class="refresh-elapsed" id="statusElapsed">⏱ 0м 0с</span>' +
-    '</div>' +
-    '<div class="progress-bar refresh-progress-bar">' +
-      '<div class="progress-fill" id="statusProgressFill" style="width:0%"></div>' +
-    '</div>' +
-    '<div id="statusSteps" class="refresh-steps">' +
-      renderStepLines(-1, refreshStepsData, 0) +
-    '</div>' +
-    '<div id="statusDealProgress" class="refresh-deal-progress"></div>' +
-  '</div>';
-
-function renderStepLines(curIdx, steps, progressPct) {
-  var h = '';
-  for (var i = 0; i < steps.length; i++) {
-    var s = steps[i];
-    var icon, cls, label;
-    if (i < curIdx) {
-      icon = '✅';
-      cls = 'step-done';
-      label = s.label;
-    } else if (i === curIdx) {
-      icon = '⏳';
-      cls = 'step-active';
-      label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>';
-    } else {
-      icon = '⬜';
-      cls = 'step-pending';
-      label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>';
-    }
-    h += '<div class="refresh-step ' + cls + '">' +
-      '<span class="step-icon">' + icon + '</span>' +
-      '<span class="step-label">' + label + '</span>' +
-    '</div>';
-  }
-  return h;
-}
-
-// Глобальная функция безопасного fetch
-async function safeFetch(url, opts) {
-  var resp = await fetch(url, opts);
-  if (resp.redirected || resp.url.endsWith('/login')) {
-    window.location.href = '/login';
-    throw new Error('redirect');
-  }
-  var text = await resp.text();
-  if (text.startsWith('<!DOCTYPE')) {
-    window.location.href = '/login';
-    throw new Error('redirect');
-  }
-  return JSON.parse(text);
-}
-
-function initRefreshButton() {
-  var toolbar = document.querySelector('.toolbar');
-  if (!toolbar) return;
-  var btn = document.createElement('button');
-  btn.id = 'refreshBtn';
-  btn.textContent = '🔄 Обновить данные';
-  toolbar.appendChild(btn);
-
-  btn.addEventListener('click', async function() {
-    this.disabled = true;
-    this.textContent = '⏳ Обновление...';
-
-    // Показываем панель статуса
-    var panel = document.getElementById('refreshStatusPanel');
-    if (!panel) {
-      // Создаём, если не существует
-      if (toolbar) {
-        toolbar.insertAdjacentHTML('afterend', statusPanelHTML);
-        panel = document.getElementById('refreshStatusPanel');
-      }
-    }
-    if (panel) {
-      // Сбрасываем состояние
-      panel.style.display = 'block';
-      document.getElementById('statusProgressFill').style.width = '0%';
-      document.getElementById('statusSteps').innerHTML = renderStepLines(-1, refreshStepsData, 0);
-      document.getElementById('statusElapsed').textContent = '⏱ 0м 0с';
-      document.getElementById('statusDealProgress').textContent = '';
-    }
-
-  try {
-    await safeFetch((window.BASE_PATH || '') + '/api/refresh', { method: 'POST' });
-    
-    // Поллинг статуса (встроенный, не runRefreshPolling)
-    var lastStepIdx = -1;
-
-    while (true) {
-      await new Promise(function(r) { setTimeout(r, 5000); });
-
-      var status = await safeFetch((window.BASE_PATH || '') + '/api/status');
-
-      var elapsed = '';
-      if (status.startedAt) {
-        var start = new Date(status.startedAt);
-        var now = new Date();
-        var diff = Math.floor((now - start) / 1000);
-        var min = Math.floor(diff / 60);
-        var sec = diff % 60;
-        elapsed = min + 'м ' + sec + 'с';
-        document.getElementById('statusElapsed').textContent = '⏱ ' + elapsed;
-      }
-
-      var pct = status.progressPct != null ? status.progressPct : 0;
-      document.getElementById('statusProgressFill').style.width = Math.min(pct, 100) + '%';
-      var _lf2=document.getElementById('loadingFill');if(_lf2)_lf2.style.width=pct+'%';
-
-      var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
-      if (status.progressSteps) {
-        var allDone = status.progressSteps.every(function(s) { return s.done; });
-        if (allDone) curIdx = 4;
-        document.getElementById('statusSteps').innerHTML = renderStepLines(curIdx, status.progressSteps, pct);
-      }
-
-      var dealText = '';
-      if (status.loadingPhase && status.loadingPhase !== 'Запуск скрипта...') {
-        dealText = status.loadingPhase;
-        if (status.loadingProgress && status.loadingProgress.current > 0) {
-          dealText += ' — ' + status.loadingProgress.current.toLocaleString('ru-RU') + ' сделок';
-        }
-      }
-      document.getElementById('statusDealProgress').textContent = dealText;
-
-      if (status.error && !status.loading) {
-        document.getElementById('statusSteps').innerHTML += '<div class="refresh-step step-error"><span class="step-icon">❌</span><span class="step-label">Ошибка: ' + escapeHtml(status.error) + '</span></div>';
-        break;
-      }
-      if (status.ready && !status.loading) {
-        document.getElementById('statusProgressFill').style.width = '100%';
-        var _lf=document.getElementById('loadingFill');if(_lf)_lf.style.width='100%';
-        document.getElementById('statusSteps').innerHTML = renderStepLines(4, refreshStepsData, 100);
-        document.getElementById('statusDealProgress').textContent = '✅ Загружено за ' + elapsed;
-        setTimeout(function() {
-          var pnl = document.getElementById('refreshStatusPanel');
-          if (pnl) pnl.style.display = 'none';
-        }, 5000);
-        loadAll().catch(function(e) {});
-        break;
-      }
-
-      lastStepIdx = curIdx;
-    }
-  } catch (e) {
-    if (e.message !== 'redirect') {
-      alert('Ошибка: ' + e.message);
-    }
-  }
-  finally { this.disabled = false; this.textContent = '🔄 Обновить данные'; }
-});
-}
 
 // --- Date filter ---
 document.getElementById('dateFrom').addEventListener('change', function() {
@@ -1307,70 +644,6 @@ document.getElementById('dateTo').addEventListener('change', function() {
 
 // --- Запуск при загрузке страницы ---
 
-// Функция: показать панель статуса обновления и поллить
-function runRefreshPolling() {
-  var panel = document.getElementById('refreshStatusPanel');
-  if (!panel) {
-    var toolbar = document.querySelector('.toolbar');
-    if (toolbar) toolbar.insertAdjacentHTML('afterend', statusPanelHTML);
-    panel = document.getElementById('refreshStatusPanel');
-  }
-  panel.style.display = 'block';
-
-  var interval = setInterval(async function() {
-    try {
-      var status = await safeFetch((window.BASE_PATH || '') + '/api/status');
-
-      var elapsed = '';
-      if (status.startedAt) {
-        var start = new Date(status.startedAt);
-        var now = new Date();
-        var diff = Math.floor((now - start) / 1000);
-        var min2 = Math.floor(diff / 60);
-        var sec2 = diff % 60;
-        elapsed = min2 + 'м ' + sec2 + 'с';
-        document.getElementById('statusElapsed').textContent = '⏱ ' + elapsed;
-      }
-
-      var pct = status.progressPct != null ? status.progressPct : 0;
-      document.getElementById('statusProgressFill').style.width = Math.min(pct, 100) + '%';
-      var _lf2=document.getElementById('loadingFill');if(_lf2)_lf2.style.width=pct+'%';
-
-      var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
-      if (status.progressSteps) {
-        var allDone = status.progressSteps.every(function(s) { return s.done; });
-        if (allDone) curIdx = 4;
-        document.getElementById('statusSteps').innerHTML = renderStepLines(curIdx, status.progressSteps, pct);
-      }
-
-      var dealText = '';
-      if (status.loadingPhase && status.loadingPhase !== 'Запуск скрипта...') {
-        dealText = status.loadingPhase;
-        if (status.loadingProgress && status.loadingProgress.current > 0) {
-          dealText += ' - ' + status.loadingProgress.current.toLocaleString('ru-RU') + ' сделок';
-        }
-      }
-      document.getElementById('statusDealProgress').textContent = dealText;
-
-      if (status.error && !status.loading) {
-        document.getElementById('statusSteps').innerHTML += '<div class="refresh-step step-error"><span class="step-icon">❌</span><span class="step-label">Ошибка: ' + escapeHtml(status.error) + '</span></div>';
-        clearInterval(interval);
-      }
-      if (status.ready && !status.loading && !status.error) {
-        document.getElementById('statusProgressFill').style.width = '100%';
-        var _lf=document.getElementById('loadingFill');if(_lf)_lf.style.width='100%';
-        document.getElementById('statusSteps').innerHTML = renderStepLines(4, refreshStepsData, 100);
-        document.getElementById('statusDealProgress').textContent = '✅ Загружено за ' + elapsed;
-        setTimeout(function() {
-          var pnl = document.getElementById('refreshStatusPanel');
-          if (pnl) pnl.style.display = 'none';
-        }, 5000);
-        loadAll().catch(function(e) {});
-        clearInterval(interval);
-      }
-    } catch(e) {}
-  }, 5000);
-}
 
 // Защищённый запуск: ошибка не должна блокировать UI
 loadAll().catch(function(e) {
@@ -1380,14 +653,5 @@ loadAll().catch(function(e) {
   if (areaNew) areaNew.innerHTML = areaNew.innerHTML || '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
 });
 
-// Если на сервере уже идёт обновление — показываем панель и поллим
-(async function() {
-  try {
-    var initStatus = await safeFetch((window.BASE_PATH || '') + '/api/status');
-    if (initStatus.loading) {
-      runRefreshPolling();
-    }
-  } catch(e) {}
-})();
 
 // --- Participants tab ---
