@@ -2,7 +2,8 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
+
+import { analyze } from './analyze.js';
 
 // Sub-apps
 import testDashboard from '../test-dashboard/server.js';
@@ -11,17 +12,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
 const CACHE_DIR = path.join(__dirname, 'cache');
-// На Windows исполняемый файл называется "python", на Linux/macOS — обычно "python3"
 const PYTHON_BIN = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
 
 await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
 
 // --- Шаги прогресса ---
 const STEP_WEIGHTS = [
-  { key: 'fetch_rest',   label: 'REST API: выгрузка сделок',         weight: 40 },
-  { key: 'fetch_export', label: 'Export API: дополнение сделок',     weight: 10 },
-  { key: 'fetch_dicts',  label: 'Загрузка справочников',             weight: 10 },
-  { key: 'analyze_new',  label: 'Анализ данных',                     weight: 40 },
+  { key: 'analyze', label: 'Анализ данных', weight: 100 },
 ];
 
 function initProgressSteps() {
@@ -82,7 +79,7 @@ async function loadCache() {
   }
 }
 
-// --- Refresh: execute Python pipeline ---
+// --- Refresh: JS analyze() ---
 
 function resetLoading() {
   dataState.loading = false;
@@ -96,132 +93,65 @@ function resetLoading() {
   console.log('🔄 Loading state reset');
 }
 
-function runRefresh() {
-  return new Promise((resolve, reject) => {
-    if (dataState.loading) return reject(new Error('Already loading'));
-    dataState.loading = true;
-    dataState.error = null;
-    dataState.startedAt = new Date().toISOString();
-    dataState.progressSteps = initProgressSteps();
-    dataState.progressPct = 0;
-    dataState.currentStepIdx = -1;
+function handleProgressMsg(msg) {
+  switch (msg.type) {
+    case 'step_start': {
+      const idx = msg.idx;
+      dataState.currentStepIdx = idx;
+      dataState.loadingPhase = (dataState.progressSteps && dataState.progressSteps[idx])
+        ? dataState.progressSteps[idx].label : 'Шаг ' + (idx + 1);
+      break;
+    }
+    case 'step_done': {
+      const idx = msg.idx;
+      if (dataState.progressSteps && dataState.progressSteps[idx]) {
+        dataState.progressSteps[idx].done = true;
+      }
+      dataState.progressPct = calcProgressPct(dataState.progressSteps, dataState.currentStepIdx);
+      break;
+    }
+    case 'deals_loaded': {
+      dataState.progressPct = 50;
+      dataState.loadingProgress = { current: msg.count || 0, total: 0 };
+      break;
+    }
+    case 'finalizing': { dataState.loadingPhase = 'Финализация...'; break; }
+    case 'all_done':   { dataState.loadingPhase = 'Загрузка завершена'; break; }
+  }
+}
+
+async function runRefresh() {
+  if (dataState.loading) throw new Error('Already loading');
+  dataState.loading = true;
+  dataState.error = null;
+  dataState.startedAt = new Date().toISOString();
+  dataState.progressSteps = initProgressSteps();
+  dataState.progressPct = 0;
+  dataState.currentStepIdx = -1;
+  dataState.loadingProgress = null;
+  dataState.loadingPhase = 'Анализ данных...';
+
+  try {
+    const result = await analyze((msg) => handleProgressMsg(msg));
+    aggCache = result;
+    dataState.ready = true;
+    dataState.loadedAt = new Date().toISOString();
+    dataState.loading = false;
+    dataState.startedAt = null;
     dataState.loadingProgress = null;
-    dataState.loadingPhase = 'Запуск скрипта...';
-
-    const script = path.join(SCRIPTS_DIR, 'run_full.py');
-    const proc = spawn(PYTHON_BIN, [script], {
-      cwd: SCRIPTS_DIR,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    // Парсим stdout в реальном времени для прогресса
-    // Формат:  ###PROGRESS:{json}
-    const handleProgressMsg = (msg) => {
-      switch (msg.type) {
-        case 'step_start': {
-          const idx = msg.idx;
-          dataState.currentStepIdx = idx;
-          dataState.loadingPhase = (dataState.progressSteps && dataState.progressSteps[idx])
-            ? dataState.progressSteps[idx].label : 'Шаг ' + (idx + 1);
-          break;
-        }
-        case 'step_done': {
-          const idx = msg.idx;
-          if (dataState.progressSteps && dataState.progressSteps[idx]) {
-            dataState.progressSteps[idx].done = true;
-          }
-          dataState.progressPct = calcProgressPct(dataState.progressSteps, dataState.currentStepIdx);
-          break;
-        }
-        case 'step_error': {
-          dataState.error = msg.stderr || 'Ошибка на шаге ' + msg.idx;
-          break;
-        }
-        case 'deals_loaded': {
-          const idx = msg.origin_step != null ? msg.origin_step : dataState.currentStepIdx;
-          if (dataState.progressSteps && dataState.progressSteps[idx]) {
-            dataState.progressSteps[idx].current = msg.count || 0;
-          }
-          dataState.progressPct = calcProgressPct(dataState.progressSteps, dataState.currentStepIdx);
-          dataState.loadingProgress = {
-            current: msg.count || 0,
-            total: 0, // 0 = неизвестно (показываем только кол-во сделок, без %)
-          };
-          break;
-        }
-        case 'finalizing': {
-          dataState.loadingPhase = 'Финализация...';
-          break;
-        }
-        case 'all_done': {
-          dataState.loadingPhase = 'Загрузка завершена';
-          break;
-        }
-      }
-    };
-
-    proc.stdout.on('data', (chunk) => {
-      const text = chunk.toString();
-      stdout += text;
-      
-      const lines = text.split('\n');
-      for (const line of lines) {
-        if (!line.startsWith('###PROGRESS:')) continue;
-        const raw = line.substring('###PROGRESS:'.length);
-        try {
-          handleProgressMsg(JSON.parse(raw));
-        } catch (e) {
-          // ignore malformed
-        }
-      }
-    });
-    
-    proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-
-    proc.on('close', async (code) => {
-      try {
-        if (code !== 0) {
-          console.error('Python error:', stderr);
-          dataState.error = stderr.substring(0, 500);
-          dataState.loading = false;
-          dataState.startedAt = null;
-          dataState.loadingProgress = null;
-          return reject(new Error(`Pipeline exit code ${code}`));
-        }
-
-        const raw = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg.json'), 'utf-8'));
-        // OOM/KOM данные — из agg.json (analyze_new.py)
-        /* raw.kom_leads_ytd = raw.kom_leads_ytd || ... — оставляем из agg.json */
-        aggCache = raw;
-        dataState.ready = true;
-        dataState.loadedAt = new Date().toISOString();
-        dataState.loading = false;
-        dataState.startedAt = null;
-        dataState.loadingProgress = null;
-        dataState.loadingPhase = null;
-        resolve(true);
-      } catch (e) {
-        dataState.error = e.message;
-        dataState.loading = false;
-        dataState.startedAt = null;
-        dataState.loadingProgress = null;
-        dataState.loadingPhase = null;
-        reject(e);
-      }
-    });
-
-    proc.on('error', (e) => {
-      dataState.error = e.message;
-      dataState.loading = false;
-      dataState.startedAt = null;
-      dataState.loadingProgress = null;
-      dataState.loadingPhase = null;
-      reject(e);
-    });
-  });
+    dataState.loadingPhase = null;
+    // Сохраняем в agg.json для холодного старта
+    await fs.writeFile(path.join(CACHE_DIR, 'agg.json'), JSON.stringify(result), 'utf-8').catch(() => {});
+    return true;
+  } catch (e) {
+    console.error('Analyze error:', e.message);
+    dataState.error = e.message;
+    dataState.loading = false;
+    dataState.startedAt = null;
+    dataState.loadingProgress = null;
+    dataState.loadingPhase = null;
+    throw e;
+  }
 }
 
 // --- Express ---
@@ -266,7 +196,7 @@ app.post('/api/refresh', async (req, res) => {
   }
   if (dataState.loading) return res.json({ ok: false, message: 'Already loading' });
   res.json({ ok: true, message: 'Refresh started' });
-  runRefresh().catch(e => console.error('Refresh failed:', e.message));
+  runRefresh().catch(e => console.error('Refresh failed:', e.message || e));
 });
 
 // Force-reset stuck loading state
