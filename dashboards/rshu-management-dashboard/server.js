@@ -11,6 +11,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const SCRIPTS_DIR = path.join(__dirname, 'scripts');
 const CACHE_DIR = path.join(__dirname, 'cache');
+// На Windows исполняемый файл называется "python", на Linux/macOS — обычно "python3"
+const PYTHON_BIN = process.env.PYTHON_BIN || (process.platform === 'win32' ? 'python' : 'python3');
 
 await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
 
@@ -107,7 +109,7 @@ function runRefresh() {
     dataState.loadingPhase = 'Запуск скрипта...';
 
     const script = path.join(SCRIPTS_DIR, 'run_full.py');
-    const proc = spawn('python3', [script], {
+    const proc = spawn(PYTHON_BIN, [script], {
       cwd: SCRIPTS_DIR,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -488,7 +490,7 @@ app.get('/api/artifacts', async (req, res) => {
 app.get('/api/forecast', async (req, res) => {
   try {
     const script = path.join(SCRIPTS_DIR, 'forecast.py');
-    const proc = spawn('python3', [script], {
+    const proc = spawn(PYTHON_BIN, [script], {
       cwd: SCRIPTS_DIR,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
