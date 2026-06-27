@@ -3,13 +3,12 @@
  * Читает data-service/cache/deals.json + dicts.json, возвращает объект out (аналог agg.json).
  */
 
-import { readFile, readdir } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_SERVICE_CACHE = path.join(__dirname, '..', '..', 'data-service', 'cache');
-const CACHE_DIR = path.join(__dirname, 'cache');
 
 const YEAR = 2026;
 const MIN_OPP = 11.0;
@@ -350,21 +349,9 @@ export async function analyze(onProgress) {
   const dealsRaw = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'deals.json'), 'utf-8'));
   const dicts    = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'dicts.json'), 'utf-8'));
 
-  let cc={};
-  try { cc = JSON.parse(await readFile(path.join(CACHE_DIR,'company_contact.json'),'utf-8')); } catch {}
-  let companies={};
-  try { companies = JSON.parse(await readFile(path.join(CACHE_DIR,'companies.json'),'utf-8')); } catch {}
-
-  let leads=[];
-  try {
-    const leadsDir = path.join(CACHE_DIR,'leads_pages');
-    const files = (await readdir(leadsDir)).filter(f=>f.startsWith('p_')&&f.endsWith('.json'));
-    for (const f of files) {
-      const arr = JSON.parse(await readFile(path.join(leadsDir,f),'utf-8'));
-      leads.push(...arr);
-    }
-    const seen=new Map(); for(const l of leads) seen.set(l.ID,l); leads=[...seen.values()];
-  } catch {}
+  const cc = {};
+  const companies = {};
+  const leads = [];
 
   const cats       = dicts.categories || {};
   const usersMap   = dicts.users || {};
