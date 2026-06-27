@@ -11,7 +11,10 @@ from collections import defaultdict, Counter
 print("== Загружаем данные ==")
 deals_raw = json.load(open(config.CACHE_DIR + "/deals_NEW.json", encoding="utf-8"))
 dicts     = json.load(open(config.DICTS_JSON, encoding="utf-8"))
-cc        = json.load(open(config.CC_JSON,    encoding="utf-8"))
+try:
+    cc = json.load(open(config.CC_JSON, encoding="utf-8"))
+except FileNotFoundError:
+    cc = {}
 
 # Компании
 companies = {}

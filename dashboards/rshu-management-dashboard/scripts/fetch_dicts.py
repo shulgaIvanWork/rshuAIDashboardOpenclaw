@@ -4,17 +4,14 @@ fetch_dicts.py — выгружает справочники Битрикс24:
 Результат: dicts.json
 Запускать при первом старте и при изменениях в справочниках.
 """
-import urllib.request, urllib.parse, json, sys
+import urllib.request, urllib.parse, json, sys, os
 import config
 
-def http_post(url, data, timeout=config.TIMEOUT):
-    body = urllib.parse.urlencode(data, doseq=True).encode()
-    req  = urllib.request.Request(url, data=body, method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode())
+import urllib.parse
 
 def call(method, params=None):
-    return http_post(config.BASE + method + ".json", params or {})
+    body = urllib.parse.urlencode(params or {}, doseq=True).encode()
+    return config.http_post(config.BASE + method + ".json", body)
 
 print("== Воронки ==")
 cats = call("crm.dealcategory.list", {"select[0]": "ID", "select[1]": "NAME"})["result"]
@@ -40,7 +37,10 @@ print(f"  Источников: {len(src_map)}")
 
 print("== Пользователи (по сделкам) ==")
 try:
-    deals = json.load(open(config.DEALS_JSON, encoding="utf-8"))
+    deals_path = os.path.join(config.CACHE_DIR, "deals_NEW.json")
+    if not os.path.exists(deals_path):
+        deals_path = config.DEALS_JSON
+    deals = json.load(open(deals_path, encoding="utf-8"))
     uids  = sorted({str(d.get("ASSIGNED_BY_ID","")) for d in deals if d.get("ASSIGNED_BY_ID")})
 except FileNotFoundError:
     print(f"  WARN: {config.DEALS_JSON} не найден — пользователи будут пустыми")
@@ -51,7 +51,7 @@ for i in range(0, len(uids), 50):
     chunk = uids[i:i+50]
     cmd   = {f"cmd[u{j}]": f"user.get?ID={uid}" for j, uid in enumerate(chunk)}
     cmd["halt"] = "0"
-    r = http_post(config.BASE + "batch.json", cmd)
+    r = config.http_post(config.BASE + "batch.json", urllib.parse.urlencode(cmd, doseq=True).encode(), headers={'Content-Type': 'application/x-www-form-urlencoded'})
     res = r.get("result", {}).get("result", {})
     for j, uid in enumerate(chunk):
         arr = res.get(f"u{j}", [])

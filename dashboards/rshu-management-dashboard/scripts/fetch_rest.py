@@ -38,13 +38,18 @@ SELECT = [
 ]
 
 
-def rest_call(method, params):
+def rest_call(method, params, retries=6):
     body = json.dumps(params).encode()
-    req = urllib.request.Request(WEBHOOK + method + '.json', data=body, method='POST')
-    req.add_header('Content-Type', 'application/json')
-    req.timeout = config.TIMEOUT
-    with urllib.request.urlopen(req) as r:
-        return json.loads(r.read().decode())
+    for attempt in range(retries):
+        try:
+            return config.http_post(WEBHOOK + method + '.json', body)
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = 10 * (attempt + 1)
+                print(f'  Retry {attempt + 1}/{retries - 1} after error: {e} (wait {wait}s)', flush=True)
+                time.sleep(wait)
+            else:
+                raise
 
 
 def fetch_all(year_start):
@@ -82,7 +87,7 @@ def fetch_all(year_start):
         if nxt is None:
             break
         start = nxt
-        time.sleep(0.35)
+        time.sleep(1.0)
 
     return list(all_deals.values())
 
@@ -112,7 +117,7 @@ def main():
     # Сохраняем
     path = os.path.join(config.CACHE_DIR, 'deals_rest.json')
     json.dump(filtered, open(path, 'w', encoding='utf-8'), ensure_ascii=False)
-    print(f'\n✅ Сохранено: {path} ({os.path.getsize(path) / 1024 / 1024:.1f} MB)')
+    print(f'\nOK Сохранено: {path} ({os.path.getsize(path) / 1024 / 1024:.1f} MB)')
 
     # Статистика
     sem_stats = {}

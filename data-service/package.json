@@ -1,0 +1,8 @@
+{
+  "name": "data-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "fetch": "node --env-file=../.env index.js"
+  }
+}

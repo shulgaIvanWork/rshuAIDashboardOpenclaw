@@ -50,3 +50,26 @@ AGG_JSON   = os.path.join(CACHE_DIR, 'agg_new.json')
 
 # Таймаут HTTP-запросов (сек)
 TIMEOUT = 90
+
+# SSL-контекст (MSYS2-Python не имеет системных CA — отключаем проверку)
+import ssl as _ssl
+import urllib.request as _urllib_request
+import json as _json
+
+SSL_CTX = _ssl.create_default_context()
+SSL_CTX.check_hostname = False
+SSL_CTX.verify_mode = _ssl.CERT_NONE
+
+def http_post(url, body: bytes, headers: dict = None, timeout=TIMEOUT):
+    """POST-запрос с обходом проверки SSL-сертификата."""
+    req = _urllib_request.Request(url, data=body, method='POST')
+    if headers and 'Content-Type' in headers:
+        req.add_header('Content-Type', headers['Content-Type'])
+        extra = {k: v for k, v in headers.items() if k != 'Content-Type'}
+    else:
+        req.add_header('Content-Type', 'application/json')
+        extra = headers or {}
+    for k, v in extra.items():
+        req.add_header(k, v)
+    with _urllib_request.urlopen(req, context=SSL_CTX, timeout=timeout) as r:
+        return _json.loads(r.read().decode())

@@ -43,12 +43,11 @@ SELECT = [
 ]
 
 
+import urllib.parse as _urllib_parse
+
 def fetch_page(params):
-    body = urllib.parse.urlencode(params).encode()
-    req = urllib.request.Request(EXPORT_URL, data=body, method='POST')
-    req.add_header('Content-Type', 'application/x-www-form-urlencoded')
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return json.loads(r.read().decode())
+    body = _urllib_parse.urlencode(params).encode()
+    return config.http_post(EXPORT_URL, body, headers={'Content-Type': 'application/x-www-form-urlencoded'}, timeout=120)
 
 
 def fetch_export_all():
@@ -150,7 +149,7 @@ def main():
     merged_list = list(merged.values())
     new_path = os.path.join(config.CACHE_DIR, 'deals_NEW.json')
     json.dump(merged_list, open(new_path, 'w', encoding='utf-8'), ensure_ascii=False)
-    print(f'✅ Сохранено: {new_path} ({os.path.getsize(new_path) / 1024 / 1024:.1f} MB)')
+    print(f'OK Сохранено: {new_path} ({os.path.getsize(new_path) / 1024 / 1024:.1f} MB)')
 
     # Статистика по семантике в финальном файле
     sem_stats = {}
