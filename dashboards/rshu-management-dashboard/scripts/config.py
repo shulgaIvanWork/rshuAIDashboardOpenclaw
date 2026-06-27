@@ -9,6 +9,9 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Кэш-директория (данные, доступные серверу)
 CACHE_DIR = os.path.join(SCRIPT_DIR, '..', 'cache')
 
+# Центральный кэш data-service (общий источник сырых данных)
+DATA_SERVICE_CACHE = os.path.join(SCRIPT_DIR, '..', '..', '..', 'data-service', 'cache')
+
 # Bitrix24 REST-endpoint (BASE + метод + .json)
 BASE = "https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/"
 
@@ -43,8 +46,8 @@ LEADS_STATE  = os.path.join(CACHE_DIR, 'leads_state.json')
 # ---------------------------------------------------------------
 # Промежуточные JSON-файлы
 # ---------------------------------------------------------------
-DEALS_JSON = os.path.join(CACHE_DIR, 'deals_2026.json')
-DICTS_JSON = os.path.join(CACHE_DIR, 'dicts.json')
+DEALS_JSON = os.path.join(DATA_SERVICE_CACHE, 'deals.json')
+DICTS_JSON = os.path.join(DATA_SERVICE_CACHE, 'dicts.json')
 CC_JSON    = os.path.join(CACHE_DIR, 'company_contact.json')
 AGG_JSON   = os.path.join(CACHE_DIR, 'agg_new.json')
 
