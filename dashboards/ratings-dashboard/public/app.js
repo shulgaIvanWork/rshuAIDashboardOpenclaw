@@ -1,4 +1,4 @@
-// ========== Helper functions ==========
+﻿// ========== Helper functions ==========
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function loadArtifacts(){
   fetch(window.BASE_PATH+'/api/artifacts').then(function(r){return r.json();}).then(function(d){
@@ -26,40 +26,6 @@ function loadArtifacts(){
 var _p = window.location.pathname;
 var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
 window.BASE_PATH = _m ? '/' + _m[1] : '';
-
-var refreshStepsData = [
-  { key: 'fetch_data',   label: 'Загрузка данных',         weight: 50 },
-  { key: 'analyze',      label: 'Анализ данных',           weight: 50 },
-];
-
-var statusPanelHTML = '' +
-  '<div id="refreshStatusPanel" class="refresh-panel" style="display:none">' +
-    '<div class="refresh-header">' +
-      '<span class="refresh-title">🔄 Обновление данных</span>' +
-      '<span class="refresh-elapsed" id="statusElapsed">⏱ 0м 0с</span>' +
-    '</div>' +
-    '<div class="progress-bar refresh-progress-bar">' +
-      '<div class="progress-fill" id="statusProgressFill" style="width:0%"></div>' +
-    '</div>' +
-    '<div id="statusSteps" class="refresh-steps"></div>' +
-    '<div id="statusDealProgress" class="refresh-deal-progress"></div>' +
-  '</div>';
-
-function renderStepLines(curIdx, steps, progressPct) {
-  var h = '';
-  for (var i = 0; i < steps.length; i++) {
-    var s = steps[i];
-    var icon, cls, label;
-    if (i < curIdx) { icon = '\u2705'; cls = 'step-done'; label = s.label; }
-    else if (i === curIdx) { icon = '\u23f3'; cls = 'step-active'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
-    else { icon = '\u2b1c'; cls = 'step-pending'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
-    h += '<div class="refresh-step ' + cls + '">' +
-      '<span class="step-icon">' + icon + '</span>' +
-      '<span class="step-label">' + label + '</span>' +
-    '</div>';
-  }
-  return h;
-}
 
 async function safeFetch(url, opts) {
   var resp = await fetch(url, opts);
@@ -120,24 +86,12 @@ async function loadAll() {
     if (u && u.role) userRole = u.role;
   } catch(e) {}
 
-  // Create refresh button only for admins
-  var container = document.getElementById('refreshBtnContainer');
-  if (container) {
-    if (userRole === 'admin') {
-      var btn = document.createElement('button');
-      btn.id = 'refreshBtn';
-      btn.textContent = '🔄 Обновить данные';
-      btn.addEventListener('click', refreshButtonHandler);
-      container.appendChild(btn);
-    }
-  }
 
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
   try {
     const d = await api('/api/data/new');
     if (!d || !d.ytd) return;
-    document.getElementById('loadingFill').style.width = '100%';
     dataCache = d;
     
     // Устанавливаем dateFrom/dateTo по умолчанию: с 01.01.2026 до today
@@ -854,116 +808,6 @@ function drawCharts(data) {
     options: { ...common, plugins: { legend: { display: false }, tooltip: commonPlugin.tooltip, datalabels: { anchor: 'end', align: 'end', color: blue, font: { size: 8 }, formatter: v => v.toFixed(0) + 'дн' } }, scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' дн.' } } } },
     plugins: [ChartDataLabels]
   });
-}
-
-// --- Refresh ---
-async function refreshButtonHandler() {
-  this.disabled = true;
-  this.textContent = '⏳ Обновление...';
-  document.getElementById('loadingFill').style.width = '10%';
-
-  try {
-    // Сбросим, если было зависшее состояние
-    await safeFetch((window.BASE_PATH || '') + '/api/refresh/reset', { method: 'POST' });
-    
-    var resData = await safeFetch((window.BASE_PATH || '') + '/api/refresh', { method: 'POST' });
-    if (!resData.ok) { alert(resData.message); return; }
-    
-    // Ждём сколько нужно — без ограничения по времени
-    var pollCount = 0;
-    var statusEl = document.getElementById('loadingBar');
-    var statusText = document.createElement('div');
-    statusText.style.cssText = 'text-align:center;font-size:0.85rem;color:#888;margin-top:4px;';
-    statusText.id = 'loadingStatusText';
-    var existing = document.getElementById('loadingStatusText');
-    if (existing) existing.remove();
-    // Показываем панель прогресса
-    var panel = document.getElementById('refreshStatusPanel');
-    if (!panel) {
-      var toolbar = document.querySelector('.toolbar');
-      if (toolbar) toolbar.insertAdjacentHTML('afterend', statusPanelHTML);
-      panel = document.getElementById('refreshStatusPanel');
-    }
-    if (panel) {
-      panel.style.display = 'block';
-      document.getElementById('statusProgressFill').style.width = '0%';
-      document.getElementById('statusSteps').innerHTML = renderStepLines(-1, refreshStepsData, 0);
-      document.getElementById('statusElapsed').textContent = '⏱ 0м 0с';
-      document.getElementById('statusDealProgress').textContent = '';
-    }
-    
-    while (true) {
-      await new Promise(r => setTimeout(r, 5000));
-      pollCount++;
-      
-      var status = await safeFetch((window.BASE_PATH || '') + '/api/status');
-      
-      // Показываем сколько времени прошло
-      var elapsed = '';
-      if (status.startedAt) {
-        var start = new Date(status.startedAt);
-        var now = new Date();
-        var diff = Math.floor((now - start) / 1000);
-        var min = Math.floor(diff / 60);
-        var sec = diff % 60;
-        elapsed = min + 'м ' + sec + 'с';
-        var elEl = document.getElementById('statusElapsed');
-        if (elEl) elEl.textContent = '⏱ ' + elapsed;
-      }
-      
-      var pct = status.progressPct != null ? status.progressPct : 0;
-      var fillEl = document.getElementById('statusProgressFill');
-      if (fillEl) fillEl.style.width = Math.min(pct, 100) + '%';
-      document.getElementById('loadingFill').style.width = Math.min(pct, 100) + '%';
-      
-      var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
-      if (status.progressSteps) {
-        var allDone = status.progressSteps.every(function(s) { return s.done; });
-        if (allDone) curIdx = refreshStepsData.length;
-        var stepsEl = document.getElementById('statusSteps');
-        if (stepsEl) stepsEl.innerHTML = renderStepLines(curIdx, status.progressSteps, pct);
-      }
-      
-      var dealText = '';
-      if (status.loadingPhase && status.loadingPhase !== 'Запуск скрипта...') {
-        dealText = status.loadingPhase;
-        if (status.loadingProgress && status.loadingProgress.current > 0) {
-          dealText += ' — ' + status.loadingProgress.current.toLocaleString('ru-RU') + ' сделок';
-        }
-      }
-      var dpEl = document.getElementById('statusDealProgress');
-      if (dpEl) dpEl.textContent = dealText;
-      
-      if (status.error && !status.loading) {
-        var stepsEl = document.getElementById('statusSteps');
-        if (stepsEl) stepsEl.innerHTML += '<div class="refresh-step step-error"><span class="step-icon">❌</span><span class="step-label">Ошибка: ' + escapeHtml(status.error) + '</span></div>';
-        alert('Ошибка: ' + status.error);
-        break;
-      }
-      if (status.ready && !status.loading) {
-        var fillEl = document.getElementById('statusProgressFill');
-        if (fillEl) fillEl.style.width = '100%';
-        document.getElementById('loadingFill').style.width = '100%';
-        var stepsEl = document.getElementById('statusSteps');
-        if (stepsEl) stepsEl.innerHTML = renderStepLines(refreshStepsData.length, refreshStepsData, 100);
-        var dpEl = document.getElementById('statusDealProgress');
-        if (dpEl) dpEl.textContent = '✅ Загружено за ' + elapsed;
-        
-        setTimeout(function() {
-          var pnl = document.getElementById('refreshStatusPanel');
-          if (pnl) pnl.style.display = 'none';
-        }, 5000);
-        
-        loadAll().catch(function(e) {});
-        break;
-      }
-    }
-  } catch (e) { 
-    if (e.message !== 'redirect') {
-      alert('Ошибка: ' + e.message);
-    }
-  }
-  finally { this.disabled = false; this.textContent = '🔄 Обновить данные'; }
 }
 
 // --- Date filter ---

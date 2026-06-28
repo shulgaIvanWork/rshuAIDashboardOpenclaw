@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -11,39 +11,6 @@ var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
 window.BASE_PATH = _m ? '/' + _m[1] : '';
 
 // --- Refresh status panel
-var refreshStepsData = [
-  { key: 'fetch_data',   label: 'Загрузка данных',         weight: 50 },
-  { key: 'analyze',      label: 'Анализ данных',           weight: 50 },
-];
-
-var statusPanelHTML = '' +
-  '<div id="refreshStatusPanel" class="refresh-panel" style="display:none">' +
-    '<div class="refresh-header">' +
-      '<span class="refresh-title">🔄 Обновление данных</span>' +
-      '<span class="refresh-elapsed" id="statusElapsed">⏱ 0м 0с</span>' +
-    '</div>' +
-    '<div class="progress-bar refresh-progress-bar">' +
-      '<div class="progress-fill" id="statusProgressFill" style="width:0%"></div>' +
-    '</div>' +
-    '<div id="statusSteps" class="refresh-steps"></div>' +
-    '<div id="statusDealProgress" class="refresh-deal-progress"></div>' +
-  '</div>';
-
-function renderStepLines(curIdx, steps, progressPct) {
-  var h = '';
-  for (var i = 0; i < steps.length; i++) {
-    var s = steps[i];
-    var icon, cls, label;
-    if (i < curIdx) { icon = '✅'; cls = 'step-done'; label = s.label; }
-    else if (i === curIdx) { icon = '⏳'; cls = 'step-active'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
-    else { icon = '⬜'; cls = 'step-pending'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
-    h += '<div class="refresh-step ' + cls + '">' +
-      '<span class="step-icon">' + icon + '</span>' +
-      '<span class="step-label">' + label + '</span>' +
-    '</div>';
-  }
-  return h;
-}
 
 async function safeFetch(url, opts) {
   var resp = await fetch(url, opts);
@@ -62,12 +29,6 @@ async function safeFetch(url, opts) {
     .wrap { max-width: 1500px; margin: 0 auto; }
     h1 { font-size: 26px; font-weight: 700; margin: 0 0 4px; }
     .sub { color: #475569; font-size: 13px; margin-bottom: 24px; }
-    .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-    .toolbar button { background: #093EB4; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: .2s; }
-    .toolbar button:hover { background: #3079D2; }
-    .toolbar button:disabled { background: #475569; cursor: wait; }
-    .loading-bar { height: 3px; background: #e0e0e0; border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
-    .loading-bar .fill { height: 100%; width: 0%; background: #093EB4; transition: width .5s; }
 
     .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
     .kpi { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
@@ -152,10 +113,6 @@ async function safeFetch(url, opts) {
 <div class="wrap">
   <h1>Участники 2026</h1>
   <p class="sub" id="sourceInfo">Битрикс24 · загрузка...</p>
-  <div class="loading-bar" id="loadingBar"><div class="fill" id="loadingFill"></div></div>
-  <div class="toolbar">
-    <button id="refreshBtn">🔄 Обновить данные</button>
-
   </div>
   
   <div class="tabs" id="tabBar">
@@ -230,7 +187,6 @@ async function loadAll() {
     const d = await api('/api/data/new');
     if (!d || !d.ytd) return;
     
-    document.getElementById('loadingFill').style.width = '100%';
 
     
     var weeks = d.weeks || [];
@@ -931,137 +887,8 @@ function drawCharts(data) {
 }
 
 // --- Refresh ---
-document.getElementById('refreshBtn').addEventListener('click', async function() {
-  this.disabled = true;
-  this.textContent = '⏳ Обновление...';
-  document.getElementById('loadingFill').style.width = '10%';
-
-  try {
-    // Функция безопасного fetch — проверяет, что ответ JSON, а не HTML
-    async function safeFetch(url, opts) {
-      var resp = await fetch(url, opts);
-      if (resp.redirected || resp.url.endsWith('/login')) {
-        window.location.href = '/login';
-        throw new Error('redirect');
-      }
-      var text = await resp.text();
-      if (text.startsWith('<!DOCTYPE')) {
-        window.location.href = '/login';
-        throw new Error('redirect');
-      }
-      return JSON.parse(text);
-    }
-    
-    // Сбросим, если было зависшее состояние
-    await safeFetch((window.BASE_PATH || '') + '/api/refresh/reset', { method: 'POST' });
-    
-    var resData = await safeFetch((window.BASE_PATH || '') + '/api/refresh', { method: 'POST' });
-    if (!resData.ok) { alert(resData.message); return; }
-    
-    // Ждём сколько нужно — без ограничения по времени
-    var pollCount = 0;
-    var statusEl = document.getElementById('loadingBar');
-    var statusText = document.createElement('div');
-    statusText.style.cssText = 'text-align:center;font-size:0.85rem;color:#888;margin-top:4px;';
-    statusText.id = 'loadingStatusText';
-    var existing = document.getElementById('loadingStatusText');
-    if (existing) existing.remove();
-    // Показываем панель прогресса
-    var panel = document.getElementById('refreshStatusPanel');
-    if (!panel) {
-      var toolbar = document.querySelector('.toolbar');
-      if (toolbar) toolbar.insertAdjacentHTML('afterend', statusPanelHTML);
-      panel = document.getElementById('refreshStatusPanel');
-    }
-    if (panel) {
-      panel.style.display = 'block';
-      document.getElementById('statusProgressFill').style.width = '0%';
-      document.getElementById('statusSteps').innerHTML = renderStepLines(-1, refreshStepsData, 0);
-      document.getElementById('statusElapsed').textContent = '⏱ 0м 0с';
-      document.getElementById('statusDealProgress').textContent = '';
-    }
-    
-    while (true) {
-      await new Promise(r => setTimeout(r, 5000));
-      pollCount++;
-      
-      var status = await safeFetch((window.BASE_PATH || '') + '/api/status');
-      
-      // Показываем сколько времени прошло
-      var elapsed = '';
-      if (status.startedAt) {
-        var start = new Date(status.startedAt);
-        var now = new Date();
-        var diff = Math.floor((now - start) / 1000);
-        var min = Math.floor(diff / 60);
-        var sec = diff % 60;
-        elapsed = min + 'м ' + sec + 'с';
-        var elEl = document.getElementById('statusElapsed');
-        if (elEl) elEl.textContent = '⏱ ' + elapsed;
-      }
-      
-      var pct = status.progressPct != null ? status.progressPct : 0;
-      var fillEl = document.getElementById('statusProgressFill');
-      if (fillEl) fillEl.style.width = Math.min(pct, 100) + '%';
-      document.getElementById('loadingFill').style.width = Math.min(pct, 100) + '%';
-      
-      var curIdx = status.currentStepIdx != null ? status.currentStepIdx : -1;
-      if (status.progressSteps) {
-        var allDone = status.progressSteps.every(function(s) { return s.done; });
-        if (allDone) curIdx = refreshStepsData.length;
-        var stepsEl = document.getElementById('statusSteps');
-        if (stepsEl) stepsEl.innerHTML = renderStepLines(curIdx, status.progressSteps, pct);
-      }
-      
-      var dealText = '';
-      if (status.loadingPhase && status.loadingPhase !== 'Запуск скрипта...') {
-        dealText = status.loadingPhase;
-        if (status.loadingProgress && status.loadingProgress.current > 0) {
-          dealText += ' — ' + status.loadingProgress.current.toLocaleString('ru-RU') + ' сделок';
-        }
-      }
-      var dpEl = document.getElementById('statusDealProgress');
-      if (dpEl) dpEl.textContent = dealText;
-      
-      if (status.error && !status.loading) {
-        var stepsEl = document.getElementById('statusSteps');
-        if (stepsEl) stepsEl.innerHTML += '<div class="refresh-step step-error"><span class="step-icon">❌</span><span class="step-label">Ошибка: ' + escapeHtml(status.error) + '</span></div>';
-        alert('Ошибка: ' + status.error);
-        break;
-      }
-      if (status.ready && !status.loading) {
-        var fillEl = document.getElementById('statusProgressFill');
-        if (fillEl) fillEl.style.width = '100%';
-        document.getElementById('loadingFill').style.width = '100%';
-        var stepsEl = document.getElementById('statusSteps');
-        if (stepsEl) stepsEl.innerHTML = renderStepLines(refreshStepsData.length, refreshStepsData, 100);
-        var dpEl = document.getElementById('statusDealProgress');
-        if (dpEl) dpEl.textContent = '✅ Загружено за ' + elapsed;
-        
-        setTimeout(function() {
-          var pnl = document.getElementById('refreshStatusPanel');
-          if (pnl) pnl.style.display = 'none';
-        }, 5000);
-        
-        loadAll().catch(function(e) {});
-        break;
-      }
-    }
-  } catch (e) { 
-    if (e.message !== 'redirect') {
-      alert('Ошибка: ' + e.message);
-    }
-  }
-  finally { this.disabled = false; this.textContent = '🔄 Обновить данные'; }
-});
 
 // Защищённый запуск: ошибка не должна блокировать UI
-loadAll().catch(function(e) {
-  var area = document.getElementById('contentArea');
-  if (area) area.innerHTML = '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '<br>Нажмите «Обновить данные»</div>';
-  var areaNew = null; /* removed in participants version */
-  if (areaNew) areaNew.innerHTML = areaNew.innerHTML || '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
-});
 
 // --- Participants tab ---
 async function loadParticipants() {
@@ -1301,7 +1128,6 @@ function escapeHtml(s) {
   return s ? String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
 }
 
-// Кнопка refreshBtn уже есть в HTML статически
 </script>
 </body>
 </html>

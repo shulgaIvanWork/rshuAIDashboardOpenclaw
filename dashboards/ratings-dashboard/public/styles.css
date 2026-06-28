@@ -3,12 +3,6 @@
     .wrap { max-width: 1500px; margin: 0 auto; }
     h1 { font-size: 26px; font-weight: 700; margin: 0 0 4px; }
     .sub { color: #475569; font-size: 13px; margin-bottom: 24px; }
-    .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-    .toolbar button { background: #093EB4; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: .2s; }
-    .toolbar button:hover { background: #3079D2; }
-    .toolbar button:disabled { background: #475569; cursor: wait; }
-    .loading-bar { height: 3px; background: #e0e0e0; border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
-    .loading-bar .fill { height: 100%; width: 0%; background: #093EB4; transition: width .5s; }
 
     .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
     .kpi { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
