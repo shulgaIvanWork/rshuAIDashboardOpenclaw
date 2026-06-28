@@ -28,6 +28,16 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
+// Alias for legacy frontend calls
+app.get('/api/data/new', async (req, res) => {
+  try {
+    const data = await getAgg();
+    res.json(Object.assign({}, data, { _loadedAt: new Date(getCacheAt()).toISOString() }));
+  } catch (e) {
+    res.status(503).json({ error: e.message });
+  }
+});
+
 app.get('/api/artifacts', async (req, res) => {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   try {

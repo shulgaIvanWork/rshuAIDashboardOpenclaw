@@ -31,11 +31,16 @@ const FileStoreSession = FileStore(session);
 const _appCache = {};
 function lazyApp(name, importFn) {
   return async (req, res, next) => {
-    if (!_appCache[name]) {
-      const mod = await importFn();
-      _appCache[name] = mod.default;
+    try {
+      if (!_appCache[name]) {
+        const mod = await importFn();
+        _appCache[name] = mod.default;
+      }
+      _appCache[name](req, res, next);
+    } catch (e) {
+      console.error(`lazyApp(${name}) error:`, e.message);
+      next(e);
     }
-    _appCache[name](req, res, next);
   };
 }
 
