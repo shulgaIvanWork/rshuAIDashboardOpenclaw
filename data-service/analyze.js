@@ -350,8 +350,12 @@ export async function analyze(onProgress) {
   const dicts    = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'dicts.json'), 'utf-8'));
 
   const cc = {};
-  const companies = {};
   const leads = [];
+
+  let companies = {};
+  try {
+    companies = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'companies.json'), 'utf-8'));
+  } catch { /* companies.json не найден — топ компаний будет без названий */ }
 
   const cats       = dicts.categories || {};
   const usersMap   = dicts.users || {};
