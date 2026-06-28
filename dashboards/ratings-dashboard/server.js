@@ -19,7 +19,7 @@ app.get('/api/user', (req, res) => {
 app.get('/api/data', async (req, res) => {
   try {
     const data = await getAgg();
-    res.json(Object.assign({}, data, { _loadedAt: new Date(getCacheAt()).toISOString() }));
+    res.json(Object.assign({}, data, { _loadedAt: data.fetched_at || new Date(getCacheAt()).toISOString() }));
   } catch (e) {
     console.error('/api/data error:', e.message);
     res.status(503).json({ error: e.message });
@@ -30,7 +30,7 @@ app.get('/api/data', async (req, res) => {
 app.get('/api/data/new', async (req, res) => {
   try {
     const data = await getAgg();
-    res.json(Object.assign({}, data, { _loadedAt: new Date(getCacheAt()).toISOString() }));
+    res.json(Object.assign({}, data, { _loadedAt: data.fetched_at || new Date(getCacheAt()).toISOString() }));
   } catch (e) {
     res.status(503).json({ error: e.message });
   }

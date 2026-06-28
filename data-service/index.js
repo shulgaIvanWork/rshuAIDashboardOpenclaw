@@ -66,6 +66,11 @@ await writeFile(
   JSON.stringify(deals),
   'utf-8'
 );
+await writeFile(
+  path.join(CACHE_DIR, 'fetched_at.json'),
+  JSON.stringify({ fetchedAt: new Date().toISOString() }),
+  'utf-8'
+);
 progress({ type: 'step_done', idx: 1 });
 console.log(`  Сохранено: cache/deals.json (${elapsed()})`);
 

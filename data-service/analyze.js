@@ -349,6 +349,12 @@ export async function analyze(onProgress) {
   const dealsRaw = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'deals.json'), 'utf-8'));
   const dicts    = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'dicts.json'), 'utf-8'));
 
+  let fetchedAt = null;
+  try {
+    const fa = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'fetched_at.json'), 'utf-8'));
+    fetchedAt = fa.fetchedAt || null;
+  } catch { /* файл ещё не создан */ }
+
   const cc = {};
   const leads = [];
 
@@ -428,7 +434,7 @@ export async function analyze(onProgress) {
     weekly[w] = {
       week:w, mon:mon.toISOString().slice(0,10), sun:sun.toISOString().slice(0,10),
       label:weekLabel(YEAR,w,TODAY), label_short:`W${fmt2(w)}`,
-      label_dates:`${fmt2(mon.getDate())}.${fmt2(mon.getMonth()+1)}—${fmt2(mon.getDate())}.${fmt2(mon.getMonth()+1)}`,
+      label_dates:`${fmt2(mon.getDate())}.${fmt2(mon.getMonth()+1)}—${fmt2(sun.getDate())}.${fmt2(sun.getMonth()+1)}`,
       created_cnt:0, created_sum:0,
       postupleniya:0, won_cnt:0, lost_cnt:0, leads:0, avg_check:0,
       durs:[], chks:[], oom_durs:[], oom_chks:[], kom_durs:[], kom_chks:[],
@@ -436,6 +442,7 @@ export async function analyze(onProgress) {
       kom_postupleniya:0, kom_won_cnt:0, kom_lost_cnt:0, invoice_cnt:0,
       oom_postupleniya:0, oom_won_cnt:0, oom_leads:0, oom_mql:0,
       fmt_oom:0, fmt_om:0, fmt_sdo:0, fmt_kom:0, presale_durs:[],
+      by_prod:{}, by_src:{}, by_mba:{},
       btype_B2B_cnt:0,btype_B2B_sum:0,btype_B2C_cnt:0,btype_B2C_sum:0,
       src_internal_cnt:0,src_internal_sum:0,src_mkt_cnt:0,src_mkt_sum:0,
       edu_pk_cnt:0,edu_pk_sum:0,edu_pp_cnt:0,edu_pp_sum:0,edu_ko_cnt:0,edu_ko_sum:0,
@@ -496,6 +503,21 @@ export async function analyze(onProgress) {
             const d=daysBetween(r.DC,r.PAY_DT);
             if (d>=0) { wd.durs.push(d); if(r.IS_KOM) wd.kom_durs.push(d); else wd.oom_durs.push(d); }
           }
+          // by_prod: только ООМ
+          if (!r.IS_KOM && r.FORMAT!=='КОМ') {
+            const pk=r.PRODUCT.slice(0,90);
+            if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
+            wd.by_prod[pk].deals++; wd.by_prod[pk].sum+=r.OPP;
+            if (r.FORMAT==='Очный') { wd.by_prod[pk].fmt_ochn_cnt++; wd.by_prod[pk].fmt_ochn_sum+=r.OPP; }
+            else { wd.by_prod[pk].fmt_sdo_cnt++; wd.by_prod[pk].fmt_sdo_sum+=r.OPP; }
+            if (r.DC&&r.PAY_DT) { const d=daysBetween(r.DC,r.PAY_DT); if(d>=0) wd.by_prod[pk].durs.push(d); }
+          }
+          // by_src
+          { const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[]}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(r.DC&&r.CL){const d=daysBetween(r.DC,r.CL);if(d>=0)wd.by_src[sn].durs.push(d);} }
+          // by_company
+          { const cid=r.COMPANY_ID; if(cid&&cid!=='0'){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
+          // by_mba
+          { const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}}}}
         }
       }
     }
@@ -700,16 +722,18 @@ export async function analyze(onProgress) {
   for (const r of rows) {
     if (r.FORMAT==='КОМ') continue;
     const key=r.PRODUCT.slice(0,90);
-    if (!prodData[key]) prodData[key]={sql:0,deals:0,sum:0,durs:[]};
+    if (!prodData[key]) prodData[key]={sql:0,deals:0,sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
     if (r.DC&&r.DC.getFullYear()===YEAR&&r.OPP>=MIN_OPP) prodData[key].sql++;
     if (payYtd(r)) {
       prodData[key].deals++; prodData[key].sum+=r.OPP;
+      if (r.FORMAT==='Очный') { prodData[key].fmt_ochn_cnt++; prodData[key].fmt_ochn_sum+=r.OPP; }
+      else { prodData[key].fmt_sdo_cnt++; prodData[key].fmt_sdo_sum+=r.OPP; }
       if (r.DC&&r.CL){const d=daysBetween(r.DC,r.CL);if(d>=0)prodData[key].durs.push(d);}
     }
   }
   const prodList=Object.entries(prodData).map(([name,d])=>{
     const avgC=d.deals?d.sum/d.deals:0, avgD=avg(d.durs);
-    return{name,sql:d.sql,deals:d.deals,sum:d.sum,avg_check:Math.round(avgC),avg_won_days:Math.round(avgD*10)/10,share:0,_durs:d.durs};
+    return{name,sql:d.sql,deals:d.deals,sum:d.sum,avg_check:Math.round(avgC),avg_won_days:Math.round(avgD*10)/10,share:0,_durs:d.durs,fmt_ochn_cnt:d.fmt_ochn_cnt,fmt_ochn_sum:d.fmt_ochn_sum,fmt_sdo_cnt:d.fmt_sdo_cnt,fmt_sdo_sum:d.fmt_sdo_sum};
   }).sort((a,b)=>b.sum-a.sum);
   const totalNonKom=prodList.reduce((s,p)=>s+p.sum,0);
   const TOP_N=20;
@@ -717,10 +741,13 @@ export async function analyze(onProgress) {
   const remaining=prodList.slice(TOP_N);
   const remSum=remaining.reduce((s,p)=>s+p.sum,0), remDeals=remaining.reduce((s,p)=>s+p.deals,0);
   const remSql=remaining.reduce((s,p)=>s+p.sql,0), remDurs=remaining.flatMap(p=>p._durs);
+  const remOchnCnt=remaining.reduce((s,p)=>s+p.fmt_ochn_cnt,0), remOchnSum=remaining.reduce((s,p)=>s+p.fmt_ochn_sum,0);
+  const remSdoCnt=remaining.reduce((s,p)=>s+p.fmt_sdo_cnt,0), remSdoSum=remaining.reduce((s,p)=>s+p.fmt_sdo_sum,0);
   const topProducts=[...selected,{
     name:`📦 Остальные (${remaining.length} продуктов)`,sql:remSql,deals:remDeals,sum:remSum,
     avg_check:remDeals?Math.round(remSum/remDeals):0,avg_won_days:Math.round(avg(remDurs)*10)/10,
     share:totalNonKom?Math.round(remSum/totalNonKom*100*10)/10:0,
+    fmt_ochn_cnt:remOchnCnt,fmt_ochn_sum:remOchnSum,fmt_sdo_cnt:remSdoCnt,fmt_sdo_sum:remSdoSum,
   }];
 
   // ── Менеджеры ─────────────────────────────────────────────────────────────
@@ -777,10 +804,12 @@ export async function analyze(onProgress) {
     const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE);
     if (!isMba) continue;
     const mt=detectMbaType(r.TITLE); if(!mt) continue;
-    if(!mbaMap[mt]) mbaMap[mt]={cnt:0,sum:0,deals:0};
+    if(!mbaMap[mt]) mbaMap[mt]={cnt:0,sum:0,deals:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
     mbaMap[mt].cnt++; mbaMap[mt].sum+=r.OPP; mbaMap[mt].deals++;
+    if (r.FORMAT==='Очный') { mbaMap[mt].fmt_ochn_cnt++; mbaMap[mt].fmt_ochn_sum+=r.OPP; }
+    else { mbaMap[mt].fmt_sdo_cnt++; mbaMap[mt].fmt_sdo_sum+=r.OPP; }
   }
-  const mbaRatingList=Object.entries(mbaMap).map(([type,v])=>({type,cnt:v.cnt,sum:v.sum,deals:v.deals,avg_check:v.cnt?Math.round(v.sum/v.cnt):0})).sort((a,b)=>b.sum-a.sum);
+  const mbaRatingList=Object.entries(mbaMap).map(([type,v])=>({type,cnt:v.cnt,sum:v.sum,deals:v.deals,avg_check:v.cnt?Math.round(v.sum/v.cnt):0,fmt_ochn_cnt:v.fmt_ochn_cnt,fmt_ochn_sum:v.fmt_ochn_sum,fmt_sdo_cnt:v.fmt_sdo_cnt,fmt_sdo_sum:v.fmt_sdo_sum})).sort((a,b)=>b.sum-a.sum);
 
   // ── Созданные по категориям ───────────────────────────────────────────────
   const createdByCat={};
@@ -820,7 +849,7 @@ export async function analyze(onProgress) {
   const todayStr=`${TODAY.getFullYear()}-${fmt2(TODAY.getMonth()+1)}-${fmt2(TODAY.getDate())}`;
 
   return {
-    today:todayStr, year:YEAR,
+    today:todayStr, year:YEAR, fetched_at:fetchedAt,
     prev_week:prevW, cur_week:curW,
     prev_week_label:weekLabel(YEAR,prevW,TODAY), cur_week_label:weekLabel(YEAR,curW,TODAY),
     min_opp:MIN_OPP,
@@ -842,7 +871,7 @@ export async function analyze(onProgress) {
     fmt_ytd:fmtYtd, fmt_prev:fmtPrev,
     edu_ytd:eduYtd, edu_prev:eduPrev, edu_cur:eduCur,
     reg_ytd:regYtd, reg_all:regAll,
-    top_products:topProducts, top_companies:topCompanies,
+    top_products:topProducts, top_companies:topCompanies, company_names:companies,
     mgr_top:mgrTop, mgr_prev_top:mgrPrevTop,
     by_category:catTop, created_by_category:createdCatList,
     mba_rating:mbaRatingList,

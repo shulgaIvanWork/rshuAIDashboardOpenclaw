@@ -1,4 +1,4 @@
-﻿// ========== Helper functions ==========
+// ========== Helper functions ==========
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 function loadArtifacts(){
   fetch(window.BASE_PATH+'/api/artifacts').then(function(r){return r.json();}).then(function(d){
@@ -103,9 +103,13 @@ async function loadAll() {
     dateToCache = document.getElementById('dateTo').value;
     
     renderFilteredData();
-    
-    document.getElementById('sourceInfo').textContent =
-      `Битрикс24 · актуально на ${d.today} · всего недель: ${(d.weeks||[]).length}, обновлено: ${new Date().toLocaleString('ru-RU', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+
+    var dateEl = document.getElementById('updateDate');
+    if (dateEl && d._loadedAt) {
+      var dt = new Date(d._loadedAt);
+      dateEl.textContent = '(Данные на: ' + dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')';
+    }
+
   } catch (e) {
     console.error('loadAll error:', e);
     if (areaNew) areaNew.innerHTML = '<div class="error-state">❌ Ошибка загрузки: '+escapeHtml(e.message)+'<br>Нажмите «🔄 Обновить данные»</div>';
@@ -201,7 +205,123 @@ function buildFilteredData(orig, filteredWeeks) {
     });
   });
   out.fmt_ytd = fmt_ytd;
-  
+
+  // Агрегируем by_prod, by_src, by_mba из отфильтрованных недель
+  var prodAgg = {}, srcAgg = {}, mbaAgg = {};
+  var avg = function(arr) { return arr.length ? arr.reduce(function(s,x){return s+x;},0)/arr.length : 0; };
+
+  filteredWeeks.forEach(function(w) {
+    // by_prod
+    Object.entries(w.by_prod || {}).forEach(function(e) {
+      var name = e[0], v = e[1];
+      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
+      prodAgg[name].deals += v.deals||0; prodAgg[name].sum += v.sum||0;
+      prodAgg[name].fmt_ochn_cnt += v.fmt_ochn_cnt||0; prodAgg[name].fmt_ochn_sum += v.fmt_ochn_sum||0;
+      prodAgg[name].fmt_sdo_cnt += v.fmt_sdo_cnt||0; prodAgg[name].fmt_sdo_sum += v.fmt_sdo_sum||0;
+      if (v.durs) prodAgg[name].durs = prodAgg[name].durs.concat(v.durs);
+    });
+    // by_src
+    Object.entries(w.by_src || {}).forEach(function(e) {
+      var name = e[0], v = e[1];
+      if (!srcAgg[name]) srcAgg[name] = {deals:0,sum:0,durs:[]};
+      srcAgg[name].deals += v.deals||0; srcAgg[name].sum += v.sum||0;
+      if (v.durs) srcAgg[name].durs = srcAgg[name].durs.concat(v.durs);
+    });
+    // by_mba
+    Object.entries(w.by_mba || {}).forEach(function(e) {
+      var type = e[0], v = e[1];
+      if (!mbaAgg[type]) mbaAgg[type] = {cnt:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
+      mbaAgg[type].cnt += v.cnt||0; mbaAgg[type].sum += v.sum||0;
+      mbaAgg[type].fmt_ochn_cnt += v.fmt_ochn_cnt||0; mbaAgg[type].fmt_ochn_sum += v.fmt_ochn_sum||0;
+      mbaAgg[type].fmt_sdo_cnt += v.fmt_sdo_cnt||0; mbaAgg[type].fmt_sdo_sum += v.fmt_sdo_sum||0;
+    });
+  });
+
+  // Добавить sql из оригинального top_products (sql считается по DATE_CREATE, не по оплате)
+  (orig.top_products || []).forEach(function(p) { if (prodAgg[p.name]) prodAgg[p.name].sql = p.sql; });
+
+  // Построить top_products
+  var totalSum = Object.values(prodAgg).reduce(function(s,v){return s+v.sum;},0) || 1;
+  var prodList = Object.entries(prodAgg).map(function(e) {
+    var name = e[0], v = e[1];
+    var avgCheck = v.deals ? Math.round(v.sum/v.deals) : 0;
+    var avgDur = Math.round(avg(v.durs)*10)/10;
+    return {name:name, sql:v.sql||0, deals:v.deals, sum:v.sum, avg_check:avgCheck,
+      avg_won_days:avgDur, share:Math.round(v.sum/totalSum*100*10)/10,
+      fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
+      fmt_sdo_cnt:v.fmt_sdo_cnt, fmt_sdo_sum:v.fmt_sdo_sum};
+  }).sort(function(a,b){return b.sum-a.sum;});
+  var top20 = prodList.slice(0,20);
+  var rest = prodList.slice(20);
+  var restSum = rest.reduce(function(s,p){return s+p.sum;},0);
+  var restDeals = rest.reduce(function(s,p){return s+p.deals;},0);
+  if (rest.length) {
+    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', sql:rest.reduce(function(s,p){return s+p.sql;},0),
+      deals:restDeals, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:0,
+      share:Math.round(restSum/totalSum*100*10)/10,
+      fmt_ochn_cnt:rest.reduce(function(s,p){return s+p.fmt_ochn_cnt;},0),
+      fmt_ochn_sum:rest.reduce(function(s,p){return s+p.fmt_ochn_sum;},0),
+      fmt_sdo_cnt:rest.reduce(function(s,p){return s+p.fmt_sdo_cnt;},0),
+      fmt_sdo_sum:rest.reduce(function(s,p){return s+p.fmt_sdo_sum;},0)});
+  }
+  out.top_products = top20;
+
+  // Построить src_rating — MQL/SQL берём из оригинала по имени источника
+  var origSrcByName = {};
+  (orig.src_rating || []).forEach(function(s) { origSrcByName[s.name] = s; });
+  var srcList = Object.entries(srcAgg).map(function(e) {
+    var name = e[0], v = e[1];
+    var origS = origSrcByName[name] || {};
+    var avgD = Math.round(avg(v.durs)*10)/10;
+    var mql = origS.mql||0, sql = origS.sql||0;
+    return {name:name, postupleniya:v.sum, deals:v.deals, mql:mql, sql:sql, leads:0,
+      avg_check:v.deals?Math.round(v.sum/v.deals):0,
+      avg_won_days:avgD,
+      conv_mql_sql:mql?Math.round(sql/mql*100*10)/10:0,
+      conv_sql_deals:sql?Math.round(v.deals/sql*100*10)/10:0,
+      conv_lead_deals:0};
+  }).sort(function(a,b){return b.postupleniya-a.postupleniya;});
+  var srcTotMql = srcList.reduce(function(s,x){return s+x.mql;},0);
+  var srcTotSql = srcList.reduce(function(s,x){return s+x.sql;},0);
+  var srcTotDeals = srcList.reduce(function(s,x){return s+x.deals;},0);
+  var srcTotSum = srcList.reduce(function(s,x){return s+x.postupleniya;},0);
+  var srcAllDurs = filteredWeeks.flatMap(function(w){return Object.values(w.by_src||{}).flatMap(function(v){return v.durs||[];});});
+  var srcTotal = {name:'📊 ИТОГО',
+    postupleniya:srcTotSum, deals:srcTotDeals, mql:srcTotMql, sql:srcTotSql, leads:0,
+    avg_check:srcTotDeals?Math.round(srcTotSum/srcTotDeals):0,
+    avg_won_days:Math.round(avg(srcAllDurs)*10)/10,
+    conv_mql_sql:srcTotMql?Math.round(srcTotSql/srcTotMql*100*10)/10:0,
+    conv_sql_deals:srcTotSql?Math.round(srcTotDeals/srcTotSql*100*10)/10:0,
+    conv_lead_deals:0};
+  out.src_rating = [srcTotal].concat(srcList.slice(0,20));
+
+  // Построить mba_rating
+  out.mba_rating = Object.entries(mbaAgg).map(function(e) {
+    var type = e[0], v = e[1];
+    return {type:type, cnt:v.cnt, sum:v.sum, deals:v.cnt, avg_check:v.cnt?Math.round(v.sum/v.cnt):0,
+      fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
+      fmt_sdo_cnt:v.fmt_sdo_cnt, fmt_sdo_sum:v.fmt_sdo_sum};
+  }).sort(function(a,b){return b.sum-a.sum;});
+
+  // Построить top_companies из by_company + маппинг имён из orig
+  var companyNames = orig.company_names || {};
+  // Дополнить из top_companies на случай если company_names отсутствует (старый кэш)
+  (orig.top_companies || []).forEach(function(c) { if (!companyNames[c.id]) companyNames[c.id] = c.name; });
+  var compAgg = {};
+  filteredWeeks.forEach(function(w) {
+    Object.entries(w.by_company || {}).forEach(function(e) {
+      var cid = e[0], v = e[1];
+      if (!compAgg[cid]) compAgg[cid] = {sum:0,cnt:0,last:null};
+      compAgg[cid].sum += v.sum||0; compAgg[cid].cnt += v.cnt||0;
+      if (v.last && (!compAgg[cid].last || v.last > compAgg[cid].last)) compAgg[cid].last = v.last;
+    });
+  });
+  out.top_companies = Object.entries(compAgg).filter(function(e){return e[1].sum>0;}).map(function(e) {
+    var cid = e[0], v = e[1];
+    return {id:cid, name:(companyNames[cid]||'—').slice(0,100), sum:v.sum, cnt:v.cnt,
+      last_date:v.last||'—', avg_check:v.cnt?Math.round(v.sum/v.cnt):0};
+  }).sort(function(a,b){return b.sum-a.sum;}).slice(0,20);
+
   return out;
 }
 
@@ -602,11 +722,11 @@ async function renderPageMainNew(d) {
     var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
 
     var src = d.src_rating||[];
-    var srcStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Источник</th><th class="sort" data-col="2">Поступления, ₽</th><th class="sort" data-col="3">MQL</th><th class="sort" data-col="4">SQL</th><th class="sort" data-col="5">Сделки</th><th class="sort" data-col="6">MQL→SQL</th><th class="sort" data-col="7">SQL→Сд.</th><th class="sort" data-col="8">Лид→Сд.</th><th class="sort" data-col="9">Лидов</th><th class="sort" data-col="10">Ср.чек, ₽</th><th class="sort" data-col="11">Срок WON</th></tr>';
+    var srcStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Источник</th><th class="sort" data-col="2">Поступления, ₽</th><th class="sort" data-col="3">MQL</th><th class="sort" data-col="4">SQL</th><th class="sort" data-col="5">Сделки</th><th class="sort" data-col="6">MQL→SQL</th><th class="sort" data-col="7">SQL→Сд.</th><th class="sort" data-col="8">Ср.чек, ₽</th><th class="sort" data-col="9">Срок WON</th></tr>';
     src.forEach(function(s,i){
       if(!s.name) return;
       var isTotal = i === 0;
-      srcStr += '<tr'+(isTotal?' style="background:#fff8e1;font-weight:700"':'')+'><td>'+(isTotal?'':i)+'</td><td>'+escapeHtml(s.name)+'</td><td><b>'+fmt(s.postupleniya)+'</b> ₽</td><td>'+(s.mql||0)+'</td><td>'+(s.sql||0)+'</td><td>'+(s.deals||0)+'</td><td>'+(s.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(s.conv_sql_deals||0).toFixed(1)+'%</td><td>'+(s.conv_lead_deals||0).toFixed(1)+'%</td><td>'+(s.leads||0)+'</td><td>'+fmt(s.avg_check)+'</td><td>'+(s.avg_won_days||0).toFixed(1)+'дн</td></tr>';
+      srcStr += '<tr'+(isTotal?' style="background:#fff8e1;font-weight:700"':'')+'><td>'+(isTotal?'':i)+'</td><td>'+escapeHtml(s.name)+'</td><td><b>'+fmt(s.postupleniya)+'</b> ₽</td><td>'+(s.mql||0)+'</td><td>'+(s.sql||0)+'</td><td>'+(s.deals||0)+'</td><td>'+(s.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(s.conv_sql_deals||0).toFixed(1)+'%</td><td>'+fmt(s.avg_check)+'</td><td>'+(s.avg_won_days||0).toFixed(1)+'дн</td></tr>';
     });
     srcStr += '</table>';
     el = document.getElementById('newSrcTable'); if(el) el.innerHTML = srcStr;
