@@ -124,8 +124,8 @@ async function buildParticipants(weekIndex) {
 
   const [dealsRaw, companiesRaw, contactsRaw, dictsRaw, ccRaw, contExtRaw, formatRaw, compExtRaw] = await Promise.all([
     fs.readFile(path.join(DS_CACHE, 'deals.json'), 'utf-8').catch(() => '[]'),
-    fs.readFile(path.join(PARTS_CACHE, 'companies.json'), 'utf-8').catch(() => '{}'),
-    fs.readFile(path.join(PARTS_CACHE, 'contacts.json'), 'utf-8').catch(() => '{}'),
+    fs.readFile(path.join(DS_CACHE, 'companies.json'), 'utf-8').catch(() => '{}'),
+    fs.readFile(path.join(DS_CACHE, 'contacts.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(DS_CACHE, 'dicts.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(PARTS_CACHE, 'company_contact.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(PARTS_CACHE, 'contacts_ext.json'), 'utf-8').catch(() => '{}'),

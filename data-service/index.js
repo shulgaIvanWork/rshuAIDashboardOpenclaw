@@ -14,6 +14,7 @@ import path from 'path';
 import { fetchDealsRest } from './lib/bitrix-rest.js';
 import { fetchDealsExport, mergeDeals } from './lib/bitrix-export.js';
 import { fetchDicts } from './lib/bitrix-dicts.js';
+import { fetchContacts, fetchCompanies } from './lib/bitrix-contacts.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'cache');
@@ -82,8 +83,32 @@ await writeFile(
 progress({ type: 'step_done', idx: 2 });
 console.log(`  Сохранено: cache/dicts.json (${elapsed()})`);
 
+// --- Шаг 4: Контакты и компании (для participants-dashboard) ---
+console.log('\n== Шаг 4/4: Контакты и компании ==');
+progress({ type: 'step_start', idx: 3 });
+
+const contacts = await fetchContacts(deals);
+await writeFile(
+  path.join(CACHE_DIR, 'contacts.json'),
+  JSON.stringify(contacts),
+  'utf-8'
+);
+console.log(`  Сохранено: cache/contacts.json — ${Object.keys(contacts).length} контактов (${elapsed()})`);
+
+const companies = await fetchCompanies(deals);
+await writeFile(
+  path.join(CACHE_DIR, 'companies.json'),
+  JSON.stringify(companies),
+  'utf-8'
+);
+console.log(`  Сохранено: cache/companies.json — ${Object.keys(companies).length} компаний (${elapsed()})`);
+
+progress({ type: 'step_done', idx: 3 });
+
 // --- Готово ---
 progress({ type: 'all_done' });
 console.log(`\n== Готово за ${elapsed()} ==`);
-console.log(`  deals.json  — ${deals.length} сделок`);
-console.log(`  dicts.json  — ${Object.keys(dicts.categories).length} воронок, ${Object.keys(dicts.users).length} пользователей`);
+console.log(`  deals.json    — ${deals.length} сделок`);
+console.log(`  dicts.json    — ${Object.keys(dicts.categories).length} воронок, ${Object.keys(dicts.users).length} пользователей`);
+console.log(`  contacts.json — ${Object.keys(contacts).length} контактов`);
+console.log(`  companies.json — ${Object.keys(companies).length} компаний`);
