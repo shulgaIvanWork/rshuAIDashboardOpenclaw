@@ -1,8 +1,17 @@
 # Environment
 .env
 
-# Dependencies
+# Dependencies — npm workspaces: корень + локальные воркспейсы
 node_modules/
+
+# Кэш данных из Bitrix (генерируется data-service при запуске)
+data-service/cache/
+
+# Runtime (сессии пользователей)
+clover-web/data/sessions/*
+
+# Чувствительные данные (пароли, база пользователей)
+clover-web/data/users.json
 
 # OS
 .DS_Store
@@ -10,30 +19,11 @@ Thumbs.db
 
 # Logs
 *.log
-/tmp/
 
-# Cached data (API responses, generated)
-cache/
-data/cache.json
-*/data/cache.json
-
-# Generated reports
-output/
-*/output/
-
-# Python
+# Python (старые скрипты)
 __pycache__/
 *.pyc
 
 # IDE
 .vscode/
 .idea/
-
-# PM2
-pm2-logrotate/
-
-# Runtime data (sessions auto-created by express-session)
-clover-web/data/sessions/*
-
-# Sensitive config (passwords, user DB)
-clover-web/data/users.json
