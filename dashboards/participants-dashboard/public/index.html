@@ -110,7 +110,6 @@ async function safeFetch(url, opts) {
     @keyframes spin { to { transform: rotate(360deg); } }
     .error-state { padding: 40px; text-align: center; color: #C62828; }
     .dt { font-size: 11px; color: #475569; font-weight: 400; }
-    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
     th.sort { cursor: pointer; user-select: none; }
     th.sort:hover { background: #3079D2; }
     th.sort::after { content: ' ⇅'; font-size: 10px; opacity: .4; font-weight: 400; }
@@ -297,10 +296,10 @@ function renderPage(data) {
 
   function b2bRow(period, b, c, tot) {
     return `<tr><td>${period}</td>
-      <td><span class="dot" style="background:#1976D2"></span>B2B</td>
+      <td>B2B</td>
       <td>${b.cnt}</td><td><b>${fmt(b.sum)}</b> ₽</td><td>${(b.sum/tot*100).toFixed(1)}%</td></tr>
       <tr><td></td>
-      <td><span class="dot" style="background:#F57C00"></span>B2C</td>
+      <td>B2C</td>
       <td>${c.cnt}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${(c.sum/tot*100).toFixed(1)}%</td></tr>`;
   }
 
@@ -366,7 +365,7 @@ function renderPage(data) {
         <div class="chartbox"><canvas id="ch_fmt"></canvas></div>
         <div style="margin-top:14px"><table><thead><tr><th>Формат</th><th>Сделок</th><th>Поступления, ₽</th><th>Доля</th></tr></thead>
         <tbody>${fmtData.map(([k, v]) =>
-          `<tr><td><span class="dot" style="background:${fmtColors[k] || '#999'}"></span>${k}</td><td>${v.cnt}</td><td><b>${fmt(v.sum)}</b> ₽</td><td>${(v.sum/totFmt*100).toFixed(1)}%</td></tr>`
+          `<tr><td>${k}</td><td>${v.cnt}</td><td><b>${fmt(v.sum)}</b> ₽</td><td>${(v.sum/totFmt*100).toFixed(1)}%</td></tr>`
         ).join('')}</tbody></table></div>
       </div>
     </div>
@@ -1097,7 +1096,7 @@ async function loadParticipants() {
       const rowClass = i < 3 ? ' class="top3"' : '';
       const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
       const fmtColor = p.format === 'Онлайн' ? '#1976D2' : '#2E7D32';
-      const fmtLabel = p.format === 'Онлайн' ? '<span class="dot" style="background:#1976D2"></span>Онлайн' : '<span class="dot" style="background:#2E7D32"></span>Очно';
+      const fmtLabel = p.format === 'Онлайн' ? 'Онлайн' : 'Очно';
       const regionLabel = p.region ? escapeHtml(p.region) : '—';
       let stageColor = '#2E7D32';  // Счёт оплачен
       if (p.stage === 'Счёт отправлен') stageColor = '#9C27B0';
@@ -1186,7 +1185,7 @@ async function loadParticipantsCurrent() {
       const rowClass = i < 3 ? ' class="top3"' : '';
       const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
       const fmtColor = p.format === 'Онлайн' ? '#1976D2' : '#2E7D32';
-      const fmtLabel = p.format === 'Онлайн' ? '<span class="dot" style="background:#1976D2"></span>Онлайн' : '<span class="dot" style="background:#2E7D32"></span>Очно';
+      const fmtLabel = p.format === 'Онлайн' ? 'Онлайн' : 'Очно';
       const regionLabel = p.region ? escapeHtml(p.region) : '—';
       let stageColor = '#2E7D32';  // Счёт оплачен
       if (p.stage === 'Счёт отправлен') stageColor = '#9C27B0';
