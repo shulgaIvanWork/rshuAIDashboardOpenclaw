@@ -161,7 +161,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // Fallback for drop-dashboard only
-app.get('*', (req, res) => {
+app.get(/(.*)/,  (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
