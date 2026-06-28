@@ -8,7 +8,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
 // Participants-specific cache (modules, contacts, companies — not in data-service)
 const PARTS_CACHE = path.join(__dirname, 'cache');
-const DEALS_PATH = path.join(__dirname, '..', '..', 'data-service', 'cache', 'deals.json');
+const DS_CACHE = path.join(__dirname, '..', '..', 'data-service', 'cache');
+const DEALS_PATH = path.join(DS_CACHE, 'deals.json');
 
 const app = express();
 app.set('etag', false);
@@ -122,10 +123,10 @@ async function buildParticipants(weekIndex) {
   }
 
   const [dealsRaw, companiesRaw, contactsRaw, dictsRaw, ccRaw, contExtRaw, formatRaw, compExtRaw] = await Promise.all([
-    fs.readFile(path.join(PARTS_CACHE, 'deals_2026.json'), 'utf-8').catch(() => '[]'),
+    fs.readFile(path.join(DS_CACHE, 'deals.json'), 'utf-8').catch(() => '[]'),
     fs.readFile(path.join(PARTS_CACHE, 'companies.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(PARTS_CACHE, 'contacts.json'), 'utf-8').catch(() => '{}'),
-    fs.readFile(path.join(PARTS_CACHE, 'dicts.json'), 'utf-8').catch(() => '{}'),
+    fs.readFile(path.join(DS_CACHE, 'dicts.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(PARTS_CACHE, 'company_contact.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(PARTS_CACHE, 'contacts_ext.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(PARTS_CACHE, 'deals_format.json'), 'utf-8').catch(() => '{}'),
