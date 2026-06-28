@@ -1,0 +1,9 @@
+{
+  "name": "rshu-ai-dashboard",
+  "private": true,
+  "workspaces": [
+    "data-service",
+    "clover-web",
+    "dashboards/*"
+  ]
+}

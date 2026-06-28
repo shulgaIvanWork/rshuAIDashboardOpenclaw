@@ -26,15 +26,18 @@ function saveUsers(users) {
 
 const FileStoreSession = FileStore(session);
 
-// --------------- Sub-apps ---------------
-import dropDashboard from '../dashboards/drop-dashboard/server.js';
-import rshuManagementDashboard from '../dashboards/rshu-management-dashboard/server.js';
-import ratingsDashboard from '../dashboards/ratings-dashboard/server.js';
-import participantsDashboard from '../dashboards/participants-dashboard/server.js';
-import testDashboard from '../dashboards/test-dashboard/server.js';
-import rshuDashboard from '../dashboards/rshu-dashboard/server.js';
-import komDashboard from '../dashboards/kom-dashboard/server.js';
-import managerReportDev from '../dashboards/manager-report-dev/server.js';
+// --------------- Lazy sub-app loader ---------------
+// Каждый дашборд загружается при первом обращении, а не при старте сервера
+const _appCache = {};
+function lazyApp(name, importFn) {
+  return async (req, res, next) => {
+    if (!_appCache[name]) {
+      const mod = await importFn();
+      _appCache[name] = mod.default;
+    }
+    _appCache[name](req, res, next);
+  };
+}
 
 // --------------- App ---------------
 const app = express();
@@ -97,16 +100,15 @@ app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
 });
 
-// --------------- Mount dashboards (with auth) ---------------
-app.use('/rshu-dashboard', requireAuth, rshuDashboard);
-app.use('/kom-dashboard', requireAuth, komDashboard);
-app.use('/drop-dashboard', requireAuth, dropDashboard);
-app.use('/rshu-management-dashboard', requireAuth, rshuManagementDashboard);
-app.use('/ratings-dashboard', requireAuth, ratingsDashboard);
-
-app.use('/participants-dashboard', requireAuth, participantsDashboard);
-app.use('/test-dashboard', requireAuth, testDashboard);
-app.use('/manager-report-dev', requireAuth, managerReportDev);
+// --------------- Mount dashboards (with auth, lazy-loaded) ---------------
+app.use('/rshu-dashboard',            requireAuth, lazyApp('rshu-dashboard',            () => import('../dashboards/rshu-dashboard/server.js')));
+app.use('/kom-dashboard',             requireAuth, lazyApp('kom-dashboard',             () => import('../dashboards/kom-dashboard/server.js')));
+app.use('/drop-dashboard',            requireAuth, lazyApp('drop-dashboard',            () => import('../dashboards/drop-dashboard/server.js')));
+app.use('/rshu-management-dashboard', requireAuth, lazyApp('rshu-management-dashboard', () => import('../dashboards/rshu-management-dashboard/server.js')));
+app.use('/ratings-dashboard',         requireAuth, lazyApp('ratings-dashboard',         () => import('../dashboards/ratings-dashboard/server.js')));
+app.use('/participants-dashboard',    requireAuth, lazyApp('participants-dashboard',    () => import('../dashboards/participants-dashboard/server.js')));
+app.use('/test-dashboard',            requireAuth, lazyApp('test-dashboard',            () => import('../dashboards/test-dashboard/server.js')));
+app.use('/manager-report-dev',        requireAuth, lazyApp('manager-report-dev',        () => import('../dashboards/manager-report-dev/server.js')));
 
 // --------------- Dashboards page ---------------
 app.get('/dashboards', requireAuth, (req, res) => {

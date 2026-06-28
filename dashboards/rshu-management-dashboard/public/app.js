@@ -646,6 +646,3 @@ loadAll().catch(function(e) {
   var areaNew = document.getElementById('contentAreaNew');
   if (areaNew) areaNew.innerHTML = '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
 });
-
-
-// --- Participants tab ---

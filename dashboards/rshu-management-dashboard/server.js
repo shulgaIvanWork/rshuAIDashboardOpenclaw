@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { analyze } from './analyze.js';
+import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 
 // Sub-apps
 import testDashboard from '../test-dashboard/server.js';
@@ -11,34 +11,6 @@ import testDashboard from '../test-dashboard/server.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const DEALS_PATH = path.join(__dirname, '..', '..', 'data-service', 'cache', 'deals.json');
-
-const CACHE_TTL_MS = 60 * 1000; // 60 секунд
-
-let aggCache = null;     // последний результат analyze()
-let aggCacheAt = 0;      // когда был рассчитан (Date.now())
-let analyzing = null;    // Promise текущего analyze(), чтобы параллельные запросы не запускали второй
-
-async function getOrRefresh() {
-  // Если кэш свежий — отдаём сразу
-  if (aggCache && (Date.now() - aggCacheAt) < CACHE_TTL_MS) {
-    return aggCache;
-  }
-  // Если уже идёт расчёт — ждём его результата
-  if (analyzing) {
-    return analyzing;
-  }
-  // Запускаем расчёт
-  analyzing = analyze().then(result => {
-    aggCache = result;
-    aggCacheAt = Date.now();
-    analyzing = null;
-    return result;
-  }).catch(e => {
-    analyzing = null;
-    throw e;
-  });
-  return analyzing;
-}
 
 // --- Express ---
 const app = express();
@@ -50,11 +22,11 @@ app.get('/api/user', (req, res) => {
   res.json({ role: (req.user && req.user.role) || 'guest' });
 });
 
-// Main data — всегда свежие, с TTL 60 сек в памяти
+// Main data — всегда свежие, из общего кэша data-service
 app.get('/api/data', async (req, res) => {
   try {
-    const data = await getOrRefresh();
-    res.json(Object.assign({}, data, { _loadedAt: new Date(aggCacheAt).toISOString() }));
+    const data = await getAgg();
+    res.json(Object.assign({}, data, { _loadedAt: new Date(getCacheAt()).toISOString() }));
   } catch (e) {
     console.error('/api/data error:', e.message);
     res.status(503).json({ error: e.message });

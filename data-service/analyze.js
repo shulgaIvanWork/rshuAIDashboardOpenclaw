@@ -8,7 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_SERVICE_CACHE = path.join(__dirname, '..', '..', 'data-service', 'cache');
+const DATA_SERVICE_CACHE = path.join(__dirname, 'cache');
 
 const YEAR = 2026;
 const MIN_OPP = 11.0;
