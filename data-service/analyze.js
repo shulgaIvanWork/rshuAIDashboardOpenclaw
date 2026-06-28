@@ -115,7 +115,7 @@ function normalizeProduct(title) {
   t = t.replace(RE_COPY,'').replace(RE_KOMPFX,'').replace(RE_GIFT,'').replace(RE_CONTRACT,'');
   t = t.replace(RE_CITY,'').replace(RE_DATE2,'').replace(RE_DATE,'').replace(RE_RANGE,'');
   t = t.replace(RE_PDATE,'').replace(RE_SDO,'').replace(/_+/g,' ').replace(/\s+/g,' ').trim();
-  return t.replace(/^[ .,:;"«»()]+|[ .,:;"«»()]+$/g,'') || title;
+  return t.replace(/^[ .,:;"«»()\-–—]+|[ .,:;"«»()\-–—]+$/g,'') || title;
 }
 
 function detectFormat(title, ufFormat) {
