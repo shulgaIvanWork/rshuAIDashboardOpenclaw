@@ -5,9 +5,6 @@ import { fileURLToPath } from 'url';
 
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 
-// Sub-apps
-import testDashboard from '../test-dashboard/server.js';
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const DEALS_PATH = path.join(__dirname, '..', '..', 'data-service', 'cache', 'deals.json');
