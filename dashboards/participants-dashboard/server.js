@@ -111,6 +111,19 @@ app.get('/api/artifacts', async (req, res) => {
   }
 });
 
+// Strip dates, cities, contract numbers from deal title to get program name
+function normalizeTitle(title) {
+  return (title || '')
+    .replace(/\s*Договор\s*№.*$/i, '')
+    .replace(/\s*\d{1,2}[./]\d{1,2}[./]?\d{0,4}[-–—]\d{1,2}[./]\d{1,2}[./]?\d{0,4}/g, '')
+    .replace(/\s*\d{1,2}[./]\d{1,2}[./]?\d{0,4}/g, '')
+    .replace(/\s+в\s+г\.?\s*[А-ЯЁA-Z][а-яёa-z\-]+/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[ .,:;"«»()\-–—]+|[ .,:;"«»()\-–—]+$/g, '')
+    || title;
+}
+
 // Build participants list for a given week index
 async function buildParticipants(weekIndex) {
   const agg = await getAgg();
@@ -246,7 +259,8 @@ async function buildParticipants(weekIndex) {
       if (!(learnStart <= range.end && learnEnd >= range.start)) continue;
       dealModules.push({
         product_id: '0',
-        original_name: '—',
+        original_name: null,
+        product_name: d.TITLE,   // use deal title as program fallback
         date_start: learnStart ? learnStart.toISOString().substring(0, 10) : null,
         date_end: learnEnd ? learnEnd.toISOString().substring(0, 10) : null
       });
@@ -260,12 +274,12 @@ async function buildParticipants(weekIndex) {
     const contactId = String(ccinfo.CONTACT_ID || d.CONTACT_ID || '0');
 
     const companyName = companies[coId] || '—';
-    const contactInfo = contactsExt[contactId] || contacts[contactId] || {};
+    const contactInfo = contacts[contactId] || contactsExt[contactId] || {};
     const contactName = contactInfo.name || (contactId !== '0' ? `Контакт #${contactId}` : '—');
     const opp = parseFloat(d.OPPORTUNITY || 0);
     const manager = users[String(d.ASSIGNED_BY_ID || '')] || String(d.ASSIGNED_BY_ID || '—');
 
-    let region = (contactsExt[contactId]?.region || contactsExt[contactId]?.locality || '');
+    let region = contactInfo.region || contactsExt[contactId]?.region || contactsExt[contactId]?.locality || '';
     if (!region && companiesExt[coId]?.region) {
       region = companiesExt[coId].region;
     }
@@ -284,9 +298,9 @@ async function buildParticipants(weekIndex) {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const moduleName = mod.original_name
-        || (mod.product_name ? mod.product_name.replace(/^Оказание образовательных услуг по теме \"(.+?)\".*$/, '$1').trim() : '—')
-        || '—';
+      const rawName = mod.original_name
+        || (mod.product_name ? mod.product_name.replace(/^Оказание образовательных услуг по теме "(.+?)".*$/, '$1').trim() : null);
+      const moduleName = rawName ? normalizeTitle(rawName) : '—';
 
       const modStart = parseModuleDate(mod.date_start);
       const modDisplayDate = modStart ? modStart.toLocaleDateString('ru-RU') : '—';

@@ -64,10 +64,11 @@ export async function fetchContacts(deals) {
 
   const contacts = await batchGet(
     ids,
-    id => `crm.contact.get?id=${id}&select[]=NAME&select[]=LAST_NAME&select[]=SECOND_NAME&select[]=POST`,
+    id => `crm.contact.get?id=${id}&select[]=NAME&select[]=LAST_NAME&select[]=SECOND_NAME&select[]=POST&select[]=ADDRESS_CITY&select[]=ADDRESS_REGION`,
     item => ({
       name: [item.NAME, item.LAST_NAME].filter(Boolean).join(' ') || `Контакт #${item.ID}`,
       post: item.POST || '',
+      region: item.ADDRESS_CITY || item.ADDRESS_REGION || '',
     })
   );
 
