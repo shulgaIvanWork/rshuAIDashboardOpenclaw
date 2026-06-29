@@ -10,15 +10,13 @@ async function safeFetch(url, opts) {
 }
 
 let metrikaData = null, roistatOrders = null, roistatCalls = null, bitrixDeals = null;
-let motivationData = null, motivationCharts = {};
+let motivCalcData = null, motivationCharts = {};
+let plansData = {};
 let exportAnalysisData = null, exportCharts = {};
 let productsData = null;
 
 async function loadAll() {
-  safeFetch(BASE + '/motivations').then(d => {
-    motivationData = d;
-    renderMotivation();
-  }).catch(() => {});
+  loadMotivation();
   safeFetch(BASE + '/export-analysis').then(d => {
     exportAnalysisData = d;
     renderExportAnalysis();
@@ -272,41 +270,45 @@ function renderConversion() {
   `;
 }
 
-// ============ 5. Мотивация ДРОП ============
-function renderMotivation() {
-  if (!motivationData) return;
-  const months = motivationData;
+// ============ 5. Мотивация ============
 
-  let totalFact = 0, totalPlan = 0, totalBonus = 0, totalReturns = 0;
-  months.forEach(m => {
-    totalFact += m.total?.fact || 0;
-    totalPlan += m.total?.plan || 0;
-    totalBonus += m.total?.itog || 0;
-    totalReturns += m.returns || 0;
-  });
-  const overallPct = totalPlan > 0 ? ((totalFact / totalPlan) * 100).toFixed(1) : 0;
+async function loadMotivation() {
+  try {
+    [motivCalcData, plansData] = await Promise.all([
+      safeFetch(BASE + '/motivation-calc'),
+      safeFetch(BASE + '/plans'),
+    ]);
+    renderMotivation();
+    renderPlansEditor();
+  } catch(e) {
+    document.getElementById('motivation-table').innerHTML = `<div class="error-state">❌ ${e.message}</div>`;
+  }
+}
+
+function renderMotivation() {
+  if (!motivCalcData) return;
+
+  let totalFact = 0, totalPlan = 0, totalItog = 0;
+  motivCalcData.forEach(m => { totalFact += m.total.fact; totalPlan += m.total.plan; totalItog += m.total.itog; });
+  const overallPct = totalPlan > 0 ? (totalFact / totalPlan * 100).toFixed(1) : 0;
 
   document.getElementById('motivation-cards').innerHTML = `
-    <div class="card"><h3>План (5 мес)</h3><div class="value blue">${fmt(Math.round(totalPlan))} ₽</div></div>
-    <div class="card"><h3>Факт (5 мес)</h3><div class="value ${totalFact >= totalPlan ? 'green' : 'red'}">${fmt(Math.round(totalFact))} ₽</div><div class="sub">Выполнение: ${overallPct}%</div></div>
-    <div class="card"><h3>Начислено мотивации</h3><div class="value purple">${fmt(Math.round(totalBonus))} ₽</div><div class="sub">${totalFact > 0 ? ((totalBonus / totalFact) * 100).toFixed(2) : 0}% от выручки</div></div>
-    <div class="card"><h3>Возвраты</h3><div class="value red">${fmt(Math.abs(totalReturns))} ₽</div><div class="sub">${totalFact > 0 ? ((Math.abs(totalReturns) / totalFact) * 100).toFixed(1) : 0}% от факта</div></div>
+    <div class="card"><h3>Факт YTD</h3><div class="value ${totalFact >= totalPlan ? 'green' : 'red'}">${fmt(totalFact)} ₽</div><div class="sub">выполнение: ${overallPct}%</div></div>
+    <div class="card"><h3>План YTD</h3><div class="value blue">${fmt(totalPlan)} ₽</div></div>
+    <div class="card"><h3>Начислено мотивации</h3><div class="value purple">${fmt(totalItog)} ₽</div><div class="sub">${totalFact > 0 ? (totalItog / totalFact * 100).toFixed(2) : 0}% от факта</div></div>
   `;
 
-  const monthLabels = months.map(m => m.month.replace(' 2026', ''));
-  const planData = months.map(m => Math.round((m.total?.plan || 0) / 1000));
-  const factData = months.map(m => Math.round((m.total?.fact || 0) / 1000));
-  const pctData  = months.map(m => +(m.total?.pct || 0).toFixed(1));
-
+  // График план vs факт по месяцам
+  const monthLabels = motivCalcData.map(m => m.month_label.replace(' 2026', ''));
   if (motivationCharts.monthly) motivationCharts.monthly.destroy();
   motivationCharts.monthly = new Chart(document.getElementById('motivationMonthlyChart'), {
     type: 'bar',
     data: {
       labels: monthLabels,
       datasets: [
-        { label: 'План (тыс)', data: planData, backgroundColor: '#93c5fd', borderRadius: 4 },
-        { label: 'Факт (тыс)', data: factData, backgroundColor: '#22c55e', borderRadius: 4 },
-        { label: '% выполнения', data: pctData, type: 'line', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, yAxisID: 'y1', tension: 0.3 }
+        { label: 'План (тыс)', data: motivCalcData.map(m => Math.round(m.total.plan / 1000)), backgroundColor: '#93c5fd', borderRadius: 4 },
+        { label: 'Факт (тыс)', data: motivCalcData.map(m => Math.round(m.total.fact / 1000)), backgroundColor: '#22c55e', borderRadius: 4 },
+        { label: '% выполнения', data: motivCalcData.map(m => m.total.pct), type: 'line', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, yAxisID: 'y1', tension: 0.3 }
       ]
     },
     options: {
@@ -318,109 +320,156 @@ function renderMotivation() {
     }
   });
 
+  // График накопленная мотивация по сотрудникам
   const empMap = {};
-  months.forEach(m => {
-    (m.employees || []).forEach(e => {
-      if (!empMap[e.name]) empMap[e.name] = 0;
-      empMap[e.name] += e.itog || 0;
-    });
-  });
+  motivCalcData.forEach(m => m.managers.forEach(e => { empMap[e.name] = (empMap[e.name] || 0) + e.itog; }));
   const sortedEmps = Object.entries(empMap).filter(([,v]) => v > 0).sort((a,b) => b[1] - a[1]);
   const empColors = ['#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#ec4899','#14b8a6','#f97316','#a855f7'];
-
   if (motivationCharts.employee) motivationCharts.employee.destroy();
   motivationCharts.employee = new Chart(document.getElementById('motivationEmployeeChart'), {
     type: 'bar',
     data: {
       labels: sortedEmps.map(e => e[0]),
-      datasets: [{
-        label: 'Мотивация, ₽',
-        data: sortedEmps.map(e => Math.round(e[1])),
-        backgroundColor: sortedEmps.map((_,i) => empColors[i % empColors.length]),
-        borderRadius: 4
-      }]
+      datasets: [{ label: 'Мотивация, ₽', data: sortedEmps.map(e => Math.round(e[1])), backgroundColor: sortedEmps.map((_,i) => empColors[i % empColors.length]), borderRadius: 4 }]
     },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      indexAxis: 'y',
-      plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, ticks: { callback: v => fmt(v) } } }
-    }
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { callback: v => fmt(v) } } } }
   });
 
-  renderMotivationTable(4);
+  renderMotivationTable('all');
 }
 
-function renderMotivationTable(monthIdx) {
-  if (!motivationData) return;
-  const data = monthIdx === 'all' ? motivationData : [motivationData[monthIdx]];
-  const isAll = monthIdx === 'all';
+function renderMotivationTable(monthKey) {
+  if (!motivCalcData) return;
+  const isAll = monthKey === 'all';
+  const data = isAll ? motivCalcData : motivCalcData.filter(m => m.month === monthKey);
 
-  const empRows = {};
+  // Агрегируем по сотруднику
+  const empMap = {};
   data.forEach(m => {
-    (m.employees || []).forEach(e => {
-      if (!empRows[e.name]) empRows[e.name] = { name: e.name, months: [], totalPlan: 0, totalFact: 0, totalReward: 0, totalItog: 0 };
-      empRows[e.name].months.push({ month: m.month, ...e });
-      empRows[e.name].totalPlan += e.plan;
-      empRows[e.name].totalFact += e.fact;
-      empRows[e.name].totalReward += e.reward;
-      empRows[e.name].totalItog += e.itog;
+    m.managers.forEach(e => {
+      if (!empMap[e.id]) empMap[e.id] = { name: e.name, fact: 0, plan: 0, itog: 0, months: 0 };
+      empMap[e.id].fact  += e.fact;
+      empMap[e.id].plan  += e.plan;
+      empMap[e.id].itog  += e.itog;
+      empMap[e.id].months++;
+      if (!isAll) { empMap[e.id].bonus_pct = e.bonus_pct; empMap[e.id].pct = e.pct; }
     });
   });
+  const sorted = Object.values(empMap).filter(r => r.fact > 0 || r.plan > 0).sort((a,b) => b.fact - a.fact);
 
-  const sorted = Object.values(empRows).filter(r => r.totalFact > 0).sort((a,b) => b.totalFact - a.totalFact);
-
-  let html = `<table><tr><th>Сотрудник</th>`;
-  if (isAll) {
-    html += `<th>Месяцев</th><th>План</th><th>Факт</th><th>%</th><th>Мотивация</th>`;
-  } else {
-    html += `<th>План</th><th>Факт</th><th>ОМ/ОН</th><th>СДО</th><th>КОМ</th><th>%</th><th>Мотивация</th><th>% от выручки</th>`;
-  }
-  html += '</tr>';
-
+  let html = `<table><tr><th>Сотрудник</th><th>Факт</th><th>План</th><th>%</th><th>Бонус %</th><th>Мотивация</th></tr>`;
   sorted.forEach(r => {
-    if (isAll) {
-      const pct = r.totalPlan > 0 ? ((r.totalFact / r.totalPlan) * 100).toFixed(1) : 0;
-      html += `<tr>
-        <td><strong>${r.name}</strong></td>
-        <td>${r.months.length}</td>
-        <td>${fmt(Math.round(r.totalPlan))}</td>
-        <td>${fmt(Math.round(r.totalFact))}</td>
-        <td>${pct}%</td>
-        <td><strong>${fmt(Math.round(r.totalItog))} ₽</strong></td>
-      </tr>`;
+    const pct = r.plan > 0 ? (r.fact / r.plan * 100).toFixed(1) : '—';
+    const bp  = isAll ? (r.fact > 0 ? (r.itog / r.fact * 100).toFixed(2) : '—') : (r.bonus_pct || '—');
+    const pctColor = r.plan > 0 ? (r.fact >= r.plan ? 'color:#2E7D32' : 'color:#C62828') : '';
+    html += `<tr>
+      <td><strong>${r.name}</strong></td>
+      <td>${fmt(r.fact)} ₽</td>
+      <td>${r.plan > 0 ? fmt(r.plan) + ' ₽' : '<span style="color:#94a3b8">—</span>'}</td>
+      <td style="${pctColor}">${r.plan > 0 ? pct + '%' : '—'}</td>
+      <td>${bp !== '—' ? bp + '%' : '—'}</td>
+      <td><strong>${r.itog > 0 ? fmt(r.itog) + ' ₽' : '—'}</strong></td>
+    </tr>`;
+  });
+
+  const totFact = sorted.reduce((s,r) => s + r.fact, 0);
+  const totPlan = sorted.reduce((s,r) => s + r.plan, 0);
+  const totItog = sorted.reduce((s,r) => s + r.itog, 0);
+  const totPct  = totPlan > 0 ? (totFact / totPlan * 100).toFixed(1) : '—';
+  html += `<tr style="font-weight:700;border-top:2px solid #333">
+    <td>ИТОГО</td><td>${fmt(totFact)} ₽</td><td>${fmt(totPlan)} ₽</td>
+    <td>${totPct !== '—' ? totPct + '%' : '—'}</td><td>—</td><td>${fmt(totItog)} ₽</td>
+  </tr></table>`;
+  document.getElementById('motivation-table').innerHTML = html;
+}
+
+// ============ Редактор планов ============
+
+function renderPlansEditor() {
+  if (!motivCalcData) return;
+  const months = motivCalcData.map(m => ({ key: m.month, label: m.month_label }));
+
+  // Собираем всех менеджеров у кого был факт хоть в один месяц
+  const mgrSet = {};
+  motivCalcData.forEach(m => m.managers.forEach(e => { mgrSet[e.id] = e.name; }));
+  const mgrs = Object.entries(mgrSet).sort((a,b) => a[1].localeCompare(b[1]));
+
+  let html = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:13px;color:#475569">Месяц:</span>
+      ${months.map(m => `<button class="tab${m.key===months[months.length-1].key?' active':''}" style="padding:5px 12px;font-size:12px" data-plan-month="${m.key}">${m.label.replace(' 2026','')}</button>`).join('')}
+    </div>
+    <div id="plans-month-tables">`;
+
+  months.forEach(m => {
+    html += `<div class="plans-month-block" data-month="${m.key}" style="display:${m.key===months[months.length-1].key?'block':'none'}">
+      <table>
+        <tr><th>Менеджер</th><th>План (₽)</th><th>Бонус %</th></tr>
+        ${mgrs.map(([id, name]) => {
+          const entry = plansData[id]?.[m.key] || {};
+          return `<tr>
+            <td>${name}</td>
+            <td><input type="number" class="plan-input" data-mgr="${id}" data-month="${m.key}" data-field="plan" value="${entry.plan || ''}" placeholder="0" style="width:130px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></td>
+            <td><input type="number" step="0.01" class="plan-input" data-mgr="${id}" data-month="${m.key}" data-field="bonus_pct" value="${entry.bonus_pct || ''}" placeholder="0.00" style="width:90px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px"></td>
+          </tr>`;
+        }).join('')}
+      </table>
+    </div>`;
+  });
+
+  html += `</div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button id="savePlansBtn" style="background:#093EB4;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600">💾 Сохранить планы</button>
+      <span id="saveStatus" style="font-size:13px;color:#475569"></span>
+    </div>`;
+
+  document.getElementById('plans-editor-body').innerHTML = html;
+
+  // Переключение месяцев в редакторе
+  document.getElementById('plans-editor-body').addEventListener('click', e => {
+    const btn = e.target.closest('[data-plan-month]');
+    if (!btn) return;
+    document.querySelectorAll('[data-plan-month]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.plans-month-block').forEach(b => b.style.display = 'none');
+    document.querySelector(`.plans-month-block[data-month="${btn.dataset.planMonth}"]`).style.display = 'block';
+  });
+
+  document.getElementById('savePlansBtn').addEventListener('click', savePlans);
+}
+
+async function savePlans() {
+  const btn = document.getElementById('savePlansBtn');
+  const status = document.getElementById('saveStatus');
+  btn.disabled = true;
+  status.textContent = 'Сохраняем...';
+
+  // Собираем все inputs → строим объект plans
+  const newPlans = JSON.parse(JSON.stringify(plansData));
+  document.querySelectorAll('.plan-input').forEach(input => {
+    const { mgr, month, field } = input.dataset;
+    const val = parseFloat(input.value);
+    if (!newPlans[mgr]) newPlans[mgr] = {};
+    if (!newPlans[mgr][month]) newPlans[mgr][month] = {};
+    if (!isNaN(val) && val > 0) {
+      newPlans[mgr][month][field] = val;
     } else {
-      const m = r.months[0];
-      if (!m) return;
-      const pct = m.pct > 0 ? m.pct.toFixed(1) + '%' : '—';
-      const bonusPct = m.bonus_pct > 0 ? m.bonus_pct.toFixed(2) + '%' : '—';
-      html += `<tr>
-        <td><strong>${r.name}</strong></td>
-        <td>${fmt(Math.round(m.plan))}</td>
-        <td>${fmt(Math.round(m.fact))}</td>
-        <td>${fmt(Math.round(m.om_on))}</td>
-        <td>${fmt(Math.round(m.sdo))}</td>
-        <td>${fmt(Math.round(m.kom))}</td>
-        <td>${pct}</td>
-        <td><strong>${fmt(Math.round(m.itog))} ₽</strong></td>
-        <td>${bonusPct}</td>
-      </tr>`;
+      delete newPlans[mgr][month][field];
     }
   });
 
-  const totalPlanSum = Object.values(empRows).reduce((s,r) => s + r.totalPlan, 0);
-  const totalFactSum = Object.values(empRows).reduce((s,r) => s + r.totalFact, 0);
-  const totalItogSum = Object.values(empRows).reduce((s,r) => s + r.totalItog, 0);
-  const totPct = totalPlanSum > 0 ? ((totalFactSum / totalPlanSum) * 100).toFixed(1) : 0;
-
-  html += `<tr style="font-weight:700;border-top:2px solid #333"><td>ИТОГО</td>`;
-  if (isAll) {
-    html += `<td>—</td><td>${fmt(Math.round(totalPlanSum))}</td><td>${fmt(Math.round(totalFactSum))}</td><td>${totPct}%</td><td>${fmt(Math.round(totalItogSum))} ₽</td>`;
-  } else {
-    html += `<td>${fmt(Math.round(totalPlanSum))}</td><td>${fmt(Math.round(totalFactSum))}</td><td>—</td><td>—</td><td>—</td><td>${totPct}%</td><td>${fmt(Math.round(totalItogSum))} ₽</td><td>—</td>`;
+  try {
+    await safeFetch(BASE + '/plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newPlans) });
+    plansData = newPlans;
+    // Перезагружаем расчёт
+    motivCalcData = await safeFetch(BASE + '/motivation-calc');
+    renderMotivation();
+    status.textContent = '✅ Сохранено';
+    setTimeout(() => { status.textContent = ''; }, 2500);
+  } catch(e) {
+    status.textContent = '❌ Ошибка: ' + e.message;
   }
-  html += '</tr></table>';
-  document.getElementById('motivation-table').innerHTML = html;
+  btn.disabled = false;
 }
 
 // ============ 6. Анализ экспорта ============
@@ -608,7 +657,16 @@ document.getElementById('tab-motivation').addEventListener('click', e => {
   if (!btn) return;
   document.querySelectorAll('#tab-motivation [data-motiv-month]').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  renderMotivationTable(btn.dataset.motivMonth);
+  renderMotivationTable(btn.dataset.motivMonth === 'all' ? 'all' : btn.dataset.motivMonth);
+});
+
+// ============ Редактор планов: toggle ============
+document.getElementById('plansEditorToggle').addEventListener('click', () => {
+  const body  = document.getElementById('plans-editor-body');
+  const arrow = document.getElementById('plansEditorArrow');
+  const open  = body.style.display === 'none';
+  body.style.display  = open ? 'block' : 'none';
+  arrow.textContent   = open ? '▲' : '▼';
 });
 
 // ============ INIT ============

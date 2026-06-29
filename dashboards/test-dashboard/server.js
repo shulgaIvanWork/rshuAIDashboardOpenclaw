@@ -4,9 +4,14 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import https from 'https';
 import fs from 'fs';
+import { readFile, writeFile } from 'fs/promises';
 import { getAgg } from '@rshu/data-service/agg-cache.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DS_CACHE = path.resolve(__dirname, '../../data-service/cache');
+const PLANS_FILE = path.join(__dirname, 'data', 'plans.json');
+
+const MONTH_NAMES = { '01':'Январь','02':'Февраль','03':'Март','04':'Апрель','05':'Май','06':'Июнь','07':'Июль','08':'Август','09':'Сентябрь','10':'Октябрь','11':'Ноябрь','12':'Декабрь' };
 
 const app = express();
 app.use(express.json());
@@ -381,6 +386,89 @@ app.get('/api/bitrix-deals', async (req, res) => {
     }
     res.json(results);
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ============== API: Планы мотивации ==============
+
+app.get('/api/plans', async (req, res) => {
+  try {
+    const data = JSON.parse(await readFile(PLANS_FILE, 'utf-8').catch(() => '{}'));
+    res.json(data);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/plans', async (req, res) => {
+  try {
+    await writeFile(PLANS_FILE, JSON.stringify(req.body, null, 2), 'utf-8');
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Факт по менеджерам помесячно из deals.json + планы из plans.json
+app.get('/api/motivation-calc', async (req, res) => {
+  try {
+    const [dealsRaw, dictsRaw, plansRaw] = await Promise.all([
+      readFile(path.join(DS_CACHE, 'deals.json'), 'utf-8'),
+      readFile(path.join(DS_CACHE, 'dicts.json'), 'utf-8'),
+      readFile(PLANS_FILE, 'utf-8').catch(() => '{}'),
+    ]);
+
+    const deals = JSON.parse(dealsRaw);
+    const users = JSON.parse(dictsRaw).users || {};
+    const plans = JSON.parse(plansRaw);
+
+    const VALID_CATS = new Set([0, 8, 19]);
+    const YEAR = 2026;
+
+    // Факт: WON-сделки, группируем по менеджеру + месяц оплаты (UF_DATE_PAY_1C)
+    const byMgrMonth = {};
+    for (const d of deals) {
+      if (!VALID_CATS.has(parseInt(d.CATEGORY_ID || 0))) continue;
+      if (d.STAGE_SEMANTIC_ID !== 'S' || d.CLOSED !== 'Y') continue;
+      if (!d.UF_DATE_PAY_1C) continue;
+      const payDate = new Date(d.UF_DATE_PAY_1C.substring(0, 10));
+      if (payDate.getFullYear() !== YEAR) continue;
+      const monthKey = `${YEAR}-${String(payDate.getMonth() + 1).padStart(2, '0')}`;
+      const mgrId = String(d.ASSIGNED_BY_ID || '');
+      if (!byMgrMonth[mgrId]) byMgrMonth[mgrId] = {};
+      byMgrMonth[mgrId][monthKey] = (byMgrMonth[mgrId][monthKey] || 0) + parseFloat(d.OPPORTUNITY || 0);
+    }
+
+    // Список месяцев с начала года до текущего
+    const today = new Date();
+    const months = [];
+    for (let m = 1; m <= Math.min(today.getMonth() + 1, 12); m++) {
+      months.push(`${YEAR}-${String(m).padStart(2, '0')}`);
+    }
+
+    const result = months.map(monthKey => {
+      const mm = monthKey.split('-')[1];
+      const managers = Object.entries(users)
+        .map(([id, name]) => {
+          const fact  = Math.round(byMgrMonth[id]?.[monthKey] || 0);
+          const entry = plans[id]?.[monthKey] || {};
+          const plan      = entry.plan      || 0;
+          const bonus_pct = entry.bonus_pct || 0;
+          const pct  = plan > 0 ? +(fact / plan * 100).toFixed(1) : 0;
+          const itog = Math.round(fact * bonus_pct / 100);
+          return { id, name, fact, plan, bonus_pct, pct, itog };
+        })
+        .filter(m => m.fact > 0 || m.plan > 0)
+        .sort((a, b) => b.fact - a.fact);
+
+      const total = managers.reduce(
+        (t, m) => ({ fact: t.fact + m.fact, plan: t.plan + m.plan, itog: t.itog + m.itog }),
+        { fact: 0, plan: 0, itog: 0 }
+      );
+      total.pct = total.plan > 0 ? +(total.fact / total.plan * 100).toFixed(1) : 0;
+
+      return { month: monthKey, month_label: `${MONTH_NAMES[mm]} ${YEAR}`, managers, total };
+    });
+
+    res.json(result);
+  } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });

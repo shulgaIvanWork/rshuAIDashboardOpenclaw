@@ -84,22 +84,27 @@
     <!-- ============ TAB 5: Мотивация ДРОП ============ -->
     <div class="tab-content" id="tab-motivation">
       <div class="cards" id="motivation-cards"></div>
+
+      <!-- Редактор планов -->
+      <div class="card" style="border-left:4px solid #093EB4">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;cursor:pointer" id="plansEditorToggle">
+          <h3 style="margin:0">⚙️ Планы и бонусы</h3>
+          <span id="plansEditorArrow" style="font-size:18px;color:#475569">▼</span>
+        </div>
+        <div id="plans-editor-body" style="display:none"><div class="loading">Загрузка...</div></div>
+      </div>
+
       <div class="card">
         <h3>План vs Факт по месяцам</h3>
         <div class="chart-container"><canvas id="motivationMonthlyChart"></canvas></div>
       </div>
       <div class="card">
-        <h3>Итоговое вознаграждение по сотрудникам (накоплено)</h3>
+        <h3>Накопленная мотивация по сотрудникам</h3>
         <div class="chart-container"><canvas id="motivationEmployeeChart"></canvas></div>
       </div>
       <div class="card">
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="all">Все месяцы</button>
-          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="0">Янв</button>
-          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="1">Фев</button>
-          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="2">Мар</button>
-          <button class="tab" style="padding:6px 14px;font-size:12px" data-motiv-month="3">Апр</button>
-          <button class="tab active" style="padding:6px 14px;font-size:12px" data-motiv-month="4">Май</button>
+          <button class="tab active" style="padding:6px 14px;font-size:12px" data-motiv-month="all">Все месяцы</button>
         </div>
         <h3>Детализация по сотрудникам</h3>
         <div id="motivation-table"><div class="loading">Загрузка</div></div>
