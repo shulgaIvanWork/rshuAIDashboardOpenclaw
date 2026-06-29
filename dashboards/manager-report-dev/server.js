@@ -2,14 +2,33 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MY_CACHE = path.resolve(__dirname, 'cache');
+const DS_CACHE = path.resolve(__dirname, '../../data-service/cache');
+
 const router = express.Router();
 
-let aggCache = null;
+// ── In-memory deals cache (reloaded when data-service refreshes) ──────────────
 let dealsCache = null;
 let dictsCache = null;
+let lastCacheTs = 0;
+
+async function ensureDeals() {
+  const ts = getCacheAt();
+  if (!dealsCache || ts > lastCacheTs) {
+    [dealsCache, dictsCache] = await Promise.all([
+      fs.readFile(path.join(DS_CACHE, 'deals.json'), 'utf-8').then(JSON.parse),
+      fs.readFile(path.join(DS_CACHE, 'dicts.json'), 'utf-8').then(JSON.parse),
+    ]);
+    lastCacheTs = ts;
+    console.log(`[manager-report-dev] Loaded ${dealsCache.length} deals from data-service`);
+  }
+}
+
+ensureDeals().catch(e => console.error('[manager-report-dev] Initial load error:', e.message));
+
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 function parseDT(s) {
   if (!s) return null;
@@ -25,44 +44,35 @@ const MIN_OPP = 11;
 const VALID_CATS = new Set([0, 8, 19]);
 const YEAR = 2026;
 
-// Ранги стадий для последовательной воронки (кат 0)
 const STAGE_RANK = {
   'NEW': 0, 'UC_1YW3V2': 1, 'UC_STZB49': 2, 'UC_838R2R': 3,
-  'UC_4RJOR4': 4, // MQL
-  'DETAILS': 5, // SQL
-  'PROPOSAL': 6, // Счёт отправлен
-  '2': 7, // Постоплата
-  '6': 8, // Частично оплачен
-  'UC_W6SCHG': 9, // Следующий год
-  'UC_670ME2': 10, // Возвращен в работу (отказ)
-  'UC_F2YC3N': 11, // Предзакрытие в отказ
-  'WON': 12, // Счёт оплачен
+  'UC_4RJOR4': 4,
+  'DETAILS': 5,
+  'PROPOSAL': 6,
+  '2': 7,
+  '6': 8,
+  'UC_W6SCHG': 9,
+  'UC_670ME2': 10,
+  'UC_F2YC3N': 11,
+  'WON': 12,
 };
 
-// Все стадии отказа
 const LOST_STAGES = new Set(['LOSE', 'UC_670ME2', 'UC_F2YC3N']);
-// Стадии квалификации (Sale)
 const QUAL_STAGES = new Set(['NEW', 'UC_1YW3V2', 'UC_STZB49', 'UC_838R2R']);
 
 function getStageRank(stage, cat, opp, hasInvoice) {
-  // PreSale — базовая
   if (cat === 8) return 0;
-  
-  // КОМ (кат 19): ранги по стадиям
   if (cat === 19) {
     const KOM_RANK = {
       'NEW': 4, 'PREPARATION': 4, 'UC_ZI3P92': 4, 'UC_2F288T': 4,
       'EXECUTING': 5, 'UC_C670BC': 5, 'UC_I443UQ': 5,
       'WON': 6,
     };
-    // Для LOSE/UC_ALOZ6B/UC_W4ML6H: если есть invoice → ранк 6, иначе 4
     if (stage === 'LOSE' && hasInvoice) return 6;
     if (['UC_ALOZ6B', 'UC_W4ML6H'].includes(stage) && hasInvoice) return 6;
     if (stage === 'LOSE') return 4;
     return KOM_RANK[stage] ?? 4;
   }
-  
-  // Sale (кат 0)
   if (stage === 'LOSE') {
     if (hasInvoice) return 6;
     if (opp >= MIN_OPP) return 4;
@@ -102,7 +112,8 @@ function getMgrKey(mgrId, mgrName) {
   return { key: mgrName, group: g };
 }
 
-// === Новая последовательная воронка ===
+// ── Analysis ──────────────────────────────────────────────────────────────────
+
 function calcManagers(deals, dicts, fromDate, toDate) {
   const users = dicts?.users || {};
   const mgrData = {};
@@ -146,13 +157,11 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const hasInvoice = !!d.UF_CRM_1753272713011;
     const isLost = LOST_STAGES.has(stage);
 
-    // Фильтр периода — включаем переходящие сделки с прошлых периодов
     let inPeriod = true;
     if (isFiltered) {
       const dcOk = dc && dc >= fromDate && dc <= toDate;
       const payOk = pay && pay >= fromDate && pay <= toDate;
       const lostOk = isLost && loseDt && loseDt >= fromDate && loseDt <= toDate;
-      // Сделка переходит с прошлого периода (создана до, не оплачена, не проиграна)
       const wasInWork = dc && dc < fromDate && (cat === 0 || cat === 19) && !isAutoOrOzk;
       const isCarryOver = wasInWork && (!pay || pay >= fromDate) && (!isLost || !loseDt || loseDt >= fromDate);
       inPeriod = dcOk || payOk || lostOk || isCarryOver;
@@ -162,47 +171,31 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const m = getMgr(key);
     if (group !== 'hidden') m.group = group;
 
-    // === in_work_start ===
     const periodStart = isFiltered ? fromDate : YEAR_START;
     if (dc && dc <= periodStart && (cat === 0 || cat === 19) && !isAutoOrOzk) {
       const wasPaid = pay && pay <= periodStart;
       const wasLost = isLost && (loseDt ? loseDt <= periodStart : true);
-      if (!wasPaid && !wasLost) {
-        m.in_work_start++;
-      }
+      if (!wasPaid && !wasLost) m.in_work_start++;
     }
 
-    // Условие для воронки: все сделки, активные в периоде (созданные + переходящие)
     const inFunnel = (!isAutoOrOzk || opp >= MIN_OPP);
     if (!inFunnel) continue;
 
     const rank = getStageRank(stage, cat, opp, hasInvoice);
-    // Без дублирующих WON в КОМ (кат 19) и PreSale (кат 8)
     const isWonDub = stage === 'WON' && (cat === 8 || cat === 19);
 
-    // === Воронка: все активные сделки (созданные + переходящие) ===
-    // Создано (все сделки в периоде, без дублей WON КОМ/PreSale)
-    if (!isWonDub) {
-      m.created++;
-    }
+    if (!isWonDub) m.created++;
 
-    // На квалификации
     if (cat === 8 && sem !== 'S' && sem !== 'F') {
       m.na_kvalifikatsii++;
     } else if (cat === 0 && QUAL_STAGES.has(stage)) {
       m.na_kvalifikatsii++;
     }
 
-    // MQL (прошли MQL+, включая ушедших в отказ после MQL)
     if (rank >= 4) m.mql++;
-
-    // SQL (прошли SQL+, включая ушедших в отказ после SQL)
     if (rank >= 5) m.sql++;
-
-    // Счёт отправлен (PROPOSAL+ с датой счёта, включая ушедших в отказ после)
     if (rank >= 6 && hasInvoice) m.invoice_cnt++;
 
-    // === 6. Оплачено ===
     const isP = isPaid(d, opp);
     if (isP && pay.getFullYear() === YEAR) {
       if (!isFiltered || (pay >= fromDate && pay <= toDate)) {
@@ -229,21 +222,16 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       }
     }
 
-    // === 7. Квал отказы / Не квал отказы ===
     if (isLost) {
       const lostInYear = loseDt ? loseDt.getFullYear() === YEAR : false;
       const lostInPeriod = !isFiltered || (loseDt && loseDt >= fromDate && loseDt <= toDate);
       if (lostInYear && lostInPeriod) {
-        if (cat === 19 || rank >= 4) {
-          m.kval_lost++;  // прошли MQL+ или КОМ
-        } else {
-          m.nekval_lost++;  // PreSale или Sale с рангом <4
-        }
+        if (cat === 19 || rank >= 4) m.kval_lost++;
+        else m.nekval_lost++;
       }
     }
   }
 
-  // === Результат ===
   const result = Object.values(mgrData).map(m => {
     const iwe = m.in_work_start + m.created - m.paid - m.kval_lost - m.nekval_lost;
     const avgCheck = m.paid ? Math.round(m.paid_sum / m.paid) : 0;
@@ -254,7 +242,6 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     const cs = m.mql ? Math.round(m.sql / m.mql * 1000) / 10 : 0;
     const ci = m.sql ? Math.round(m.invoice_cnt / m.sql * 1000) / 10 : 0;
     const cp = m.invoice_cnt ? Math.round(m.paid / m.invoice_cnt * 1000) / 10 : 0;
-
     return {
       name: m.name, group: m.group || 'main',
       in_work_start: m.in_work_start, created: m.created,
@@ -272,78 +259,71 @@ function calcManagers(deals, dicts, fromDate, toDate) {
       edu_pk_sum: Math.round(m.edu_pk_sum), edu_pp_sum: Math.round(m.edu_pp_sum), edu_kom_sum: Math.round(m.edu_kom_sum),
     };
   });
-
   result.sort((a, b) => (b.paid_sum || (b.group === 'main' ? 1 : 0)) - (a.paid_sum || (a.group === 'main' ? 1 : 0)));
   return result;
 }
 
-// === Загрузка кэша ===
-async function loadCache() {
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+router.get('/api/managers', async (req, res) => {
   try {
-    const raw = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'agg.json'), 'utf-8'));
-    aggCache = raw;
-    dealsCache = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'deals_NEW.json'), 'utf-8'));
-    dictsCache = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'dicts.json'), 'utf-8'));
-    console.log(`[manager-report-dev] Cache: ${aggCache.mgr_top?.length || 0} managers, ${dealsCache.length} deals`);
+    await ensureDeals();
+    if (!dealsCache) return res.json({ error: 'Нет данных' });
+
+    const from = req.query.from;
+    const to   = req.query.to;
+    let fromDate = null, toDate = null;
+    let periodLabel = 'YTD';
+    if (from && to) {
+      fromDate = new Date(from + 'T00:00:00');
+      toDate   = new Date(to   + 'T23:59:59');
+      periodLabel = `${from} — ${to}`;
+    }
+
+    const all = calcManagers(dealsCache, dictsCache, fromDate, toDate);
+    const groups = {
+      main:       all.filter(m => m.group === 'main'),
+      autopay:    all.filter(m => m.group === 'autopay'),
+      ozk:        all.filter(m => m.group === 'ozk'),
+      other:      all.filter(m => m.group === 'other'),
+      tech:       all.filter(m => m.group === 'tech'),
+      bond:       all.filter(m => m.group === 'bond'),
+      afanasyev:  all.filter(m => m.group === 'afanasyev'),
+    };
+
+    const d = getAgg() || {};
+    res.json({
+      managers:         [...groups.main, ...groups.autopay, ...groups.ozk, ...groups.other, ...groups.tech],
+      managersBond:     groups.bond,
+      managersAfanasyev: groups.afanasyev,
+      managersTech:     groups.tech,
+      groups,
+      period:           periodLabel,
+      ytd:              d.ytd,
+      weeks:            d.weeks,
+      fmt_ytd:          d.fmt_ytd,
+      loadedAt:         d.fetched_at || new Date(getCacheAt()).toISOString(),
+    });
   } catch (e) {
-    console.log('[manager-report-dev] Cache error:', e.message);
+    res.status(500).json({ error: e.message });
   }
-}
-
-router.use(express.static(path.join(__dirname, 'public')));
-
-router.get('/api/managers', (req, res) => {
-  if (!aggCache || !dealsCache) return res.json({ error: 'Нет данных' });
-
-  const from = req.query.from;
-  const to = req.query.to;
-  let fromDate = null, toDate = null;
-  let periodLabel = 'YTD';
-
-  if (from && to) {
-    fromDate = new Date(from + 'T00:00:00');
-    toDate = new Date(to + 'T23:59:59');
-    periodLabel = `${from} — ${to}`;
-  }
-
-  const all = calcManagers(dealsCache, dictsCache, fromDate, toDate);
-
-  const groups = {
-    main: all.filter(m => m.group === 'main'),
-    autopay: all.filter(m => m.group === 'autopay'),
-    ozk: all.filter(m => m.group === 'ozk'),
-    other: all.filter(m => m.group === 'other'),
-    tech: all.filter(m => m.group === 'tech'),
-    bond: all.filter(m => m.group === 'bond'),
-    afanasyev: all.filter(m => m.group === 'afanasyev'),
-  };
-
-  res.json({
-    managers: [...groups.main, ...groups.autopay, ...groups.ozk, ...groups.other, ...groups.tech],
-    managersBond: groups.bond,
-    managersAfanasyev: groups.afanasyev,
-    managersTech: groups.tech,
-    groups,
-    period: periodLabel,
-    ytd: aggCache.ytd,
-    weeks: aggCache.weeks,
-    fmt_ytd: aggCache.fmt_ytd,
-    loadedAt: aggCache.today,
-  });
 });
 
-router.get('/api/funnel', async (req, res) => {
+router.get('/api/funnel', (req, res) => {
   try {
-    const data = JSON.parse(await fs.readFile(path.join(MY_CACHE, 'agg.json'), 'utf-8'));
-    const weeks = (data.weeks || []).map(function(w) {
-      return {
-        label_dates: w.label_dates, week: w.week,
-        stack_rej_nq: w.stack_rej_nq || 0, stack_rej: w.stack_rej || 0,
-        stack_nq: w.stack_nq || 0, stack_mql: w.stack_mql || 0,
-        stack_sql: w.stack_sql || 0, stack_inv: w.stack_inv || 0,
-        stack_pay: w.stack_pay || 0
-      };
-    });
+    const d = getAgg();
+    if (!d) return res.json({ weeks: [] });
+    const weeks = (d.weeks || []).map(w => ({
+      label_dates: w.label_dates,
+      week: w.week,
+      stack_rej_nq: w.stack2_rej_nq || 0,
+      stack_rej:    w.stack2_rej    || 0,
+      stack_nq:     w.stack2_nq     || 0,
+      stack_mql:    w.stack2_mql    || 0,
+      stack_sql:    w.stack2_sql    || 0,
+      stack_inv:    w.stack2_inv    || 0,
+      stack_pay:    w.stack2_pay    || 0,
+    }));
     res.json({ weeks });
   } catch (e) {
     res.json({ weeks: [] });
@@ -351,17 +331,15 @@ router.get('/api/funnel', async (req, res) => {
 });
 
 router.get('/api/status', (req, res) => {
+  const d = getAgg();
   res.json({
-    ready: !!aggCache,
-    managers: aggCache?.mgr_top?.length || 0,
-    deals: dealsCache?.length || 0,
+    ready:    !!d,
+    deals:    dealsCache?.length || 0,
+    loadedAt: d?.fetched_at || null,
   });
 });
 
-router.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
-loadCache();
+router.use(express.static(path.join(__dirname, 'public')));
+router.get(/(.*)/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 export default router;
