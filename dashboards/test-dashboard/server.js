@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import https from 'https';
 import fs from 'fs';
+import { getAgg } from '@rshu/data-service/agg-cache.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -384,22 +385,10 @@ app.get('/api/bitrix-deals', async (req, res) => {
   }
 });
 
-// ============== API: Новая логика (06.06.26) ==============
+// ============== API: Новая логика ==============
 app.get('/api/data/new', async (req, res) => {
   try {
-    // Пробуем сначала локальный кэш
-    const localPath = path.join(__dirname, 'data', 'agg_new.json');
-    if (fs.existsSync(localPath)) {
-      const data = JSON.parse(fs.readFileSync(localPath, 'utf-8'));
-      return res.json(data);
-    }
-    // Fallback на кэш drop-dashboard
-    const dropPath = path.resolve(__dirname, '..', 'drop-dashboard', 'cache', 'agg_new.json');
-    if (fs.existsSync(dropPath)) {
-      const data = JSON.parse(fs.readFileSync(dropPath, 'utf-8'));
-      return res.json(data);
-    }
-    res.status(503).json({ error: 'Новые данные (06.06.26) не загружены' });
+    res.json(await getAgg());
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
