@@ -226,6 +226,15 @@ app.use('/dashboard-files', requireAuth, express.static(PROJECTS_DIR, {
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// --------------- Global error handler ---------------
+// Перехватывает необработанные ошибки из дашбордов и возвращает JSON,
+// а не HTML-страницу ошибки — иначе фронтенд делает редирект на /login → /dashboards
+app.use((err, req, res, next) => {
+  console.error('[error]', req.method, req.path, err.message);
+  if (res.headersSent) return next(err);
+  res.status(503).json({ error: 'Временная ошибка сервера', detail: err.message });
+});
+
 // --------------- Start ---------------
 app.listen(PORT, '127.0.0.1', () => {
   console.log('📊 РШУ дашборды на http://0.0.0.0:' + PORT);

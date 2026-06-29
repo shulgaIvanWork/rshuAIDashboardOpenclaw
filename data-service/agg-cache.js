@@ -5,7 +5,7 @@
 
 import { analyze } from './analyze.js';
 
-const CACHE_TTL_MS = 60 * 1000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 let aggCache = null;
 let aggCacheAt = 0;
@@ -21,6 +21,11 @@ export async function getAgg() {
     return result;
   }).catch(e => {
     analyzing = null;
+    if (aggCache) {
+      // Данные временно недоступны (идёт обновление) — отдаём старый кэш
+      console.warn('[agg-cache] analyze() failed, serving stale cache:', e.message);
+      return aggCache;
+    }
     throw e;
   });
   return analyzing;
