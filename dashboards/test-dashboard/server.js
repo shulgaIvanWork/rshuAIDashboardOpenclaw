@@ -292,30 +292,91 @@ app.get('/api/roistat-funnel', (req, res) => {
   }
 });
 
-// ============== API: Мотивации ДРОП 2026 ==============
-app.get('/api/motivations', (req, res) => {
-  try {
-    const dataPath = path.join(__dirname, 'data', 'motivations.json');
-    if (!fs.existsSync(dataPath)) {
-      return res.json({ error: 'Файл с данными мотиваций не найден' });
-    }
-    const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-    res.json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// ============== API: Анализ источников/форматов по менеджерам ==============
+const OUTGOING_SOURCE_IDS = new Set([
+  '79641902894', // Аккаунтинг
+  'UC_7G65N9',   // Реанимация
+  '79641902977', // RepeatSale
+  'REPEAT_SALE',
+  '79641902926', // Upsale
+  '79641902903', // Очная/Холодная база
+  'UC_0QUMRZ',   // Out Sale
+]);
 
-// ============== API: Анализ экспортных листов (источники/форматы) ==============
-app.get('/api/export-analysis', (req, res) => {
+app.get('/api/export-analysis', async (req, res) => {
   try {
-    const dataPath = path.join(__dirname, 'data', 'export_analysis.json');
-    if (!fs.existsSync(dataPath)) {
-      return res.json({ error: 'Файл с анализом экспорта не найден' });
+    const [dealsRaw, dictsRaw] = await Promise.all([
+      readFile(path.join(DS_CACHE, 'deals.json'), 'utf-8'),
+      readFile(path.join(DS_CACHE, 'dicts.json'), 'utf-8'),
+    ]);
+    const deals = JSON.parse(dealsRaw);
+    const dicts = JSON.parse(dictsRaw);
+    const users   = dicts.users   || {};
+    const sources = dicts.sources || {};
+
+    const VALID_CATS = new Set([0, 8, 19]);
+    const YEAR = 2026;
+
+    // { "2026-01": { mgrId: { incoming, outgoing, kom, other, sources: { srcName: amount } } } }
+    const byMonthMgr = {};
+
+    for (const d of deals) {
+      if (!VALID_CATS.has(parseInt(d.CATEGORY_ID || 0))) continue;
+      if (d.STAGE_SEMANTIC_ID !== 'S' || d.CLOSED !== 'Y') continue;
+      if (!d.UF_DATE_PAY_1C) continue;
+      const payDate = new Date(d.UF_DATE_PAY_1C.substring(0, 10));
+      if (payDate.getFullYear() !== YEAR) continue;
+
+      const monthKey = `${YEAR}-${String(payDate.getMonth() + 1).padStart(2, '0')}`;
+      const mgrId    = String(d.ASSIGNED_BY_ID || '');
+      const amount   = parseFloat(d.OPPORTUNITY || 0);
+      const srcId    = String(d.SOURCE_ID || '');
+      const srcName  = sources[srcId] || srcId || 'Не указан';
+      const isKom    = parseInt(d.CATEGORY_ID) === 19 || d.UF_FORMAT === '19042498';
+      const isOut    = OUTGOING_SOURCE_IDS.has(srcId);
+
+      if (!byMonthMgr[monthKey]) byMonthMgr[monthKey] = {};
+      if (!byMonthMgr[monthKey][mgrId]) byMonthMgr[monthKey][mgrId] = { incoming: 0, outgoing: 0, kom: 0, other: 0, sources: {} };
+
+      const m = byMonthMgr[monthKey][mgrId];
+      if (isKom)       m.kom      += amount;
+      else if (isOut)  m.outgoing += amount;
+      else             m.incoming += amount;
+      m.other = m.kom; // для совместимости с фронтом (other = KOM, остальное = ООМ/ОМ)
+      m.sources[srcName] = (m.sources[srcName] || 0) + amount;
     }
-    const data = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
-    res.json(data);
-  } catch (e) {
+
+    // Собираем результат в формате { "2026-01": { managers: [...], total_* } }
+    const result = {};
+    for (const [monthKey, mgrMap] of Object.entries(byMonthMgr)) {
+      const managers = Object.entries(mgrMap)
+        .map(([id, v]) => ({
+          name: users[id] || `ID:${id}`,
+          incoming: Math.round(v.incoming),
+          outgoing: Math.round(v.outgoing),
+          kom:      Math.round(v.kom),
+          other:    Math.round(v.kom),
+          total:    Math.round(v.incoming + v.outgoing + v.kom),
+          sources:  Object.entries(v.sources)
+            .map(([name, amount]) => ({ name, amount: Math.round(amount) }))
+            .sort((a, b) => b.amount - a.amount),
+        }))
+        .filter(m => m.total > 0)
+        .sort((a, b) => b.total - a.total);
+
+      result[monthKey] = {
+        month: monthKey,
+        managers,
+        total_incoming: managers.reduce((s, m) => s + m.incoming, 0),
+        total_outgoing: managers.reduce((s, m) => s + m.outgoing, 0),
+        total_kom:      managers.reduce((s, m) => s + m.kom, 0),
+        total_other:    managers.reduce((s, m) => s + m.kom, 0),
+        total_all:      managers.reduce((s, m) => s + m.total, 0),
+      };
+    }
+
+    res.json(result);
+  } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });

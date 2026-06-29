@@ -476,7 +476,8 @@ async function savePlans() {
 function renderExportAnalysis() {
   if (!exportAnalysisData || exportAnalysisData.error) return;
 
-  const monthKey = '2026-05';
+  // Берём последний доступный месяц
+  const monthKey = Object.keys(exportAnalysisData).sort().reverse()[0];
   const data = exportAnalysisData[monthKey];
   if (!data) {
     document.getElementById('source-table').innerHTML = '<div class="card"><span class="value red">Нет данных</span></div>';
