@@ -2,162 +2,25 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
-
-// Sub-apps
-import testDashboard from '../test-dashboard/server.js';
+import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = parseInt(process.env.PORT || '3000', 10);
-const SCRIPTS_DIR = path.join(__dirname, 'scripts');
-const CACHE_DIR = path.join(__dirname, 'cache');
-
-await fs.mkdir(CACHE_DIR, { recursive: true }).catch(() => {});
-
-// --- State ---
-const dataState = {
-  ready: false,
-  loading: false,
-  error: null,
-  loadedAt: null,
-};
-
-let aggCache = null;
-
-// --- Load cache ---
-async function loadCache() {
-  try {
-    aggCache = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg.json'), 'utf-8'));
-    dataState.ready = true;
-    dataState.loadedAt = new Date().toISOString();
-    console.log(`✓ Cache loaded: ${aggCache.weeks.length} weeks`);
-  } catch (e) {
-    console.log('Cache not found:', e.message);
-  }
-}
-
-// --- Refresh: execute Python pipeline ---
-
-function resetLoading() {
-  dataState.loading = false;
-  dataState.error = 'Сброшено принудительно';
-  dataState.startedAt = null;
-  dataState.loadingProgress = null;
-  dataState.loadingPhase = null;
-  console.log('🔄 Loading state reset');
-}
-
-function runRefresh() {
-  return new Promise((resolve, reject) => {
-    if (dataState.loading) return reject(new Error('Already loading'));
-    dataState.loading = true;
-    dataState.error = null;
-    dataState.startedAt = new Date().toISOString();
-    dataState.loadingProgress = null;
-    dataState.loadingPhase = 'Запуск скрипта...';
-
-    const script = path.join(SCRIPTS_DIR, 'run_full.py');
-    const proc = spawn('python3', [script], {
-      cwd: SCRIPTS_DIR,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    // Парсим stdout в реальном времени для прогресса
-    proc.stdout.on('data', (chunk) => {
-      const text = chunk.toString();
-      stdout += text;
-      
-      // Извлекаем прогресс из строк вида:
-      // ▶  fetch_deals.py --reset --batches 9999  → фаза
-      // [CREATE] batch 0..2450  got=2500  progress=2500/32128 → прогресс
-      // ✓  fetch_deals.py — 123.4s → фаза завершена
-      // ✅  Полная выгрузка завершена!
-      
-      const phases = {
-        'fetch_deals': 'Выгрузка сделок из Bitrix24',
-        'fetch_leads': 'Выгрузка лидов',
-        'merge': 'Объединение данных',
-        'fetch_dicts': 'Загрузка справочников',
-        'analyze': 'Анализ данных',
-        'build_html': 'Сборка HTML-отчёта',
-        'build_xlsx': 'Сборка Excel-отчёта',
-      };
-      
-      // Определяем фазу
-      for (const [key, label] of Object.entries(phases)) {
-        if (text.includes(`▶  ${key}`) || text.includes(`▶  ${key}.py`)) {
-          dataState.loadingPhase = label;
-          dataState.loadingProgress = null;
-          break;
-        }
-      }
-      
-      // Парсим прогресс сделок: progress=2500/32128
-      const progMatch = text.match(/progress=([\d]+)\/([\d]+)/);
-      if (progMatch) {
-        dataState.loadingProgress = {
-          current: parseInt(progMatch[1]),
-          total: parseInt(progMatch[2])
-        };
-      }
-      
-      // Определяем завершение
-      if (text.includes('✅  Полная выгрузка завершена')) {
-        dataState.loadingPhase = 'Финализация...';
-      }
-    });
-    
-    proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-
-    proc.on('close', async (code) => {
-      try {
-        if (code !== 0) {
-          console.error('Python error:', stderr);
-          dataState.error = stderr.substring(0, 500);
-          dataState.loading = false;
-          dataState.startedAt = null;
-          dataState.loadingProgress = null;
-          return reject(new Error(`Pipeline exit code ${code}`));
-        }
-
-        aggCache = JSON.parse(await fs.readFile(path.join(CACHE_DIR, 'agg.json'), 'utf-8'));
-        dataState.ready = true;
-        dataState.loadedAt = new Date().toISOString();
-        dataState.loading = false;
-        dataState.startedAt = null;
-        dataState.loadingProgress = null;
-        dataState.loadingPhase = null;
-        resolve(true);
-      } catch (e) {
-        dataState.error = e.message;
-        dataState.loading = false;
-        dataState.startedAt = null;
-        dataState.loadingProgress = null;
-        dataState.loadingPhase = null;
-        reject(e);
-      }
-    });
-
-    proc.on('error', (e) => {
-      dataState.error = e.message;
-      dataState.loading = false;
-      dataState.startedAt = null;
-      dataState.loadingProgress = null;
-      dataState.loadingPhase = null;
-      reject(e);
-    });
-  });
-}
+const DS_CACHE = path.resolve(__dirname, '../../data-service/cache');
 
 // --- Express ---
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 
 // Status
-app.get('/api/status', (req, res) => res.json(dataState));
+app.get('/api/status', (req, res) => {
+  const ts = getCacheAt();
+  res.json({
+    ready: ts > 0,
+    loading: false,
+    error: null,
+    loadedAt: ts > 0 ? new Date(ts).toISOString() : null,
+  });
+});
 
 // User info
 app.get('/api/user', (req, res) => {
@@ -165,103 +28,59 @@ app.get('/api/user', (req, res) => {
 });
 
 // Main data
-app.get('/api/data', (req, res) => {
-  if (!aggCache) return res.status(503).json({ error: 'Data not loaded' });
-  res.json(aggCache);
+app.get('/api/data', async (req, res) => {
+  try {
+    res.json(await getAgg());
+  } catch (e) {
+    res.status(503).json({ error: e.message });
+  }
 });
 
-// Refresh
-// New logic data endpoint
+// New-logic data (same source — kept for UI compatibility)
 app.get('/api/data/new', async (req, res) => {
-  const aggNewPath = path.join(CACHE_DIR, 'agg_new.json');
   try {
-    const data = JSON.parse(await fs.readFile(aggNewPath, 'utf-8'));
-    res.json(data);
+    res.json(await getAgg());
   } catch (e) {
-    res.status(503).json({ error: 'New logic data not loaded' });
+    res.status(503).json({ error: e.message });
   }
 });
 
-app.post('/api/refresh', async (req, res) => {
-  if (dataState.loading) return res.json({ ok: false, message: 'Already loading' });
-  res.json({ ok: true, message: 'Refresh started' });
-  runRefresh().catch(e => console.error('Refresh failed:', e.message));
+// Refresh — data-service updates on its own schedule; this is a no-op for the client
+app.post('/api/refresh', (req, res) => {
+  res.json({ ok: true, message: 'Данные обновляются автоматически через data-service' });
 });
 
-// Force-reset stuck loading state
 app.post('/api/refresh/reset', (req, res) => {
-  resetLoading();
-  res.json({ ok: true, message: 'Loading state reset' });
+  res.json({ ok: true, message: 'OK' });
 });
 
-// --- Forecast ---
-app.get('/api/forecast', async (req, res) => {
-  try {
-    const script = path.join(SCRIPTS_DIR, 'forecast.py');
-    const proc = spawn('python3', [script], {
-      cwd: SCRIPTS_DIR,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    proc.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    await new Promise((resolve, reject) => {
-      proc.on('close', (code) => {
-        if (code !== 0) return reject(new Error(stderr.substring(0, 500)));
-        resolve();
-      });
-      proc.on('error', reject);
-    });
-    res.json(JSON.parse(stdout));
-  } catch (e) {
-    console.error('/api/forecast error:', e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Download Excel
-app.get('/api/export', async (req, res) => {
-  const xlsxPath = path.join(CACHE_DIR, 'output', 'Отчёт_продажи_2026.xlsx');
-  try {
-    await fs.access(xlsxPath);
-    res.download(xlsxPath, 'Отчёт_продажи_2026.xlsx');
-  } catch {
-    res.status(404).json({ error: 'Excel file not found. Run refresh first.' });
-  }
-});
-
-// --- Helper: load participant data & build participants list ---
+// --- Helper: build participants list for a given week ---
 async function buildParticipants(weekIndex) {
-  if (!aggCache) throw new Error('Data not loaded');
+  const agg = await getAgg();
+  const weeks = agg.weeks || [];
+  const targetWeek = weeks[weekIndex];
+  if (!targetWeek) return { participants: [], weekLabel: '—' };
 
-  const [dealsRaw, companiesRaw, contactsRaw, dictsRaw, ccRaw, contExtRaw, formatRaw, compExtRaw] = await Promise.all([
-    fs.readFile(path.join(CACHE_DIR, 'deals_2026.json'), 'utf-8').catch(() => '[]'),
-    fs.readFile(path.join(CACHE_DIR, 'companies.json'), 'utf-8').catch(() => '{}'),
-    fs.readFile(path.join(CACHE_DIR, 'contacts.json'), 'utf-8').catch(() => '{}'),
-    fs.readFile(path.join(CACHE_DIR, 'dicts.json'), 'utf-8').catch(() => '{}'),
-    fs.readFile(path.join(CACHE_DIR, 'company_contact.json'), 'utf-8').catch(() => '{}'),
-    fs.readFile(path.join(CACHE_DIR, 'contacts_ext.json'), 'utf-8').catch(() => '{}'),
-    fs.readFile(path.join(CACHE_DIR, 'deals_format.json'), 'utf-8').catch(() => '{}'),
-    fs.readFile(path.join(CACHE_DIR, 'companies_ext.json'), 'utf-8').catch(() => '{}'),
+  const wkLabel = targetWeek.label_short + ' (' + targetWeek.label_dates + ')';
+
+  const [dealsRaw, companiesRaw, contactsRaw, dictsRaw] = await Promise.all([
+    fs.readFile(path.join(DS_CACHE, 'deals.json'), 'utf-8').catch(() => '[]'),
+    fs.readFile(path.join(DS_CACHE, 'companies.json'), 'utf-8').catch(() => '{}'),
+    fs.readFile(path.join(DS_CACHE, 'contacts.json'), 'utf-8').catch(() => '{}'),
+    fs.readFile(path.join(DS_CACHE, 'dicts.json'), 'utf-8').catch(() => '{}'),
   ]);
 
   const deals = JSON.parse(dealsRaw);
   const companies = JSON.parse(companiesRaw);
   const contacts = JSON.parse(contactsRaw);
   const dicts = JSON.parse(dictsRaw);
-  const cc = JSON.parse(ccRaw);
-  const contactsExt = JSON.parse(contExtRaw);
-  const dealsFormat = JSON.parse(formatRaw);
-  const companiesExt = JSON.parse(compExtRaw);
 
   const cats = dicts.categories || {};
   const users = dicts.users || {};
 
   const KOM_CATS = ['КОМ (Sale)', 'КОМ (Post Sale)'];
 
-  function detectFormat(title, catName, dealId) {
-    const ufFmt = dealId && dealsFormat ? dealsFormat[dealId] : null;
+  function detectFormat(title, catName, ufFmt) {
     if (ufFmt === '19042468') return 'ОМ (Онлайн)';
     if (ufFmt === '19042498') return 'КОМ';
     if (KOM_CATS.includes(catName)) return 'КОМ';
@@ -275,12 +94,6 @@ async function buildParticipants(weekIndex) {
     }
     return 'ОМ (Онлайн)';
   }
-
-  const weeks = aggCache.weeks || [];
-  const targetWeek = weeks[weekIndex];
-  if (!targetWeek) return { participants: [], weekLabel: '—' };
-
-  const wkLabel = targetWeek.label_short + ' (' + targetWeek.label_dates + ')';
 
   function parseDateRange(datesStr) {
     const parts = datesStr.split('—');
@@ -305,7 +118,7 @@ async function buildParticipants(weekIndex) {
     return isNaN(d.getTime()) ? null : d;
   }
 
-  function isRealTraining(title, dealId) {
+  function isRealTraining(title, ufFmt) {
     const t = (title || '').toLowerCase();
     const skipWords = ['копия для статистики', 'входящий звонок', 'запрос программы',
       'запрос каталога', 'запрос на прораба', 'уход со страницы', 'получите консультацию',
@@ -314,53 +127,46 @@ async function buildParticipants(weekIndex) {
       if (t.includes(w)) return false;
     }
     const realFormats = ['19042467', '19042468', '19042495'];
-    if (dealId && dealsFormat && realFormats.includes(dealsFormat[dealId])) return true;
+    if (realFormats.includes(ufFmt)) return true;
     if (t.length < 10 && (t.startsWith('запрос') || t === 'промо')) return false;
     return true;
   }
 
-  // Дата начала и окончания обучения (приоритет: товар → сделка → CLOSEDATE)
   function getLearnPeriod(d) {
     let start = toDate(d.UF_CRM_DATE_START_LEARN);
     let end = toDate(d.UF_CRM_DATE_END_LEARN);
-    // Fallback на CLOSEDATE, если дат обучения нет
     if (!start && !end) {
       const cd = toDate(d.CLOSEDATE);
-      if (cd) {
-        start = cd;
-        end = cd;
-      }
+      if (cd) { start = cd; end = cd; }
     }
     return { start, end };
   }
 
-  // Проверка: пересекается ли период обучения с неделей
   function learnOverlapsWeek(d) {
     const p = getLearnPeriod(d);
     if (!p.start || !p.end) return false;
     return p.start <= range.end && p.end >= range.start;
   }
 
-  // Find ООМ/ОМ сделки — WON, у которых обучение пересекается с неделей
   const OOM_OM_DEALS = deals.filter(d => {
     const catName = cats[String(d.CATEGORY_ID || '0')];
-    const fmt = detectFormat(d.TITLE, catName, d.ID);
+    const fmt = detectFormat(d.TITLE, catName, d.UF_FORMAT);
     if (fmt !== 'ООМ (Очное)' && fmt !== 'ОМ (Онлайн)') return false;
     if (d.STAGE_SEMANTIC_ID !== 'S') return false;
     if (d.CLOSED !== 'Y') return false;
     if (!learnOverlapsWeek(d)) return false;
     const opp = parseFloat(d.OPPORTUNITY || 0);
     if (opp > 0) return true;
-    return isRealTraining(d.TITLE, d.ID);
+    return isRealTraining(d.TITLE, d.UF_FORMAT);
   });
 
   // Build company history
   const companyHistory = {};
   for (const d of deals) {
     const catName = cats[String(d.CATEGORY_ID || '0')];
-    const fmt = detectFormat(d.TITLE, catName, d.ID);
+    const fmt = detectFormat(d.TITLE, catName, d.UF_FORMAT);
     if (fmt === 'КОМ') continue;
-    const coId = String(cc[d.ID]?.COMPANY_ID || d.COMPANY_ID || '0');
+    const coId = String(d.COMPANY_ID || '0');
     if (!companyHistory[coId]) companyHistory[coId] = [];
     companyHistory[coId].push({ date: d.CLOSEDATE || d.DATE_CREATE, title: d.TITLE });
   }
@@ -369,17 +175,15 @@ async function buildParticipants(weekIndex) {
   const seen = new Set();
 
   for (const d of OOM_OM_DEALS) {
-    const ccinfo = cc[d.ID] || {};
-    const coId = String(ccinfo.COMPANY_ID || d.COMPANY_ID || '0');
-    const contactId = String(ccinfo.CONTACT_ID || d.CONTACT_ID || '0');
+    const coId = String(d.COMPANY_ID || '0');
+    const contactId = String(d.CONTACT_ID || '0');
 
     const companyName = companies[coId] || '—';
-    const contactInfo = contactsExt[contactId] || contacts[contactId] || {};
+    const contactInfo = contacts[contactId] || {};
     const contactName = contactInfo.name || (contactId !== '0' ? `Контакт #${contactId}` : '—');
     const opp = parseFloat(d.OPPORTUNITY || 0);
     const manager = users[String(d.ASSIGNED_BY_ID || '')] || String(d.ASSIGNED_BY_ID || '—');
 
-    // Check history
     const prevDeals = companyHistory[coId] || [];
     const closedDate = d.CLOSEDATE || d.DATE_CREATE;
     let hadPrev = false;
@@ -399,28 +203,21 @@ async function buildParticipants(weekIndex) {
           return da > db ? a : b;
         }, earlier[0]);
         if (lastDate.date) {
-          const d = new Date(lastDate.date.replace('+03:00', '').replace('+00:00', '').substring(0, 19));
-          prevDates = d.toLocaleDateString('ru-RU');
+          const dt = new Date(lastDate.date.replace('+03:00', '').replace('+00:00', '').substring(0, 19));
+          prevDates = dt.toLocaleDateString('ru-RU');
         }
       }
     }
 
-    // Дата обучения (для показа в таблице)
     const learnStart = toDate(d.UF_CRM_DATE_START_LEARN);
     const learnEnd = toDate(d.UF_CRM_DATE_END_LEARN);
-    const displayDate = learnStart ? learnStart.toLocaleDateString('ru-RU') 
-      : (learnEnd ? learnEnd.toLocaleDateString('ru-RU') 
+    const displayDate = learnStart ? learnStart.toLocaleDateString('ru-RU')
+      : (learnEnd ? learnEnd.toLocaleDateString('ru-RU')
       : (closedDate ? new Date(closedDate.replace('+03:00', '').replace('+00:00', '').substring(0, 19)).toLocaleDateString('ru-RU') : '—'));
 
     const key = d.ID;
     if (seen.has(key)) continue;
     seen.add(key);
-
-    // Region resolution: contact → company fallback
-    let region = (contactsExt[contactId]?.region || contactsExt[contactId]?.locality || '');
-    if (!region && companiesExt[coId]?.region) {
-      region = companiesExt[coId].region;
-    }
 
     participants.push({
       id: d.ID,
@@ -437,8 +234,8 @@ async function buildParticipants(weekIndex) {
       prevTrainingDate: prevDates,
       stage: d.STAGE_SEMANTIC_ID === 'S' ? 'WON' : d.STAGE_SEMANTIC_ID === 'F' ? 'LOSE' : 'В работе',
       isPaid: d.CLOSED === 'Y' && d.STAGE_SEMANTIC_ID === 'S',
-      format: detectFormat(d.TITLE, cats[String(d.CATEGORY_ID || '0')], d.ID),
-      region
+      format: detectFormat(d.TITLE, cats[String(d.CATEGORY_ID || '0')], d.UF_FORMAT),
+      region: '',
     });
   }
 
@@ -451,10 +248,11 @@ async function buildParticipants(weekIndex) {
   return { participants, total: participants.length, weekLabel: wkLabel };
 }
 
-// --- Participants: ООМ/ОМ deals for previous week ---
+// Participants: previous week
 app.get('/api/participants', async (req, res) => {
   try {
-    const weeks = aggCache?.weeks || [];
+    const agg = await getAgg();
+    const weeks = agg.weeks || [];
     const result = await buildParticipants(weeks.length - 2);
     res.json(result);
   } catch (e) {
@@ -463,10 +261,11 @@ app.get('/api/participants', async (req, res) => {
   }
 });
 
-// --- Participants: ООМ/ОМ deals for current week ---
+// Participants: current week
 app.get('/api/participants/current', async (req, res) => {
   try {
-    const weeks = aggCache?.weeks || [];
+    const agg = await getAgg();
+    const weeks = agg.weeks || [];
     const result = await buildParticipants(weeks.length - 1);
     res.json(result);
   } catch (e) {
@@ -475,10 +274,10 @@ app.get('/api/participants/current', async (req, res) => {
   }
 });
 
-// Static files (no-cache for HTML to force refresh)
+// Static files
 app.use(express.static(path.join(__dirname, 'public'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.html')) {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
@@ -486,16 +285,6 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 
-// Fallback for drop-dashboard only
 app.get(/(.*)/,  (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 export default app;
-
-// --- Direct start (port mode) ---
-const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  await loadCache();
-  app.listen(PORT, '0.0.0.0', () => console.log(`🍀 Дроп-дашборд на http://0.0.0.0:${PORT}`));
-} else {
-  await loadCache();
-}
