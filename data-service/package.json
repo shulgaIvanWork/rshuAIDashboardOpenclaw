@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "fetch": "node --env-file=../.env index.js"
+    "fetch": "node --env-file=../.env index.js",
+    "fetch-partial": "node --env-file=../.env fetch-partial.js"
   }
 }

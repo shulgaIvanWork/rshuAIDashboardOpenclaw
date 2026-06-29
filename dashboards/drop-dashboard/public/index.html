@@ -891,6 +891,9 @@ function drawCharts(data) {
 
 loadAll();
 
+function escapeHtml(s) {
+  return s ? String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
+}
 
 </script>
 </body>

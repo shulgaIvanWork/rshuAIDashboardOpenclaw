@@ -30,6 +30,111 @@ app.get('/api/data', async (req, res) => {
   }
 });
 
+// Воронка регистраций с фильтром по дате создания
+app.get('/api/reg-funnel', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const REG_SRC_ID = '79641902890';
+    const VALID_CATS = new Set([0, 8, 19]);
+
+    const deals = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
+
+    let subset = deals.filter(d => {
+      if (String(d.SOURCE_ID || '') !== REG_SRC_ID) return false;
+      if (!VALID_CATS.has(parseInt(d.CATEGORY_ID || 0))) return false;
+      return true;
+    });
+
+    if (from || to) {
+      const dtFrom = from ? new Date(from) : null;
+      const dtTo   = to   ? new Date(to + 'T23:59:59') : null;
+      subset = subset.filter(d => {
+        const dc = d.DATE_CREATE ? new Date(d.DATE_CREATE.substring(0, 10)) : null;
+        if (!dc) return false;
+        if (dtFrom && dc < dtFrom) return false;
+        if (dtTo   && dc > dtTo)   return false;
+        return true;
+      });
+    }
+
+    const MIN_OPP = 11.0;
+    function getOpp(d) { return parseFloat(d.OPPORTUNITY || 0); }
+    function getPayDate(d) {
+      const s = d.UF_DATE_PAY_1C || d.CLOSEDATE;
+      return s ? s.substring(0, 10) : null;
+    }
+    function getInvDate(d) {
+      const s = d.UF_CRM_1753272713011;
+      return s ? s.substring(0, 10) : null;
+    }
+    function daysBetween(a, b) {
+      if (!a || !b) return -1;
+      return Math.round((new Date(b) - new Date(a)) / 86400000);
+    }
+
+    const SEM_LOSE = 'F', SEM_P = 'P';
+    const regIsPaid    = d => !!d.UF_DATE_PAY_1C && getOpp(d) >= MIN_OPP;
+    const regIsLose    = d => d.STAGE_SEMANTIC_ID === SEM_LOSE;
+    const regIsInvoice = d => d.STAGE_SEMANTIC_ID !== SEM_LOSE && (!!getInvDate(d) || regIsPaid(d));
+    const regIsSql     = d => d.STAGE_SEMANTIC_ID === SEM_P && getOpp(d) >= MIN_OPP && !getInvDate(d) && !d.UF_DATE_PAY_1C;
+
+    let sql = 0, inv = 0, paid = 0, lose = 0, other = 0;
+    let paidSum = 0, sqlSum = 0, invSum = 0, loseSum = 0;
+    let realInvCnt = 0, realInvSum = 0;
+    const paidDurs = [], invDurs = [];
+
+    for (const d of subset) {
+      const opp = getOpp(d);
+      if (regIsLose(d))      { lose++; loseSum += opp; }
+      else if (regIsInvoice(d)) { inv++;  invSum  += opp; }
+      else if (regIsSql(d))  { sql++;  sqlSum  += opp; }
+      else other++;
+      if (regIsPaid(d))      { paid++; paidSum += opp; }
+
+      const invDt = getInvDate(d);
+      const invEff = invDt || (regIsPaid(d) ? getPayDate(d) : null);
+      if (invEff && d.DATE_CREATE && d.STAGE_SEMANTIC_ID !== SEM_LOSE) {
+        const dd = daysBetween(d.DATE_CREATE.substring(0, 10), invEff);
+        if (dd >= 0) invDurs.push(dd);
+      }
+      if (invDt && d.STAGE_SEMANTIC_ID !== SEM_LOSE && !regIsPaid(d)) {
+        realInvCnt++; realInvSum += opp;
+      }
+      if (regIsPaid(d)) {
+        const pd = getPayDate(d);
+        if (pd && d.DATE_CREATE) {
+          const dd = daysBetween(d.DATE_CREATE.substring(0, 10), pd);
+          if (dd >= 0) paidDurs.push(dd);
+        }
+      }
+    }
+
+    const total = subset.length;
+    const totalPaid = paid;
+    const totalPaidSum = paidSum;
+    const avgDur    = paidDurs.length ? paidDurs.reduce((s, d) => s + d, 0) / paidDurs.length : 0;
+    const avgInvDur = invDurs.length  ? invDurs.reduce((s, d) => s + d, 0)  / invDurs.length  : 0;
+
+    res.json({
+      total, sql, sql_sum: Math.round(sqlSum),
+      invoice: inv, inv_sum: Math.round(invSum),
+      paid, paid_sum: Math.round(paidSum),
+      total_paid: totalPaid, total_paid_sum: Math.round(totalPaidSum),
+      lose, lose_sum: Math.round(loseSum), other,
+      avg_check:   totalPaid ? Math.round(totalPaidSum / totalPaid) : 0,
+      avg_dur:     Math.round(avgDur * 10) / 10,
+      avg_inv_dur: Math.round(avgInvDur * 10) / 10,
+      conv:     total ? Math.round(totalPaid / total * 100 * 10) / 10 : 0,
+      lose_pct: total ? Math.round(lose / total * 100 * 10) / 10 : 0,
+      real_inv_cnt: realInvCnt, real_inv_sum: Math.round(realInvSum),
+      inv_conv: total ? Math.round(inv / total * 100 * 10) / 10 : 0,
+    });
+  } catch (e) {
+    console.error('/api/reg-funnel error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Артефакты — аномалии в данных (только для admin)
 app.get('/api/artifacts', async (req, res) => {
   if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'Forbidden' });

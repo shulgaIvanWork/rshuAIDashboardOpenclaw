@@ -40,7 +40,7 @@ function weekToMonth(labelDates) {
 // ── /api/data ─────────────────────────────────────────────────────────────────
 app.get('/api/data', async (req, res) => {
   try {
-    const d = getAgg();
+    const d = await getAgg();
     if (!d) return res.json({ ready: false, error: 'Нет данных — дождитесь первой загрузки' });
 
     const komYtd      = d.kom_ytd || {};

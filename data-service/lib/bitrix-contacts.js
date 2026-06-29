@@ -22,12 +22,19 @@ function flattenParams(obj, prefix = '') {
 
 async function restCall(method, params = {}) {
   const body = new URLSearchParams(flattenParams(params)).toString();
-  const res = await fetch(WEBHOOK + method + '.json', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-  return res.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(WEBHOOK + method + '.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+      signal: controller.signal,
+    });
+    return res.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -40,6 +47,7 @@ async function batchGet(ids, buildCmd, extractFn) {
     const chunk = unique.slice(i, i + 50);
     const cmd = { halt: '0' };
     chunk.forEach((id, j) => { cmd[`cmd[i${j}]`] = buildCmd(id); });
+    process.stdout.write(`  [${i + chunk.length}/${unique.length}] запрос...\r`);
     try {
       const r = await restCall('batch', cmd);
       const res = r.result?.result || {};
@@ -48,10 +56,11 @@ async function batchGet(ids, buildCmd, extractFn) {
         if (item) result[id] = extractFn(item);
       });
     } catch (e) {
-      process.stderr.write(`  WARN batch error: ${e.message}\n`);
+      process.stderr.write(`\n  WARN batch error at ${i}: ${e.message}\n`);
     }
-    if (i + 50 < unique.length) await sleep(500);
+    if (i + 50 < unique.length) await sleep(300);
   }
+  process.stdout.write('\n');
   return result;
 }
 

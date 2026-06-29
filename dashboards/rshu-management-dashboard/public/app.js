@@ -111,7 +111,7 @@ async function loadAll() {
   }
 }
 
-function renderFilteredData() {
+async function renderFilteredData() {
   var d = dataCache;
   if (!d) return;
   var dateFrom = document.getElementById('dateFrom').value;
@@ -128,6 +128,15 @@ function renderFilteredData() {
 
   // Пересчитываем KPI из отфильтрованных недель
   var filteredData = buildFilteredData(d, filtered);
+
+  // Воронка регистраций — фильтруется по DATE_CREATE через отдельный endpoint
+  try {
+    var params = '';
+    if (dateFrom) params += (params ? '&' : '?') + 'from=' + dateFrom;
+    if (dateTo)   params += (params ? '&' : '?') + 'to='   + dateTo;
+    var regData = await api('/api/reg-funnel' + params);
+    filteredData.reg_ytd = regData;
+  } catch (e) { /* fallback: оставляем оригинальные данные */ }
 
   // Обновляем info
   var infoEl = document.getElementById('filterInfo');

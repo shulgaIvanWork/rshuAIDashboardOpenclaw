@@ -15,6 +15,7 @@ import { fetchDealsRest } from './lib/bitrix-rest.js';
 import { fetchDealsExport, mergeDeals } from './lib/bitrix-export.js';
 import { fetchDicts } from './lib/bitrix-dicts.js';
 import { fetchContacts, fetchCompanies } from './lib/bitrix-contacts.js';
+import { fetchModules } from './lib/fetch-modules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'cache');
@@ -109,6 +110,27 @@ await writeFile(
 console.log(`  Сохранено: cache/companies.json — ${Object.keys(companies).length} компаний (${elapsed()})`);
 
 progress({ type: 'step_done', idx: 3 });
+
+// --- Шаг 5: Модули участников (даты начала/конца каждого модуля программы) ---
+console.log('\n== Шаг 5/5: Модули участников ==');
+progress({ type: 'step_start', idx: 4 });
+
+const MODULES_OUT = path.join(
+  __dirname, '..', 'dashboards', 'participants-dashboard', 'cache', 'modules.json'
+);
+try {
+  const { mkdir: mkdirFs } = await import('fs/promises');
+  await mkdirFs(path.dirname(MODULES_OUT), { recursive: true });
+
+  const modules = await fetchModules(deals, msg => console.log(msg));
+  await writeFile(MODULES_OUT, JSON.stringify(modules));
+
+  const withMods = Object.values(modules).filter(v => v.length > 0).length;
+  console.log(`  Сохранено: modules.json — ${withMods} сделок с модулями (${elapsed()})`);
+} catch (e) {
+  console.error(`  Ошибка выгрузки модулей: ${e.message}`);
+}
+progress({ type: 'step_done', idx: 4 });
 
 // --- Готово ---
 progress({ type: 'all_done' });

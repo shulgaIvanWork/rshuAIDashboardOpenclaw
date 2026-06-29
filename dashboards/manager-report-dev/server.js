@@ -291,7 +291,7 @@ router.get('/api/managers', async (req, res) => {
       afanasyev:  all.filter(m => m.group === 'afanasyev'),
     };
 
-    const d = getAgg() || {};
+    const d = await getAgg() || {};
     res.json({
       managers:         [...groups.main, ...groups.autopay, ...groups.ozk, ...groups.other, ...groups.tech],
       managersBond:     groups.bond,
@@ -309,9 +309,9 @@ router.get('/api/managers', async (req, res) => {
   }
 });
 
-router.get('/api/funnel', (req, res) => {
+router.get('/api/funnel', async (req, res) => {
   try {
-    const d = getAgg();
+    const d = await getAgg();
     if (!d) return res.json({ weeks: [] });
     const weeks = (d.weeks || []).map(w => ({
       label_dates: w.label_dates,
@@ -330,8 +330,8 @@ router.get('/api/funnel', (req, res) => {
   }
 });
 
-router.get('/api/status', (req, res) => {
-  const d = getAgg();
+router.get('/api/status', async (req, res) => {
+  const d = await getAgg();
   res.json({
     ready:    !!d,
     deals:    dealsCache?.length || 0,

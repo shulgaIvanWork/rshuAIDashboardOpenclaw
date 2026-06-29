@@ -54,7 +54,7 @@ app.use(session({
   secret: 'clover-web-secret-2026',
   resave: false,
   saveUninitialized: false,
-  store: new FileStoreSession({ path: path.join(DATA_DIR, 'sessions') }),
+  store: new FileStoreSession({ path: path.join(DATA_DIR, 'sessions'), logFn: () => {} }),
   cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
 }));
 app.use(express.static(path.join(__dirname, 'public')));
