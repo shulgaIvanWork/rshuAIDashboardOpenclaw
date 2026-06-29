@@ -1,456 +1,98 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>КОМ — Отчёт 2026</title>
-<script>
-var _p = window.location.pathname;
-var _m = _p.match(/^\/([^/]+)\//);
-window.BASE_PATH = _m ? '/' + _m[1] : '';
-
-var refreshStepsData = [
-  { key: 'fetch_data',   label: 'Загрузка данных',         weight: 50 },
-  { key: 'analyze',      label: 'Анализ данных',           weight: 50 },
-];
-
-var statusPanelHTML = '' +
-  '<div id="refreshStatusPanel" class="refresh-panel" style="display:none">' +
-    '<div class="refresh-header">' +
-      '<span class="refresh-title">🔄 Обновление данных</span>' +
-      '<span class="refresh-elapsed" id="statusElapsed">⏱ 0м 0с</span>' +
-    '</div>' +
-    '<div class="progress-bar refresh-progress-bar">' +
-      '<div class="progress-fill" id="statusProgressFill" style="width:0%"></div>' +
-    '</div>' +
-    '<div id="statusSteps" class="refresh-steps"></div>' +
-    '<div id="statusDealProgress" class="refresh-deal-progress"></div>' +
-  '</div>';
-
-function renderStepLines(curIdx, steps, progressPct) {
-  var h = '';
-  for (var i = 0; i < steps.length; i++) {
-    var s = steps[i];
-    var icon, cls, label;
-    if (i < curIdx) { icon = '\u2705'; cls = 'step-done'; label = s.label; }
-    else if (i === curIdx) { icon = '\u23f3'; cls = 'step-active'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
-    else { icon = '\u2b1c'; cls = 'step-pending'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
-    h += '<div class="refresh-step ' + cls + '">' +
-      '<span class="step-icon">' + icon + '</span>' +
-      '<span class="step-label">' + label + '</span>' +
-    '</div>';
-  }
-  return h;
-}
-
-async function safeFetch(url, opts) {
-  var resp = await fetch(url, opts);
-  if (resp.redirected || resp.url.endsWith('/login')) { window.location.href = '/login'; throw new Error('redirect'); }
-  var text = await resp.text();
-  if (text.startsWith('<!DOCTYPE')) { window.location.href = '/login'; throw new Error('redirect'); }
-  return JSON.parse(text);
-}
-</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F7F8FA; padding: 24px; color: #0F172A; }
-    .wrap { max-width: 1500px; margin: 0 auto; }
-    h1 { font-size: 26px; font-weight: 700; margin: 0 0 4px; }
-    .sub { color: #475569; font-size: 13px; margin-bottom: 24px; }
-    .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-    .toolbar button { background: #093EB4; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: .2s; }
-    .toolbar button:hover { background: #3079D2; }
-    .toolbar button:disabled { background: #475569; cursor: wait; }
-    .loading-bar { height: 3px; background: #e0e0e0; border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
-    .loading-bar .fill { height: 100%; width: 0%; background: #093EB4; transition: width .5s; }
-
-    .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
-    .kpi { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    .kpi .lbl { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px; }
-    .kpi .val { font-size: 18px; font-weight: 700; margin: 4px 0 2px; color: #0F172A; }
-    .kpi .sub { font-size: 12px; color: #475569; margin: 0; }
-    .kpi .val-big { font-size: 21px; font-weight: 700; }
-    .kpi .si { font-size: 12px; color: #475569; font-weight: 400; }
-    .kpi .lbl2 { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin: 4px 0; }
-    .kpi .row { display: flex; justify-content: space-between; align-items: baseline; }
-    .kpi-total { background-color: rgba(31, 42, 68, 0.08) !important; }
-    .kpi-oom { background-color: rgba(0, 188, 212, 0.12) !important; }
-    .kpi-kom { background-color: rgba(156, 39, 176, 0.12) !important; }
-    .kpi-reg { background-color: rgba(76, 175, 80, 0.12) !important; }
-    .c-total { color: #1f2a44 !important; }
-    .c-oom { color: #00bcd4 !important; }
-    .c-kom { color: #9C27B0 !important; }
-    .c-reg { color: #4CAF50 !important; }
-    .kpi-header { grid-column: 1 / -1; font-size: 15px; font-weight: 700; margin: 4px 0; }
-    .delta-up { color: #2E7D32; font-size: 12px; }
-    .delta-down { color: #C62828; font-size: 12px; }
-    .delta-flat { color: #475569; font-size: 12px; }
-
-    .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    .card.kom { border-left: 4px solid #7A2E2E; }
-    .card h2 { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
-    .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
-    .chartbox { height: 340px; position: relative; }
-    .chartbox-sm { height: 240px; position: relative; }
-    .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .threecol { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { background: #093EB4; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; position: sticky; top: 0; }
-    td { padding: 8px 12px; border-bottom: 1px solid #E2E8F0; }
-    tr:hover td { background: #F1F3F6; }
-    tr.cur td { background: #F1F3F6; font-weight: 600; }
-    .scroll-x { overflow-x: auto; }
-    .loading-state { padding: 60px; text-align: center; color: #475569; }
-    .loading-state .spinner { width: 40px; height: 40px; border: 4px solid #E2E8F0; border-top-color: #093EB4; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 16px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .error-state { padding: 40px; text-align: center; color: #C62828; }
-    .dt { font-size: 11px; color: #475569; font-weight: 400; }
-    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
-    th.sort { cursor: pointer; user-select: none; }
-    th.sort:hover { background: #3079D2; }
-    th.sort::after { content: ' ⇅'; font-size: 10px; opacity: .4; font-weight: 400; }
-    th.sort.asc::after { content: ' ▲'; opacity: 1; }
-    th.sort.desc::after { content: ' ▼'; opacity: 1; }
-    .badge-prev { display:inline-block; background:#E8F5E9; color:#2E7D32; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px }
-    .badge-new { display:inline-block; background:#FFF3E0; color:#E65100; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px }
-    .tdleft { text-align: left; }
-    .tdright { text-align: right; }
-    .deal-title { font-weight: 600; }
-    .muted { color: #475569; font-size: 11px; }
-    .tabs { display: flex; gap: 4px; margin-bottom: 20px; flex-wrap: wrap; }
-    .tab { padding: 10px 20px; cursor: pointer; color: #475569; font-size: 14px; font-weight: 600; border-bottom: 3px solid transparent; transition: all .2s; border-radius: 8px 8px 0 0; background: none; border-top: none; border-left: none; border-right: none; }
-    .tab:hover { color: #093EB4; background: #F1F3F6; }
-    .tab.active { color: #9C27B0; border-bottom-color: #9C27B0; background: #fff; }
-    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
-    .kpi-card { background: #fff; border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    .kpi-card .label { font-size: 11px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px; }
-    .kpi-card .value { font-size: 20px; font-weight: 700; color: #0F172A; }
-    .kpi-card .sub { font-size: 12px; color: #475569; margin-top: 2px; }
-    .kpi-card.accent { border-top: 3px solid #9C27B0; }
-    .kpi-card.warn { border-top: 3px solid #F57C00; }
-    .info-box { background: #F3E8FF; border: 1px solid #D8B4FE; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #6B21A8; line-height: 1.4; }
-    .table-card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    .table-card .section-title { font-size: 16px; font-weight: 600; margin: 0 0 14px; color: #0F172A; }
-    .table-card .sub { font-size: 12px; color: #475569; margin-bottom: 14px; }
-    
-    @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } .twocol, .threecol { grid-template-columns: 1fr; } }
-
-    .refresh-panel { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    .refresh-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    .refresh-title { font-size: 16px; font-weight: 600; color: #0F172A; }
-    .refresh-elapsed { font-size: 14px; color: #475569; font-weight: 500; }
-    .refresh-progress-bar { height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; margin-bottom: 14px; }
-    .refresh-progress-bar .progress-fill { height: 100%; background: linear-gradient(90deg, #093EB4, #3079D2); border-radius: 4px; transition: width .8s ease; }
-    .refresh-steps { margin-top: 4px; }
-    .refresh-step { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #F1F3F6; }
-    .refresh-step:last-child { border-bottom: none; }
-    .refresh-step .step-icon { width: 28px; font-size: 16px; text-align: center; flex-shrink: 0; }
-    .refresh-step .step-label { font-size: 14px; color: #0F172A; margin-left: 8px; }
-    .refresh-step .step-weight { font-size: 12px; color: #888; font-weight: 400; }
-    .refresh-step.step-active .step-label { font-weight: 600; color: #093EB4; }
-    .refresh-step.step-done { opacity: 0.85; }
-    .refresh-step.step-done .step-label { color: #475569; }
-    .refresh-step.step-pending .step-label { color: #94A3B8; }
-    .refresh-step.step-error .step-label { color: #C62828; font-weight: 500; }
-    .refresh-deal-progress { font-size: 13px; color: #475569; margin-top: 10px; text-align: center; font-weight: 500; }
-</style>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>КОМ — Отчёт 2026</title>
+  <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
 <body>
-<div class="header">
-  <div>
-    <h1>📊 КОМ — Корпоративное обучение</h1>
-    <div class="sub">Отчёт 2026 · Данные Bitrix24 · <span id="updateTime">Обновлено: май 2026</span></div>
+<div class="wrap">
+  <h1>📊 КОМ — Корпоративное обучение <span id="updateTime" class="page-title-meta"></span></h1>
+
+  <div class="tabs" id="komTabs">
+    <div class="tab active" data-tab="summary">📈 Итого</div>
+    <div class="tab" data-tab="monthly">📅 По месяцам</div>
+    <div class="tab" data-tab="weekly">📆 По неделям</div>
+    <div class="tab" data-tab="deals">🏆 ТОП сделок</div>
+    <div class="tab" data-tab="companies">🏢 Компании КОМ</div>
+    <div class="tab" data-tab="managers">👤 Менеджеры КОМ</div>
+    <div class="tab" data-tab="potential">💎 Потенциальные продажи</div>
   </div>
-  <div class="header-actions">
-    <span class="badge-live">Январь — Май 2026</span>
-    <button class="btn btn-refresh" id="refreshBtn">🔄 Обновить</button>
+
+  <div id="summary" class="tab-area active">
+    <div id="infoBox" class="info-box" style="display:none"></div>
+    <div id="kpiGrid" class="kpi-grid">
+      <div class="loading-state"><div class="spinner"></div><div>Загрузка KPI…</div></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card"><h3>Лиды vs Платящие — по месяцам</h3><div class="chart-wrap"><canvas id="chartLidsMonth"></canvas></div></div>
+      <div class="chart-card"><h3>Выручка — по месяцам (тыс. ₽)</h3><div class="chart-wrap"><canvas id="chartRevMonth"></canvas></div></div>
+      <div class="chart-card"><h3>Конверсия Лиды→Платящие %</h3><div class="chart-wrap"><canvas id="chartConvMonth"></canvas></div></div>
+      <div class="chart-card"><h3>Длительность закрытия (дней)</h3><div class="chart-wrap"><canvas id="chartDurMonth"></canvas></div></div>
+    </div>
+  </div>
+
+  <div id="monthly" class="tab-area">
+    <div class="table-card">
+      <h3 class="section-title">Ежемесячные показатели КОМ 2026</h3>
+      <div id="monthlyTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card"><h3>Воронка: Лиды → Платящие</h3><div class="chart-wrap"><canvas id="chartFunnelMonth"></canvas></div></div>
+      <div class="chart-card"><h3>Выручка по месяцам (тыс. ₽)</h3><div class="chart-wrap"><canvas id="chartRevMonth2"></canvas></div></div>
+    </div>
+  </div>
+
+  <div id="weekly" class="tab-area">
+    <div class="charts-row">
+      <div class="chart-card"><h3>Лиды vs Платящие — по неделям</h3><div class="chart-wrap"><canvas id="chartLidsWeek"></canvas></div></div>
+      <div class="chart-card"><h3>Выручка — по неделям (тыс. ₽)</h3><div class="chart-wrap"><canvas id="chartRevWeek"></canvas></div></div>
+    </div>
+    <div class="table-card">
+      <h3 class="section-title">Еженедельные показатели КОМ 2026</h3>
+      <div id="weeklyTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div>
+    </div>
+  </div>
+
+  <div id="deals" class="tab-area">
+    <div id="dealsNote" class="note"></div>
+    <div class="table-card">
+      <h3 class="section-title">🏆 ТОП сделок КОМ по оплате</h3>
+      <div id="dealsTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div>
+    </div>
+  </div>
+
+  <div id="companies" class="tab-area">
+    <div class="table-card">
+      <h3 class="section-title">🏢 Компании КОМ — уже принесли доход</h3>
+      <div class="sub" style="margin:-8px 0 14px">Только оплаченные сделки · сортировка кликом по заголовку</div>
+      <div id="companiesTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div>
+    </div>
+  </div>
+
+  <div id="managers" class="tab-area">
+    <div class="table-card">
+      <h3 class="section-title">👤 Менеджеры, работающие с КОМ</h3>
+      <div class="sub" style="margin:-8px 0 14px">По сумме договоров · сортировка кликом по заголовку</div>
+      <div id="managersTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div>
+    </div>
+  </div>
+
+  <div id="potential" class="tab-area">
+    <div class="table-card">
+      <h3 class="section-title">💎 Потенциальные продажи КОМ — в воронке</h3>
+      <div class="sub" style="margin:-8px 0 14px">Неоплаченные сделки в работе · сортировка кликом по заголовку</div>
+      <div id="potentialTableWrap"><div class="loading-state"><div class="spinner"></div><div>Загрузка…</div></div></div>
+    </div>
   </div>
 </div>
-<div id="loadingOverlay" class="loading-overlay"><div class="loading-spinner">⏳ Обновление данных...</div></div>
-<div class="tabs">
-  <div class="tab active" onclick="showTab('summary')">📈 Итого</div>
-  <div class="tab" onclick="showTab('monthly')">📅 По месяцам</div>
-  <div class="tab" onclick="showTab('weekly')">📆 По неделям</div>
-  <div class="tab" onclick="showTab('deals')">🏆 ТОП сделок</div>
-  <div class="tab" onclick="showTab('companies')">🏢 Компании КОМ</div>
-  <div class="tab" onclick="showTab('managers')">👤 Менеджеры КОМ</div>
-  <div class="tab" onclick="showTab('potential')">💎 Потенциальные продажи</div>
-</div>
-<div id="summary" class="content active">
-  <div id="infoBox" class="info-box"></div>
-  <div id="kpiGrid" class="kpi-grid"></div>
-  <div class="charts-row">
-    <div class="chart-card"><h3>Лиды vs Платящие — по месяцам</h3><div class="chart-wrap"><canvas id="chartLidsMonth"></canvas></div></div>
-    <div class="chart-card"><h3>Выручка — по месяцам (тыс. ₽)</h3><div class="chart-wrap"><canvas id="chartRevMonth"></canvas></div></div>
-    <div class="chart-card"><h3>Конверсия Лиды→Платящие %</h3><div class="chart-wrap"><canvas id="chartConvMonth"></canvas></div></div>
-    <div class="chart-card"><h3>Длительность закрытия (дней)</h3><div class="chart-wrap"><canvas id="chartDurMonth"></canvas></div></div>
-  </div>
-</div>
-<div id="monthly" class="content">
-  <div class="table-card"><h3 class="section-title">Ежемесячные показатели КОМ 2026</h3><div id="monthlyTableWrap"></div></div>
-  <div class="charts-row">
-    <div class="chart-card"><h3>Воронка: Лиды → Платящие</h3><div class="chart-wrap"><canvas id="chartFunnelMonth"></canvas></div></div>
-    <div class="chart-card"><h3>Выручка по месяцам (тыс. ₽)</h3><div class="chart-wrap"><canvas id="chartRevMonth2"></canvas></div></div>
-  </div>
-</div>
-<div id="weekly" class="content">
-  <div class="charts-row">
-    <div class="chart-card"><h3>Лиды vs Платящие — по неделям</h3><div class="chart-wrap"><canvas id="chartLidsWeek"></canvas></div></div>
-    <div class="chart-card"><h3>Выручка — по неделям (тыс. ₽)</h3><div class="chart-wrap"><canvas id="chartRevWeek"></canvas></div></div>
-  </div>
-  <div class="table-card"><h3 class="section-title">Еженедельные показатели КОМ 2026</h3><div id="weeklyTableWrap"></div></div>
-</div>
-<div id="deals" class="content">
-  <div id="dealsNote" class="note"></div>
-  <div class="table-card"><h3 class="section-title">🏆 ТОП сделок КОМ по оплате</h3><div id="dealsTableWrap"></div></div>
-</div>
-<div id="companies" class="content">
-  <div class="table-card"><h3 class="section-title">🏢 Компании КОМ — уже принесли доход</h3><div class="sub" style="margin:-8px 0 14px">Только оплаченные сделки · сортировка кликом по заголовку</div><div id="companiesTableWrap"></div></div>
-</div>
-<div id="managers" class="content">
-  <div class="table-card"><h3 class="section-title">👤 Менеджеры, работающие с КОМ</h3><div class="sub" style="margin:-8px 0 14px">По сумме договоров · сортировка кликом по заголовку</div><div id="managersTableWrap"></div></div>
-</div>
-<div id="potential" class="content">
-  <div class="table-card"><h3 class="section-title">💎 Потенциальные продажи КОМ — в воронке</h3><div class="sub" style="margin:-8px 0 14px">Неоплаченные сделки в работе · сортировка кликом по заголовку</div><div id="potentialTableWrap"></div></div>
-</div>
-<script>
-const NAVY='#1F3A5F',BLUE='#2E6DA4',GREEN='#38A169',ORANGE='#DD6B20';
-let chartInstances={},dataCache=null;
-
-function fmtCurr(v){return v?Number(v).toLocaleString('ru-RU')+' ₽':'0 ₽'}
-function fmtPct(v){return v!==undefined&&v!==null?Number(v).toFixed(1)+'%':'0.0%'}
-function fmtNum(v){return v!==undefined&&v!==null?Number(v).toLocaleString('ru-RU'):'0'}
-function fmtDur(v){return v?v+' дн.':'0 дн.'}
-function escapeHtml(s){return s?s.toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'):''}
-
-function showTab(id){
-  document.querySelectorAll('.content').forEach(c=>c.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-  document.querySelector(`.tab[onclick*="'${id}'"]`).classList.add('active');
-  setTimeout(()=>{Object.values(chartInstances).forEach(c=>{if(c&&c.resize)c.resize()})},100)
-}
-
-async function loadData(){
-  // Используем live-данные из B24 (UF_FORMAT=19042498), не кеш
-  const res=await fetch((window.BASE_PATH||'')+'/api/live-data');
-  const data=await res.json();
-  if(!data.ready)throw new Error(data.error||data.error||'No data');
-  dataCache=data;
-  renderAll(data);
-  // Extended-данные пока отключаем (кеш не синхронизирован с live)
-  // loadExtended();
-  setTimeout(initTableSort,150);
-}
-
-async function loadExtended(){
-  try{
-    const res=await fetch((window.BASE_PATH||'')+'/api/kom-extended');
-    const ext=await res.json();
-    renderCompaniesTable(ext.companies||[]);
-    renderManagersTable(ext.managers||[]);
-    renderPotentialTable(ext.potential||[]);
-    setTimeout(initTableSort,100);
-  }catch(e){console.error('loadExtended:',e)}
-}
-
-function initTableSort(){
-  document.querySelectorAll('table.sortable').forEach(tbl=>{
-    const ths=tbl.querySelectorAll('thead th.sort');
-    ths.forEach(th=>{
-      th.addEventListener('click',()=>{
-        const col=parseInt(th.dataset.col);
-        const tbody=tbl.querySelector('tbody');
-        if(!tbody)return;
-        const rows=Array.from(tbody.querySelectorAll('tr:not(.total-row)'));
-        const totalRows=Array.from(tbody.querySelectorAll('tr.total-row'));
-        const isAsc=th.classList.contains('asc');
-        ths.forEach(h=>h.classList.remove('asc','desc'));
-        th.classList.add(isAsc?'desc':'asc');
-        rows.sort((a,b)=>{
-          const va=(a.cells[col]?.innerText||'').trim();
-          const vb=(b.cells[col]?.innerText||'').trim();
-          const na=parseFloat(va.replace(/[^\d\-.,]/g,'').replace(',',''));
-          const nb=parseFloat(vb.replace(/[^\d\-.,]/g,'').replace(',',''));
-          if(!isNaN(na)&&!isNaN(nb))return isAsc?na-nb:nb-na;
-          return isAsc?va.localeCompare(vb):vb.localeCompare(va);
-        });
-        [...totalRows,...rows].forEach(r=>tbody.appendChild(r));
-      })
-    })
-  })
-}
-
-function renderAll(data){
-  const k=data.kpi;
-  document.getElementById('updateTime').textContent='Обновлено: '+(data.updatedAt||'—').slice(0,16).replace('T',' ')+' · LIVE';
-  if(data.note) document.getElementById('infoBox').innerHTML='<b>📌 '+data.note+'</b>';
-  document.getElementById('kpiGrid').innerHTML=
-    '<div class="kpi-card accent"><div class="label">Поступления КОМ</div><div class="value">'+fmtCurr(k.totalRevenue)+'</div><div class="sub">Факт. поступлений</div></div>'+
-    '<div class="kpi-card"><div class="label">Лиды КОМ ✋</div><div class="value">'+fmtNum(k.totalLeads)+'</div><div class="sub">Входящих обращений</div></div>'+
-    '<div class="kpi-card"><div class="label">Платящие КОМ</div><div class="value">'+fmtNum(k.totalPaid)+'</div><div class="sub">Оплаченных сделок</div></div>'+
-    '<div class="kpi-card accent"><div class="label">Ср. чек сделки</div><div class="value">'+fmtCurr(k.avgCheck)+'</div><div class="sub">WON сделки</div></div>'+
-    '<div class="kpi-card warn"><div class="label">Конверсия Лиды→Плат</div><div class="value">'+fmtPct(k.conversion)+'</div><div class="sub">Из лидов в оплату</div></div>'+
-    '<div class="kpi-card warn"><div class="label">Длительность закрытия</div><div class="value">'+fmtDur(k.avgDuration)+'</div><div class="sub">Ср. срок</div></div>'+
-    '<div class="kpi-card"><div class="label">Тренинг дней КОМ</div><div class="value">'+fmtNum(k.trainingDays)+'</div><div class="sub">Суммарно</div></div>'+
-    '<div class="kpi-card"><div class="label">Участников</div><div class="value">'+fmtNum(k.participants)+'</div><div class="sub"></div></div>';
-  renderMonthlyTable(data.monthly);
-  renderWeeklyTable(data.weekly);
-  renderDealsTable(data.topDeals,data.dealsNote);
-  renderCharts(data.monthly,data.weekly);
-}
-
-function renderMonthlyTable(monthly){
-  let html='<table class="sortable"><thead><tr>'+
-    '<th class="sort" data-col="0">Месяц</th><th class="sort" data-col="1">Поступления</th><th class="sort" data-col="2">Выручка</th><th class="sort" data-col="3">Лиды ✋</th><th class="sort" data-col="4">Регистрации</th><th class="sort" data-col="5">Платящие</th>'+
-    '<th class="sort" data-col="6">Ср. чек</th><th class="sort" data-col="7">Конверсия %</th><th class="sort" data-col="8">Длит. закрытия</th><th class="sort" data-col="9">Трен. дней</th><th class="sort" data-col="10">Участников</th>'+
-    '</tr></thead><tbody>';
-  let tr=0,tl=0,trg=0,tp=0,td=0,tpt=0,tdur_weighted=0,tdur_paid=0;
-  for(const m of monthly){
-    tr+=m.revenue;tl+=m.leads;trg+=m.registrations;tp+=m.paid;td+=m.trainingDays;tpt+=m.participants;
-    if(m.paid>0){tdur_weighted+=m.avgDuration*m.paid;tdur_paid+=m.paid;}
-    html+='<tr><td><b>'+m.monthName+'</b></td><td>'+fmtCurr(m.revenue)+'</td><td>'+fmtCurr(m.revenue)+'</td><td>'+m.leads+'</td><td>'+m.registrations+'</td><td>'+m.paid+'</td><td>'+fmtCurr(m.avgCheck)+'</td><td>'+fmtPct(m.conversion)+'</td><td>'+fmtDur(m.avgDuration)+'</td><td>'+m.trainingDays+'</td><td>'+m.participants+'</td></tr>';
-  }
-  const tac=tp?tr/tp:0;
-  const tdur_avg=tdur_paid?Math.round(tdur_weighted/tdur_paid):0;
-  html+='<tr class="total-row" style="background:#1F3A5F;color:#fff;font-weight:700"><td>ИТОГО</td><td>'+fmtCurr(tr)+'</td><td>'+fmtCurr(tr)+'</td><td>'+tl+'</td><td>'+trg+'</td><td>'+tp+'</td><td>'+fmtCurr(tac)+'</td><td>'+fmtPct(tp&&tl?tp/tl*100:0)+'</td><td>'+fmtDur(tdur_avg)+'</td><td>'+td+'</td><td>'+tpt+'</td></tr>';
-  html+='</tbody></table>';
-  document.getElementById('monthlyTableWrap').innerHTML=html;
-}
-
-function renderWeeklyTable(weekly){
-  let html='<table class="sortable"><thead><tr>'+
-    '<th class="sort" data-col="0">Неделя</th><th class="sort" data-col="1">Даты</th><th class="sort" data-col="2">Выручка</th><th class="sort" data-col="3">Лиды</th><th class="sort" data-col="4">Платящие</th><th class="sort" data-col="5">Ср. чек</th><th class="sort" data-col="6">Конв. %</th><th class="sort" data-col="7">Длит. закрытия</th><th class="sort" data-col="8">Трен. дней</th>'+
-    '</tr></thead><tbody>';
-  let tr=0,tl=0,tp=0,ttd=0,tdur_weighted=0,tdur_paid=0;
-  for(const w of weekly){
-    tr+=w.revenue;tl+=w.leads;tp+=w.paid;ttd+=w.trainingDays||0;
-    if(w.paid>0){tdur_weighted+=w.avgDuration*w.paid;tdur_paid+=w.paid;}
-    html+='<tr><td>'+w.label+'</td><td>'+w.dates+'</td><td>'+fmtCurr(w.revenue)+'</td><td>'+w.leads+'</td><td>'+w.paid+'</td><td>'+fmtCurr(w.avgCheck)+'</td><td>'+fmtPct(w.conversion)+'</td><td>'+fmtDur(w.avgDuration)+'</td><td>'+(w.trainingDays||0)+'</td></tr>';
-  }
-  const tac=tp?Math.round(tr/tp):0;
-  const tconv=tp&&tl?tp/tl*100:0;
-  const tdur_avg=tdur_paid?Math.round(tdur_weighted/tdur_paid):0;
-  html+='<tr class="total-row" style="background:#1F3A5F;color:#fff;font-weight:700"><td><b>📊 ИТОГО</b></td><td></td><td>'+fmtCurr(tr)+'</td><td>'+tl+'</td><td>'+tp+'</td><td>'+fmtCurr(tac)+'</td><td>'+fmtPct(tconv)+'</td><td>'+fmtDur(tdur_avg)+'</td><td>'+ttd+'</td></tr>';
-  html+='</tbody></table>';
-  document.getElementById('weeklyTableWrap').innerHTML=html;
-}
-
-function renderDealsTable(deals,note){
-  if(note&&note.text) document.getElementById('dealsNote').innerHTML='* <b>'+note.text+'</b>';
-  let html='<table class="sortable"><thead><tr>'+
-    '<th class="sort" data-col="0">#</th><th class="sort" data-col="1" style="text-align:left">Сделка / Менеджер</th><th class="sort" data-col="2">Поступления</th><th class="sort" data-col="3">Тип клиента</th>'+
-    '<th class="sort" data-col="4">Нач. обучения</th><th class="sort" data-col="5">Конец обучения</th><th class="sort" data-col="6">Гонорар препод.</th><th class="sort" data-col="7">Длит. закрытия</th><th class="sort" data-col="8">Дата оплаты</th>'+
-    '</tr></thead><tbody>';
-  for(const d of deals){
-    const tc='top3';
-    html+='<tr class="'+(d.rank<=3?tc:'')+'"><td>'+d.rank+'</td>'+
-      '<td class="tdleft"><span class="deal-title">'+escapeHtml(d.title)+'</span><br><small class="muted">'+escapeHtml(d.manager)+'</small></td>'+
-      '<td>'+fmtCurr(d.revenue)+'</td><td><span class="badge '+(d.clientType==='repeat'?'badge-return':'badge-new')+'">'+(d.clientType==='repeat'?'🔄 Повторный':'🆕 Новый')+'</span></td>'+
-      '<td>'+(d.trainStart?d.trainStart:'—')+'</td><td>'+(d.trainEnd?d.trainEnd:'—')+'</td>'+
-      '<td>'+(d.teacherFee!==null?fmtCurr(d.teacherFee):'—')+'</td><td>'+fmtDur(d.duration)+'</td><td>'+(d.payDate||'—')+'</td></tr>';
-  }
-  html+='</tbody></table>';
-  document.getElementById('dealsTableWrap').innerHTML=html;
-}
-
-function renderCompaniesTable(companies){
-  let html='<table class="sortable compact"><thead><tr>'+
-    '<th class="sort tight" data-col="0">#</th><th class="sort wide" data-col="1" style="text-align:left">Компания</th>'+
-    '<th class="sort mid" data-col="2">Доход, ₽</th><th class="sort tight3" data-col="3">Оплач.</th><th class="sort tight3" data-col="4">Сд.</th>'+
-    '<th class="sort tdlong" data-col="5" style="text-align:left">Менеджер</th>'+
-    '</tr></thead><tbody>';
-  for(let i=0;i<companies.length;i++){
-    const c=companies[i];
-    html+='<tr'+(i<3?' class="top3"':'')+'><td class="tight">'+(i+1)+'</td><td class="tdleft wide"><b>'+escapeHtml(c.name)+'</b></td>'+
-      '<td class="mid"><b>'+fmtCurr(c.paidRevenue)+'</b></td><td class="tight3">'+c.paidCount+'</td><td class="tight3">'+c.dealCount+'</td>'+
-      '<td class="tdleft tdlong">'+(c.managers||[]).join(', ')+'</td></tr>';
-  }
-  html+='</tbody></table>';
-  document.getElementById('companiesTableWrap').innerHTML=html;
-}
-
-function renderManagersTable(managers){
-  let html='<table class="sortable compact"><thead><tr>'+
-    '<th class="sort tight" data-col="0">#</th><th class="sort tdlong" data-col="1" style="text-align:left">Менеджер</th>'+
-    '<th class="sort mid" data-col="2">Пост., ₽</th><th class="sort tight2" data-col="3">Сд.</th><th class="sort tight2" data-col="4">WON</th><th class="sort tdlong" data-col="5" style="text-align:left">Компании</th>'+
-    '</tr></thead><tbody>';
-  for(let i=0;i<managers.length;i++){
-    const m=managers[i];
-    html+='<tr><td class="tight">'+(i+1)+'</td><td class="tdleft tdlong"><b>'+escapeHtml(m.name)+'</b></td><td class="mid"><b>'+fmtCurr(m.totalRevenue)+'</b></td><td class="tight2">'+m.dealCount+'</td><td class="tight2">'+(m.wonCount||0)+'</td><td class="tdleft tdlong">'+(m.companies||[]).slice(0,3).join(', ')+((m.companies||[]).length>3?'...':'')+'</td></tr>';
-  }
-  html+='</tbody></table>';
-  document.getElementById('managersTableWrap').innerHTML=html;
-}
-
-function renderPotentialTable(potential){
-  let html='<table class="sortable compact"><thead><tr>'+
-    '<th class="sort tight" data-col="0">#</th><th class="sort wide" data-col="1" style="text-align:left">Компания</th>'+
-    '<th class="sort mid" data-col="2">Потенциал, ₽</th><th class="sort tight3" data-col="3">Сд.</th>'+
-    '<th class="sort tight3" data-col="4">Длит., дн.</th><th class="sort tdlong" data-col="5" style="text-align:left">Темы</th><th class="sort tdlong" data-col="6" style="text-align:left">Менеджер</th>'+
-    '</tr></thead><tbody>';
-  for(let i=0;i<potential.length;i++){
-    const c=potential[i];
-    html+='<tr'+(i<3?' class="top3"':'')+'><td class="tight">'+(i+1)+'</td><td class="tdleft wide"><b>'+escapeHtml(c.name)+'</b></td>'+
-      '<td class="mid"><b>'+fmtCurr(c.pendingRevenue)+'</b></td><td class="tight3">'+c.dealCount+'</td><td class="tight3">'+c.totalDuration+'</td>'+
-      '<td class="tdleft tdlong">'+(c.themes||[]).slice(0,3).join('; ')+'</td>'+
-      '<td class="tdleft tdlong">'+(c.managers||[]).join(', ')+'</td></tr>';
-  }
-  html+='</tbody></table>';
-  document.getElementById('potentialTableWrap').innerHTML=html;
-}
-
-function formatDate(iso){
-  if(!iso)return '—';
-  const d=new Date((iso+'T00:00:00').substring(0,19));
-  const m=['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
-  return d.getDate()+' '+m[d.getMonth()]+' '+d.getFullYear();
-}
-
-function renderCharts(monthly,weekly){
-  function dstr(id,cfg){destroyChart(id);chartInstances[id]=new Chart(document.getElementById(id),cfg)}
-  function destroyChart(id){if(chartInstances[id]){chartInstances[id].destroy();delete chartInstances[id]}}
-  const ml=monthly.map(m=>m.monthName.substring(0,3));
-  const mr=monthly.map(m=>Math.round(m.revenue/1000));
-  const ll=monthly.map(m=>m.leads),pl=monthly.map(m=>m.paid),cl=monthly.map(m=>m.conversion);
-  const dl=monthly.map(m=>m.avgDuration);
-  const wl=weekly.map(w=>w.label),wr=weekly.map(w=>Math.round(w.revenue/1000));
-  const wle=weekly.map(w=>w.leads),wpa=weekly.map(w=>w.paid);
-  const opts={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}}}};
-  dstr('chartLidsMonth',{type:'bar',data:{labels:ml,datasets:[{label:'Лиды',data:ll,backgroundColor:BLUE},{label:'Платящие',data:pl,backgroundColor:GREEN}]},options:opts});
-  dstr('chartRevMonth',{type:'line',data:{labels:ml,datasets:[{label:'Выручка, тыс.₽',data:mr,borderColor:NAVY,backgroundColor:'rgba(31,58,95,.1)',fill:true,tension:.3}]},options:opts});
-  dstr('chartConvMonth',{type:'line',data:{labels:ml,datasets:[{label:'Конверсия %',data:cl,borderColor:ORANGE,backgroundColor:'rgba(221,107,32,.1)',fill:true,tension:.3}]},options:{...opts,scales:{y:{beginAtZero:true,ticks:{callback:v=>v+'%'}}}}});
-  dstr('chartDurMonth',{type:'line',data:{labels:ml,datasets:[{label:'Длит., дн.',data:dl,borderColor:NAVY,backgroundColor:'rgba(31,58,95,.1)',fill:true,tension:.3}]},options:opts});
-  dstr('chartFunnelMonth',{type:'bar',data:{labels:ml,datasets:[{label:'Лиды',data:ll,backgroundColor:BLUE},{label:'Платящие',data:pl,backgroundColor:GREEN}]},options:opts});
-  dstr('chartRevMonth2',{type:'line',data:{labels:ml,datasets:[{label:'Выручка, тыс.₽',data:mr,borderColor:NAVY,backgroundColor:'rgba(31,58,95,.1)',fill:true,tension:.3}]},options:opts});
-  dstr('chartLidsWeek',{type:'bar',data:{labels:wl,datasets:[{label:'Лиды',data:wle,backgroundColor:BLUE},{label:'Платящие',data:wpa,backgroundColor:GREEN}]},options:opts});
-  dstr('chartRevWeek',{type:'line',data:{labels:wl,datasets:[{label:'Выручка, тыс.₽',data:wr,borderColor:NAVY,backgroundColor:'rgba(31,58,95,.1)',fill:true,tension:.3}]},options:opts});
-}
-
-// Events
-document.getElementById('refreshBtn').addEventListener('click',async function(){
-  this.disabled=true;this.textContent='⏳ Обновление...';document.getElementById('loadingOverlay').classList.add('active');
-  await fetch((window.BASE_PATH||'')+'/api/refresh',{method:'POST'});
-  for(let i=0;i<120;i++){await new Promise(r=>setTimeout(r,3000));const st=await(await fetch((window.BASE_PATH||'')+'/api/status')).json();if(st.ready){await loadData();break}}
-  this.disabled=false;this.textContent='🔄 Обновить';document.getElementById('loadingOverlay').classList.remove('active');
-});
-
-loadData();
-initRefreshButton();
-
-function initRefreshButton() {
-  var toolbar = document.querySelector('.toolbar');
-  if (!toolbar) return;
-  var btn = document.createElement('button');
-  btn.id = 'refreshBtn';
-  btn.textContent = '\ud83d\udd04 Обновить данные';
-  toolbar.appendChild(btn);
-}
-</script>
+<script src="app.js"></script>
 </body>
 </html>

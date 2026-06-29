@@ -196,7 +196,6 @@ function isQualLeadW(r) {
 function isAllLead(r) {
   if (!VALID_CATS.has(r.CAT_ID)) return false;
   if (r.SEM==='S' && r.OPP<MIN_OPP) return false;
-  if ((r.CAT_ID===8||r.CAT_ID===19) && r.SEM==='S') return false;
   return true;
 }
 
