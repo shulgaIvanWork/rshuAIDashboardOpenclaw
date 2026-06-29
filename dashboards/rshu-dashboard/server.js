@@ -2,14 +2,11 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
-const _require = createRequire(import.meta.url);
-const xlsx = _require('xlsx');
+import { getCacheAt } from '@rshu/data-service/agg-cache.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3001;
-const DATA_DIR = path.join(__dirname, 'data');
-const BITRIX_BASE = process.env.BITRIX_BASE || 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/';
+const DS_CACHE = path.resolve(__dirname, '../../data-service/cache');
 const YEAR = 2026; // Основной дашборд — только 2026
 // Для source-report используется yearFrom/yearTo
 
@@ -18,123 +15,6 @@ const ALLOWED_CATEGORIES = ['0', '8', '19'];
 
 // Поле даты отказа в Битрикс24
 const UF_REFUSAL_DATE = 'UF_CRM_1753341391806';
-
-await fs.mkdir(DATA_DIR, { recursive: true }).catch(() => {});
-
-// --- Bitrix24 API helper ---
-async function bitrixList(method, params = {}, onProgress) {
-  const all = [];
-  let start = 0;
-  let total = 0;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 1800000); // 30 min timeout
-  try {
-  while (true) {
-    const url = `${BITRIX_BASE + method}.json?start=${start}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params),
-      signal: controller.signal,
-    });
-    if (!res.ok) { console.error(`${method} HTTP ${res.status}`); break; }
-    const json = await res.json();
-    if (!json || !json.result) break;
-    const items = Array.isArray(json.result) ? json.result : Object.values(json.result);
-    for (const item of items) all.push(item);
-    total = json.total || total;
-    console.log(`${method}: fetched ${all.length} of ${json.total || '?'}`);
-    if (onProgress) onProgress(all.length, json.total || 0);
-    if (json.next === undefined || json.next === null) break;
-    start = json.next;
-    await new Promise(r => setTimeout(r, 100));
-  }
-  } catch(e) {
-    if (e.name === 'AbortError') {
-      console.error(`${method} TIMEOUT, fetched ${all.length}`);
-    } else {
-      throw e;
-    }
-  } finally {
-    clearTimeout(timeoutId);
-  }
-  return all;
-}
-
-// --- Поля для выборки сделки ---
-function dealSelectFields() {
-  return [
-    'ID','TITLE','STAGE_ID','STAGE_SEMANTIC_ID','CATEGORY_ID',
-    'OPPORTUNITY','CURRENCY_ID','DATE_CREATE','CLOSEDATE','CLOSED',
-    'ASSIGNED_BY_ID','SOURCE_ID','PROBABILITY',
-    'UF_DATE_PAY_1C',
-    'UF_CRM_1474975772',  // Согл. дата оплаты
-    'UF_CRM_1753272713011', // Дата Счет отправлен
-    'UF_CRM_1697096074',    // Продукт (чистое название)
-    'UF_FORMAT',             // Формат обучения (19042467=очный, 19042468=онлайн, 19042469=СДО, 19042498=КОМ)
-    'UF_CRM_1744273716729', // Направление обучения
-    UF_REFUSAL_DATE,
-  ];
-}
-
-// --- Выгрузка сделок 2026 ---
-async function fetchAllDeals() {
-  console.log('Fetching deals from Bitrix24 (year ' + YEAR + ')...');
-  const filterInYear = {
-    '>=DATE_CREATE': `${YEAR}-01-01T00:00:00`,
-    '<=DATE_CREATE': `${YEAR}-12-31T23:59:59`,
-  };
-  const select = dealSelectFields();
-
-  const created = await bitrixList('crm.deal.list', {
-    order: { ID: 'ASC' },
-    filter: filterInYear,
-    select,
-  }, (loaded, total) => {
-    dataState.loadingProgress = { phase: 'created', loaded, total };
-  });
-
-  const closed = await bitrixList('crm.deal.list', {
-    order: { ID: 'ASC' },
-    filter: { '>=CLOSEDATE': `${YEAR}-01-01T00:00:00`, '<=CLOSEDATE': `${YEAR}-12-31T23:59:59` },
-    select,
-  }, (loaded, total) => {
-    dataState.loadingProgress = { phase: 'closed', loaded, total };
-  });
-
-  const map = new Map();
-  for (const d of created) if (d?.ID) map.set(d.ID, d);
-  for (const d of closed) if (d?.ID && !map.has(d.ID)) map.set(d.ID, d);
-  let deals = Array.from(map.values());
-  console.log(`Total unique deals: ${deals.length}`);
-
-  const catCounts = {};
-  for (const d of deals) {
-    const k = d?.CATEGORY_ID;
-    catCounts[k] = (catCounts[k] || 0) + 1;
-  }
-  console.log('CATEGORY_ID distribution:', JSON.stringify(catCounts));
-  const beforeFilter = deals.length;
-  deals = deals.filter(d => d && ALLOWED_CATEGORIES.includes(String(d.CATEGORY_ID)));
-  console.log(`Filtered to allowed categories (Sale/Pre Sale/КОМ Sale): ${deals.length} of ${beforeFilter}`);
-  return deals;
-}
-
-// --- Выгрузка сделок переходящего остатка (созданы до 2026, в работе, не оплачены, не в отказе) ---
-async function fetchCarryOver() {
-  console.log('Carry-over skipped for speed');
-  return [];
-}
-
-async function fetchDicts() {
-  const [categories, stages, sources, users] = await Promise.all([
-    bitrixList('crm.category.list', { entityTypeId: 2 }).catch(e => (console.error('cats err:', e.message), [])),
-    bitrixList('crm.dealcategory.stage.list').catch(e => (console.error('stages err:', e.message), [])),
-    bitrixList('crm.status.list', { filter: { ENTITY_ID: 'SOURCE' } }).catch(e => (console.error('sources err:', e.message), [])),
-    bitrixList('user.get').catch(e => (console.error('users err:', e.message), [])),
-  ]);
-  return { categories, stages, sources, users };
-}
 
 // --- ISO week ---
 function isoWeek(d) {
@@ -1004,8 +884,17 @@ function topByPaid(deals, usersDict) {
 }
 
 // --- Пользователи: id → запись ---
+// Поддерживает DS-формат {id: "Full Name"} и старый [{ID, NAME, LAST_NAME}]
 function usersById(users) {
   if (!users) return {};
+  if (!Array.isArray(users)) {
+    const map = {};
+    for (const [id, name] of Object.entries(users)) {
+      const parts = (name || '').split(' ');
+      map[id] = { ID: id, NAME: parts[0] || '', LAST_NAME: parts.slice(1).join(' ') || '' };
+    }
+    return map;
+  }
   const map = {};
   for (const u of users) {
     if (u?.ID) map[String(u.ID)] = u;
@@ -1023,101 +912,45 @@ let monthlyData = null;
 let kpiCache = null;
 let topMgrsCache = [];
 
+let lastCacheTs = 0;
+
 async function reloadData() {
+  const ts = getCacheAt();
+  if (dataState.ready && ts <= lastCacheTs) return;
   dataState.loading = true;
   dataState.error = null;
-  dataState.dealsCount = 0;
-  dataState.carryOverCount = 0;
   try {
-    // Загружаем сделки 2026
-    dealsCache = await fetchAllDeals();
-    dataState.dealsCount = dealsCache.length;
-    
-    // Загружаем сделки переходящего остатка
-    carryOverCache = await fetchCarryOver();
-    dataState.carryOverCount = carryOverCache.length;
-    
-    dictsCache = await fetchDicts();
-    
-    // Агрегация по неделям и месяцам
-    weeklyData = aggregateWithCarryOver(dealsCache, carryOverCache, 'week');
-    monthlyData = aggregateWithCarryOver(dealsCache, carryOverCache, 'month');
-    
-    kpiCache = calcKpi(weeklyData.periods);
-    const usersMap = usersById(dictsCache?.users);
-    topMgrsCache = topByPaid(dealsCache, usersMap);
+    const [dealsRaw, dictsRaw] = await Promise.all([
+      fs.readFile(path.join(DS_CACHE, 'deals.json'), 'utf-8'),
+      fs.readFile(path.join(DS_CACHE, 'dicts.json'), 'utf-8'),
+    ]);
+    const allDeals = JSON.parse(dealsRaw);
+    const dicts = JSON.parse(dictsRaw);
 
-    // Кешируем
-    await fs.writeFile(
-      path.join(DATA_DIR, 'cache.json'),
-      JSON.stringify({
-        deals: dealsCache,
-        carryOver: carryOverCache,
-        dicts: dictsCache,
-        weekly: weeklyData,
-        monthly: monthlyData,
-        kpi: kpiCache,
-        topMgrs: topMgrsCache,
-      }),
-      'utf-8'
-    );
+    dealsCache = allDeals.filter(d => d && ALLOWED_CATEGORIES.includes(String(d.CATEGORY_ID)));
+    carryOverCache = [];
+    dictsCache = { users: dicts.users || {} };
+
+    weeklyData = aggregateWithCarryOver(dealsCache, [], 'week');
+    monthlyData = aggregateWithCarryOver(dealsCache, [], 'month');
+    kpiCache = calcKpi(weeklyData.periods);
+    topMgrsCache = topByPaid(dealsCache, usersById(dictsCache.users));
+
     dataState.ready = true;
     dataState.dealsCount = dealsCache.length;
-    dataState.carryOverCount = carryOverCache.length;
-    console.log('✓ Data reloaded and cached');
+    dataState.carryOverCount = 0;
+    lastCacheTs = ts;
+    console.log(`[rshu-dashboard] Loaded ${dealsCache.length} deals from data-service`);
   } catch (e) {
     dataState.error = e.message;
-    console.error('✗ reloadData failed:', e.message);
+    console.error('[rshu-dashboard] Load error:', e.message);
   } finally {
     dataState.loading = false;
   }
 }
 
 async function loadCache() {
-  try {
-    const raw = await fs.readFile(path.join(DATA_DIR, 'cache.json'), 'utf-8');
-    const c = JSON.parse(raw);
-    dealsCache = c.deals || [];
-    carryOverCache = c.carryOver || [];
-    dictsCache = c.dicts || null;
-    weeklyData = c.weekly || { periods: [], carryOver: { cnt: 0, sum: 0 } };
-    monthlyData = c.monthly || { periods: [], carryOver: { cnt: 0, sum: 0 } };
-    kpiCache = c.kpi || calcKpi([]);
-    topMgrsCache = c.topMgrs || [];
-
-    const hasPayField = dealsCache.some(d => d && d.UF_DATE_PAY_1C !== undefined);
-    if (!hasPayField && dealsCache.length > 0) {
-      console.log('Cache is outdated. Forcing reload...');
-      dealsCache = [];
-      carryOverCache = [];
-      weeklyData = { periods: [], carryOver: { cnt: 0, sum: 0 } };
-      monthlyData = { periods: [], carryOver: { cnt: 0, sum: 0 } };
-      kpiCache = calcKpi([]);
-      topMgrsCache = [];
-      dataState.ready = false;
-    } else {
-      dataState.ready = true;
-      dataState.dealsCount = dealsCache.length;
-      dataState.carryOverCount = carryOverCache.length;
-
-      // Если weekly/monthly пустые — пересчитать из сделок
-      if ((!weeklyData.periods || weeklyData.periods.length === 0) && dealsCache.length > 0) {
-        console.log('Recalculating weekly/monthly from cache...');
-        const validDeals = dealsCache.filter(d => d && !isCopy(d) && !isTechPaid(d) && parseFloat(d.OPPORTUNITY || 0) > 0);
-        const weekResult = aggregateWithCarryOver(validDeals, carryOverCache, 'week');
-        weeklyData = weekResult;
-        const monthResult = aggregateWithCarryOver(validDeals, carryOverCache, 'month');
-        monthlyData = monthResult;
-        kpiCache = calcKpi(monthResult?.periods || []);
-        topMgrsCache = calcTopManagers(validDeals, monthResult?.periods || []);
-        console.log(`✓ Recalculated: ${weeklyData.periods?.length || 0} weeks, ${monthlyData.periods?.length || 0} months`);
-      }
-
-      console.log(`✓ Cache loaded: ${dealsCache.length} deals, ${carryOverCache.length} carry-over`);
-    }
-  } catch {
-    console.log('No cache found on disk.');
-  }
+  return reloadData();
 }
 
 // --- Express ---
@@ -1157,10 +990,11 @@ app.get('/api/kpi', (req, res) => res.json(kpiCache));
 // API: топ менеджеров
 app.get('/api/top-managers', (req, res) => res.json(topMgrsCache || []));
 
-// API: обновить данные
+// API: обновить данные (теперь перечитывает DS-кэш)
 app.post('/api/refresh', (req, res) => {
   if (dataState.loading) return res.json({ ok: false, message: 'Already loading' });
   res.json({ ok: true, message: 'Data reload started' });
+  lastCacheTs = 0; // force reload
   reloadData();
 });
 
@@ -1759,57 +1593,6 @@ app.get('/api/product-ranking-year', async (req, res) => {
   }
 });
 
-// ===== Live API (прямые запросы в B24, без кеша) =====
-app.get('/api/charts-data', async (req, res) => {
-  const WEBHOOK = 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/';
-  async function b24(method, params) {
-    const body = Object.entries(params).map(([k,v]) => {
-      if (Array.isArray(v)) return v.map(x => encodeURIComponent(k) + '=' + encodeURIComponent(x)).join('&');
-      return encodeURIComponent(k) + '=' + encodeURIComponent(v);
-    }).join('&');
-    const resp = await fetch(WEBHOOK + method, { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body });
-    return resp.json();
-  }
-  async function b24All(method, params) {
-    const all = []; let start = 0;
-    while (true) {
-      const r = await b24(method, { ...params, limit: '50', start: String(start) });
-      const items = r.result || [];
-      if (!items.length) break;
-      all.push(...items);
-      if (r.next === undefined || r.next === null || all.length >= 500) break;
-      start = r.next;
-    }
-    return all;
-  }
-  try {
-    const deals = await b24All('crm.deal.list', {
-      'filter[CATEGORY_ID]': '0', 'filter[>OPPORTUNITY]': '0',
-      'filter[>=UF_DATE_PAY_1C]': '2026-05-01', 'filter[<UF_DATE_PAY_1C]': '2026-06-01',
-      'select[]': ['ID', 'TITLE', 'OPPORTUNITY', 'UF_DATE_PAY_1C', 'UF_FORMAT', 'UF_CRM_1744273716729', 'UF_CRM_1697096074', 'ASSIGNED_BY_ID', 'DATE_CREATE']
-    });
-    const daily = {}; const dirMap = {}; const fmtCnt = {}; const fmtSum = {}; const mgrMap = {};
-    const fmtIds = { '19042467': 'Очный', '19042468': 'Онлайн', '19042469': 'СДО', '19042498': 'КОМ' };
-    for (const d of deals) {
-      const day = (d.UF_DATE_PAY_1C || '').slice(0, 10);
-      if (day) { if (!daily[day]) daily[day] = { cnt: 0, sum: 0 }; daily[day].cnt++; daily[day].sum += parseFloat(d.OPPORTUNITY || 0); }
-      const dir = d.UF_CRM_1744273716729 || 'Не указано';
-      if (!dirMap[dir]) dirMap[dir] = { cnt: 0, sum: 0 }; dirMap[dir].cnt++; dirMap[dir].sum += parseFloat(d.OPPORTUNITY || 0);
-      const f = fmtIds[String(d.UF_FORMAT || '')] || 'Другой';
-      fmtCnt[f] = (fmtCnt[f] || 0) + 1; fmtSum[f] = (fmtSum[f] || 0) + parseFloat(d.OPPORTUNITY || 0);
-      const mid = d.ASSIGNED_BY_ID || '0';
-      if (!mgrMap[mid]) mgrMap[mid] = { name: mid, cnt: 0, sum: 0 }; mgrMap[mid].cnt++; mgrMap[mid].sum += parseFloat(d.OPPORTUNITY || 0);
-    }
-    res.json({
-      total: deals.length,
-      totalSum: Math.round(deals.reduce((s,d) => s + parseFloat(d.OPPORTUNITY||0), 0)),
-      daily: Object.entries(daily).sort().map(([k,v]) => ({ date: k, cnt: v.cnt, sum: Math.round(v.sum) })),
-      directions: Object.entries(dirMap).sort((a,b) => b[1].sum - a[1].sum).map(([k,v]) => ({ name: k, cnt: v.cnt, sum: Math.round(v.sum) })),
-      formats: Object.keys(fmtCnt).map(k => ({ name: k, cnt: fmtCnt[k], sum: Math.round(fmtSum[k] || 0) })).sort((a,b) => b.sum - a.sum),
-      managers: Object.values(mgrMap).sort((a,b) => b.sum - a.sum).slice(0,15).map(m => ({ name: m.name, cnt: m.cnt, sum: Math.round(m.sum) }))
-    });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
 
 
 // Статика
