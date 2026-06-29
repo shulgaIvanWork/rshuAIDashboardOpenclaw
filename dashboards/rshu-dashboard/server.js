@@ -903,7 +903,7 @@ function usersById(users) {
 }
 
 // --- Состояние ---
-let dataState = { ready: false, loading: false, error: null, dealsCount: 0, carryOverCount: 0, loadingProgress: null };
+let dataState = { ready: false, loading: false, error: null, dealsCount: 0, carryOverCount: 0, loadingProgress: null, loadedAt: null };
 let dealsCache = [];
 let carryOverCache = [];
 let dictsCache = null;
@@ -940,6 +940,10 @@ async function reloadData() {
     dataState.dealsCount = dealsCache.length;
     dataState.carryOverCount = 0;
     lastCacheTs = ts;
+    try {
+      const fa = JSON.parse(await fs.readFile(path.join(DS_CACHE, 'fetched_at.json'), 'utf-8'));
+      dataState.loadedAt = fa.fetchedAt || new Date(ts).toISOString();
+    } catch { dataState.loadedAt = new Date(ts).toISOString(); }
     console.log(`[rshu-dashboard] Loaded ${dealsCache.length} deals from data-service`);
   } catch (e) {
     dataState.error = e.message;

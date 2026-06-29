@@ -353,6 +353,13 @@ export async function analyze(onProgress) {
     const fa = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'fetched_at.json'), 'utf-8'));
     fetchedAt = fa.fetchedAt || null;
   } catch { /* файл ещё не создан */ }
+  if (!fetchedAt) {
+    try {
+      const { stat } = await import('fs/promises');
+      const st = await stat(path.join(DATA_SERVICE_CACHE, 'deals.json'));
+      fetchedAt = st.mtime.toISOString();
+    } catch { /* ignore */ }
+  }
 
   const cc = {};
   const leads = [];

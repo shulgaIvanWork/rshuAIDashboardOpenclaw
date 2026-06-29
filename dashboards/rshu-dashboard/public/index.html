@@ -63,7 +63,7 @@ async function safeFetch(url, opts) {
     .toolbar button { background: #093EB4; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: .2s; }
     .toolbar button:hover { background: #3079D2; }
     .toolbar button:disabled { background: #475569; cursor: wait; }
-    .loading-bar { height: 3px; background: #e0e0e0; border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
+    .page-title-meta { font-size: 13px; font-weight: 400; color: #888; }
     .loading-bar .fill { height: 100%; width: 0%; background: #093EB4; transition: width .5s; }
 
     .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
@@ -143,9 +143,8 @@ async function safeFetch(url, opts) {
 </head>
 <body>
 <div class="wrap">
-  <h1>📊 Дашборд продаж 2026</h1>
-  <p class="sub" id="sourceInfo">Источник: Битрикс24 · загрузка...</p>
-  <div class="loading-bar" id="loadingBar"><div class="fill" id="loadingFill"></div></div>
+  <h1>📊 Дашборд продаж 2026 <span id="updateDate" class="page-title-meta"></span></h1>
+  <p class="sub" id="sourceInfo">Источник: Битрикс24</p>
   <div class="toolbar">
     <div class="period-group" id="periodGroup">
       <button data-period="week" class="active">Неделя</button>
@@ -195,55 +194,16 @@ function periodDateRange(row, period) {
 
 async function loadAll(period) {
   const area = document.getElementById('contentArea');
-  const bar = document.getElementById('loadingFill');
-
-  const status = await api('/api/status');
-
-  if (!status.ready) {
-    if (status.loading) {
-      area.innerHTML = `<div class="loading-state"><div class="spinner"></div><div>Загрузка данных из Битрикс24…<br><small style="color:#6a7a9a">${status.dealsCount || 0} сделок получено</small></div></div>`;
-      while (true) {
-        await new Promise(r => setTimeout(r, 2000));
-        const s = await api('/api/status');
-        if (s.ready) break;
-        if (s.error) {
-          area.innerHTML = `<div class="error-state">❌ Ошибка: ${s.error}</div>`;
-          return;
-        }
-        var prog = s.loadingProgress;
-        var progressText = 'загрузка...';
-        var phaseName = '';
-        if (prog && prog.total > 0) {
-          var pct = Math.round((prog.loaded / prog.total) * 100);
-          phaseName = prog.phase === 'closed' ? 'закрытых' : 'созданных';
-          progressText = prog.loaded + ' из ' + prog.total + ' (' + pct + '%)';
-        } else if (prog) {
-          progressText = 'обработано ' + prog.loaded;
-        }
-        area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка ' + phaseName + ' сделок: ' + progressText + '</div></div>';
-      }
-    } else {
-      area.innerHTML = `
-        <div class="loading-state" style="padding:80px 40px">
-          <div style="font-size:48px;margin-bottom:16px">📭</div>
-          <div style="font-size:18px;font-weight:600;margin-bottom:8px">Нет загруженных данных</div>
-          <div style="color:#6a7a9a;margin-bottom:24px">Нажмите «Обновить данные», чтобы загрузить информацию из Битрикс24</div>
-          <button style="background:#093EB4;color:#fff;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:16px;font-weight:500" onclick="document.getElementById('refreshBtn').click()">🔄 Загрузить данные</button>
-        </div>`;
-      document.getElementById('sourceInfo').textContent = 'Источник: Битрикс24 · данные не загружены';
-      document.getElementById('loadingFill').style.width = '0%';
-      return;
-    }
-  }
-
-  bar.style.width = '100%';
 
   try {
-    overviewData = await api(`/api/overview?period=${period}`);
-    const carry = overviewData.carryOver || { cnt: 0, sum: 0 };
-    document.getElementById('sourceInfo').textContent =
-      `Источник: Битрикс24 · ${overviewData.dealsCount || 0} сделок в 2026 · переходящий остаток: ${carry.cnt} шт. / ${(carry.sum || 0).toLocaleString()} ₽`;
+    const status = await api('/api/status');
+    const dateEl = document.getElementById('updateDate');
+    if (dateEl && status.loadedAt) {
+      const dt = new Date(status.loadedAt);
+      dateEl.textContent = '(Данные на: ' + dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')';
+    }
 
+    overviewData = await api(`/api/overview?period=${period}`);
     renderPage(overviewData, period);
     drawCharts(overviewData.periods || [], period);
   } catch (e) {
@@ -425,14 +385,12 @@ document.getElementById('refreshBtn').addEventListener('click', async function()
   this.disabled = true; this.textContent = '⏳ Обновление...';
   const area = document.getElementById('contentArea');
   area.innerHTML = `<div class="loading-state"><div class="spinner"></div><div id="refreshStatus">Загрузка данных из Битрикс24…<br><small style="color:#6a7a9a">0 сделок получено</small></div></div>`;
-  document.getElementById('loadingFill').style.width = '30%';
 
   try {
     await fetch((window.BASE_PATH || '') + '/api/refresh', { method: 'POST' });
     while (true) {
       await new Promise(r => setTimeout(r, 2000));
       const s = await api('/api/status');
-      document.getElementById('loadingFill').style.width = s.loading ? '60%' : '90%';
       document.getElementById('refreshStatus').innerHTML =
         s.loading
           ? `Загрузка данных из Битрикс24…<br><small style="color:#6a7a9a">${s.dealsCount || 0} сделок получено</small>`

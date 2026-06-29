@@ -590,6 +590,11 @@ async function loadForecast() {
   try {
     var r = await safeFetch(BASE + '/data/new');
     if (!r || !r.weeks) { area.innerHTML = '<div class="error-state">❌ Нет данных прогноза</div>'; return; }
+    var dateEl = document.getElementById('updateDate');
+    if (dateEl && r._loadedAt) {
+      var dt = new Date(r._loadedAt);
+      dateEl.textContent = '(Данные на: ' + dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')';
+    }
     var ytd = r.ytd || {};
     var h = '<div class="kpis" style="margin-bottom:12px">';
     h += '<div class="kpi kpi-total"><div class="lbl">Поступления YTD</div><div class="val">'+fmt(ytd.postupleniya)+' ₽</div><div class="sub">'+(ytd.won_relevant_cnt||0)+' сделок</div></div>';
