@@ -1,6 +1,30 @@
 /**
- * Выгрузка сделок через Bitrix24 REST API crm.deal.list
- * Пагинация через `next`-токен, retry при обрывах соединения.
+ * bitrix-rest.js — выгрузка сделок через Bitrix24 REST API.
+ *
+ * ВЫЗЫВАЕТСЯ: из index.js (Шаг 1) во время npm run fetch.
+ *
+ * ЧТО ДЕЛАЕТ:
+ *   Запрашивает crm.deal.list через вебхук BITRIX_BASE (.env).
+ *   Листает все страницы через `next`-токен пагинации.
+ *   При обрыве соединения делает до 6 повторных попыток с экспоненциальной задержкой.
+ *
+ * ВОЗВРАЩАЕТ: массив сделок из воронок CATEGORIES=[0,8,19], начиная с YEAR_START.
+ *
+ * ПОЛЯ СДЕЛОК (SELECT):
+ *   Стандартные: ID, TITLE, STAGE_ID, STAGE_SEMANTIC_ID, CATEGORY_ID, OPPORTUNITY,
+ *                DATE_CREATE, CLOSEDATE, CLOSED, ASSIGNED_BY_ID, SOURCE_ID,
+ *                COMPANY_ID, CONTACT_ID
+ *   Кастомные UF-поля:
+ *     UF_DATE_PAY_1C          — дата оплаты (из 1С)
+ *     UF_FORMAT               — формат обучения (онлайн/очно/КОМ/...)
+ *     UF_CRM_1498466811       — направление (MBA, Mini MBA, ...)
+ *     UF_CRM_1683882427069    — флаг КОМ-сделки
+ *     UF_CRM_1765896709800    — тип обучения (ПК/ПП/КО)
+ *     UF_CRM_1753272713011    — дата выставления счёта (INV_DT)
+ *     UF_CRM_DATE_START_LEARN — дата начала обучения (уровень сделки)
+ *     UF_CRM_DATE_END_LEARN   — дата конца обучения (уровень сделки)
+ *
+ * ОГРАНИЧЕНИЕ: только сделки начиная с 2025-01-01 и воронок 0, 8, 19.
  */
 
 const WEBHOOK = process.env.BITRIX_BASE;

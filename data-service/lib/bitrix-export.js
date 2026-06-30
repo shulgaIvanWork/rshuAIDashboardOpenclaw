@@ -1,8 +1,25 @@
 /**
- * Выгрузка сделок через CRM Export API.
- * Используется как второй проход — даёт сделки которых нет в REST
- * (старые сделки без STAGE_SEMANTIC_ID).
- * REST-данные имеют приоритет при мерже.
+ * bitrix-export.js — выгрузка сделок через кастомный Export API (от Сергея).
+ *
+ * ВЫЗЫВАЕТСЯ: из index.js (Шаг 2) во время npm run fetch.
+ *
+ * ЗАЧЕМ НУЖЕН ОТДЕЛЬНО ОТ REST (bitrix-rest.js):
+ *   Старые сделки в Б24 (до ~2023) не содержат поле STAGE_SEMANTIC_ID через REST.
+ *   Export API возвращает его корректно. Поэтому выгрузка идёт через оба источника,
+ *   а mergeDeals() объединяет их: данные REST имеют приоритет, Export заполняет пробелы.
+ *
+ * API: POST https://24.uprav.ru/web_services/crm/export.php
+ *   Параметры ОБЯЗАТЕЛЬНО в плоском PHP-формате (не JSON!):
+ *     data[FILTER][=CATEGORY_ID]=0
+ *     data[SELECT][0]=ID
+ *     data[nav][limit]=50
+ *   Передача data={"FILTER":{...}} как JSON-строки — НЕ РАБОТАЕТ (PHP игнорирует).
+ *
+ * ФУНКЦИИ:
+ *   fetchDealsExport() → массив сделок из воронок [0, 8, 19], пагинация по 50 штук
+ *   mergeDeals(rest, exp) → Map по ID: REST-запись побеждает, Export добавляет недостающие
+ *
+ * ОГРАНИЧЕНИЯ API: max limit=50, max offset=5000.
  */
 
 const EXPORT_URL = 'https://24.uprav.ru/web_services/crm/export.php';

@@ -1,6 +1,27 @@
 /**
- * Выгрузка контактов и компаний из Bitrix24 по ID из сделок.
- * Используется participants-dashboard для отображения имён участников.
+ * bitrix-contacts.js — выгрузка контактов и компаний по ID из сделок.
+ *
+ * ВЫЗЫВАЕТСЯ: из index.js (Шаг 4) во время npm run fetch.
+ *   Принимает на вход уже загруженный массив deals.
+ *
+ * ЗАЧЕМ:
+ *   analyze.js не хранит имена контактов и компаний — только их ID.
+ *   participants-dashboard нужно показывать реальные имена участников (кто учится)
+ *   и названия компаний. Этот модуль выгружает их отдельно через REST API.
+ *
+ * ЧТО ВЫГРУЖАЕТ:
+ *   contacts.json — { contactId → { name, post, region } }
+ *     Поля: NAME + LAST_NAME (ФИО), POST (должность), ADDRESS_CITY/REGION (город)
+ *     Источник: crm.contact.get через batch-запросы по 50 штук
+ *
+ *   companies.json — { companyId → "Название компании" }
+ *     Источник: crm.company.get через batch-запросы по 50 штук
+ *
+ * ИСПОЛЬЗУЕТСЯ: participants-dashboard/server.js для отображения таблицы участников.
+ *   kom-dashboard/server.js также читает companies.json для топ-компаний.
+ *
+ * ПРОИЗВОДИТЕЛЬНОСТЬ: ~20 000 контактов → ~400 batch-запросов → ~7 минут.
+ *   Каждый запрос имеет таймаут 15 сек, при зависании выводит WARN и продолжает.
  */
 
 const WEBHOOK = process.env.BITRIX_BASE;

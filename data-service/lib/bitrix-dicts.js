@@ -1,6 +1,20 @@
 /**
- * Выгрузка справочников Bitrix24 (REST + Export API):
- * воронки, стадии, источники, пользователи, форматы, направления, UF-поля
+ * bitrix-dicts.js — выгрузка всех справочников Bitrix24.
+ *
+ * ВЫЗЫВАЕТСЯ: из index.js (Шаг 3) во время npm run fetch.
+ *   Принимает на вход уже загруженный массив deals (для извлечения уникальных ID).
+ *
+ * ЧТО ВЫГРУЖАЕТ (через REST + Export API):
+ *   categories  — воронки CRM: { id → название }  (crm.category.list)
+ *   stages      — стадии воронок: { stageId → название }  (crm.dealcategory.stage.list)
+ *   sources     — источники лидов: { sourceId → название }  (crm.status.list)
+ *   users       — сотрудники: { userId → имя }  (user.get по ASSIGNED_BY_ID из сделок)
+ *   formats     — форматы обучения из инфоблока (Export API getFormats)
+ *   directions  — направления обучения из UF_CRM_1498466811 (Export API getDirections)
+ *
+ * ВОЗВРАЩАЕТ: объект dicts → сохраняется в cache/dicts.json.
+ *   analyze.js читает dicts.json для декодирования ID в читаемые названия
+ *   (например, ASSIGNED_BY_ID → имя менеджера, SOURCE_ID → "Сайт", "Рекомендация" и т.д.)
  */
 
 const WEBHOOK = process.env.BITRIX_BASE;

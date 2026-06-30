@@ -1,11 +1,28 @@
 /**
- * data-service — центральная выгрузка данных из Bitrix24
+ * index.js — точка входа для выгрузки данных из Bitrix24.
  *
- * Запуск: npm run fetch  (из папки data-service/)
+ * ЗАПУСК: npm run fetch  (из папки data-service/, требует ../.env с BITRIX_BASE)
  *
- * Результат:
- *   cache/deals.json  — все сделки (REST + Export, смержены)
- *   cache/dicts.json  — справочники (воронки, стадии, источники, пользователи)
+ * Этот файл запускается ВРУЧНУЮ (или по расписанию) и НЕ участвует в работе
+ * веб-сервера. Он последовательно выполняет 5 шагов и сохраняет результаты
+ * в папку cache/ — откуда их потом читает analyze.js при каждом запросе к дашборду.
+ *
+ * ШАГИ:
+ *   1. bitrix-rest.js    → REST API crm.deal.list → все сделки (основной источник)
+ *   2. bitrix-export.js  → Export API (старые сделки без STAGE_SEMANTIC_ID) + merge
+ *      → cache/deals.json, cache/fetched_at.json
+ *   3. bitrix-dicts.js   → справочники: воронки, стадии, пользователи, форматы, направления
+ *      → cache/dicts.json
+ *   4. bitrix-contacts.js → имена контактов и компаний по CONTACT_ID / COMPANY_ID из сделок
+ *      → cache/contacts.json, cache/companies.json
+ *   5. fetch-modules.js  → даты модулей программ для participants-dashboard
+ *      → dashboards/participants-dashboard/cache/modules.json
+ *
+ * ВРЕМЯ ВЫПОЛНЕНИЯ: ~20-40 минут (зависит от скорости Б24 и объёма данных).
+ * Во время выполнения дашборды продолжают работать на старых данных из кэша.
+ *
+ * Прогресс-сообщения (###PROGRESS:...) читает rshu-dashboard для отображения
+ * статуса загрузки.
  */
 
 import { writeFile, mkdir } from 'fs/promises';

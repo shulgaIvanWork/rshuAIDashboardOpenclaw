@@ -1,10 +1,31 @@
 /**
- * Выгружает модули (с датами) для активных сделок cat=0 через Export API WITH_PRODUCTS=Y.
- * Результат: { dealId: [{ product_id, product_name, original_name, date_start, date_end }] }
+ * fetch-modules.js — выгрузка модулей программ с датами для participants-dashboard.
  *
- * Свойство 223 = дата начала модуля, 224 = дата конца (инфоблок 52 Б24).
- * ID сделок берутся из уже загруженного deals.json — не нужно листать Export API заново.
- * Запросы идут батчами по BATCH_SIZE штук за раз.
+ * ВЫЗЫВАЕТСЯ: из index.js (Шаг 5) во время npm run fetch.
+ *   Принимает на вход уже загруженный массив deals (ID берутся из него).
+ *
+ * ЗАЧЕМ:
+ *   participants-dashboard показывает кто учится НА ЭТОЙ НЕДЕЛЕ.
+ *   Если брать только даты начала/конца программы (UF_CRM_DATE_START_LEARN / END_LEARN),
+ *   то участник MBA (6 месяцев) попадает в таблицу каждую неделю полгода — это неверно.
+ *   Правильная логика: показывать участника только на неделях, когда идёт его МОДУЛЬ.
+ *
+ * ЧТО ДЕЛАЕТ:
+ *   1. Из deals выбирает активные сделки воронки 0 (стадии WON, PROPOSAL, 2, 6 и их C0:-варианты)
+ *   2. Для каждой сделки запрашивает Export API с WITH_PRODUCTS=Y
+ *   3. Из ответа извлекает MODULES[] → свойство 223 (дата начала) и 224 (дата конца модуля)
+ *      Инфоблок 52 в Б24, поля: PROPERTY_MODULE_DATE_START_VALUE, PROPERTY_MODULE_DATE_END_VALUE
+ *   4. Конвертирует даты из DD.MM.YYYY → YYYY-MM-DD
+ *
+ * РЕЗУЛЬТАТ: { dealId: [{ product_id, product_name, original_name, date_start, date_end }] }
+ *   Сохраняется в dashboards/participants-dashboard/cache/modules.json
+ *
+ * ПРОИЗВОДИТЕЛЬНОСТЬ: ~7 680 сделок батчами по 10 → ~768 запросов × 200мс ≈ 3 минуты.
+ *   Таймаут на каждый батч: 20 секунд.
+ *
+ * ВАЖНО: Export API требует плоский PHP-формат параметров (не JSON):
+ *   data[FILTER][ID][0]=123&data[FILTER][ID][1]=456  — так работает
+ *   data={"FILTER":{"ID":[123,456]}}                 — НЕ работает
  */
 
 const EXPORT_URL  = 'https://24.uprav.ru/web_services/crm/export.php';
