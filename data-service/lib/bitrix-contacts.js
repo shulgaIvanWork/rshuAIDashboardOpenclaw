@@ -96,7 +96,7 @@ export async function fetchContacts(deals) {
     ids,
     id => `crm.contact.get?id=${id}&select[]=NAME&select[]=LAST_NAME&select[]=SECOND_NAME&select[]=POST&select[]=ADDRESS_CITY&select[]=ADDRESS_REGION`,
     item => ({
-      name: [item.NAME, item.LAST_NAME].filter(Boolean).join(' ') || `Контакт #${item.ID}`,
+      name: [item.LAST_NAME, item.NAME, item.SECOND_NAME].filter(Boolean).join(' ') || `Контакт #${item.ID}`,
       post: item.POST || '',
       region: item.ADDRESS_CITY || item.ADDRESS_REGION || '',
     })

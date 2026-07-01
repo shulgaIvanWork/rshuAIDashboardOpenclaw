@@ -303,7 +303,9 @@ async function buildParticipants(weekIndex) {
       const moduleName = rawName ? normalizeTitle(rawName) : '—';
 
       const modStart = parseModuleDate(mod.date_start);
-      const modDisplayDate = modStart ? modStart.toLocaleDateString('ru-RU') : '—';
+      const modEnd   = parseModuleDate(mod.date_end);
+      const modDisplayDate    = modStart ? modStart.toLocaleDateString('ru-RU') : '—';
+      const modDisplayDateEnd = modEnd   ? modEnd.toLocaleDateString('ru-RU')   : '—';
 
       participants.push({
         id: did,
@@ -315,6 +317,7 @@ async function buildParticipants(weekIndex) {
         companyId: coId,
         amount: opp,
         date: modDisplayDate,
+        dateEnd: modDisplayDateEnd,
         moduleDateStart: mod.date_start,
         moduleDateEnd: mod.date_end,
         manager,

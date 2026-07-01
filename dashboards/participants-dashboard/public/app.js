@@ -113,9 +113,10 @@ function buildParticipantsTable(res, tableId) {
     '<th class="sort" data-col="5" style="text-align:left;min-width:100px">Регион</th>' +
     '<th class="sort" data-col="6" style="text-align:left;min-width:200px">Компания</th>' +
     '<th class="sort" data-col="7" style="text-align:right">Сумма, ₽</th>' +
-    '<th class="sort" data-col="8">Дата модуля</th>' +
-    '<th class="sort" data-col="9">Статус</th>' +
-    '<th class="sort" data-col="10" style="text-align:left">Менеджер</th>' +
+    '<th class="sort" data-col="8">Начало</th>' +
+    '<th class="sort" data-col="9">Конец</th>' +
+    '<th class="sort" data-col="10">Статус</th>' +
+    '<th class="sort" data-col="11" style="text-align:left">Менеджер</th>' +
     '</tr></thead><tbody>';
 
   for (let i = 0; i < res.participants.length; i++) {
@@ -139,6 +140,7 @@ function buildParticipantsTable(res, tableId) {
       '<td class="tdleft">' + escapeHtml(p.company.substring(0, 60)) + (p.company.length > 60 ? '…' : '') + '</td>' +
       '<td class="tdright">' + amount + '</td>' +
       '<td>' + p.date + '</td>' +
+      '<td>' + (p.dateEnd || '—') + '</td>' +
       '<td style="color:' + stageColor + ';font-weight:600">' + p.stage + '</td>' +
       '<td class="tdleft">' + escapeHtml(p.manager) + '</td>' +
       '</tr>';
