@@ -469,7 +469,8 @@ export async function analyze(onProgress) {
       mql:0, sql:0, oplata:0,
       kom_postupleniya:0, kom_won_cnt:0, kom_lost_cnt:0, invoice_cnt:0,
       oom_postupleniya:0, oom_won_cnt:0, oom_leads:0, oom_mql:0,
-      fmt_oom:0, fmt_om:0, fmt_sdo:0, fmt_kom:0, presale_durs:[],
+      fmt_oom:0, fmt_om:0, fmt_sdo:0, fmt_kom:0,
+      fmt_oom_cnt:0, fmt_om_cnt:0, fmt_sdo_cnt:0, fmt_kom_cnt:0, presale_durs:[],
       by_prod:{}, by_src:{}, by_mba:{},
       btype_B2B_cnt:0,btype_B2B_sum:0,btype_B2C_cnt:0,btype_B2C_sum:0,
       src_internal_cnt:0,src_internal_sum:0,src_mkt_cnt:0,src_mkt_sum:0,
@@ -517,7 +518,7 @@ export async function analyze(onProgress) {
           if (r.IS_KOM) { wd.kom_postupleniya+=r.OPP; wd.kom_won_cnt++; wd.kom_chks.push(r.OPP); }
           else           { wd.oom_postupleniya+=r.OPP; wd.oom_won_cnt++; wd.won_cnt++; wd.chks.push(r.OPP); wd.oom_chks.push(r.OPP); }
           const fk={'Очный':'fmt_oom','Онлайн':'fmt_om','Видеокурс':'fmt_sdo','Корпоративное обучение':'fmt_kom'};
-          if (fk[r.FORMAT]) wd[fk[r.FORMAT]]+=r.OPP;
+          if (fk[r.FORMAT]) { wd[fk[r.FORMAT]]+=r.OPP; wd[fk[r.FORMAT]+'_cnt']++; }
           wd[`btype_${r.BTYPE}_cnt`]++; wd[`btype_${r.BTYPE}_sum`]+=r.OPP;
           if (isInternalSource(r.SRC_ID)) { wd.src_internal_cnt++; wd.src_internal_sum+=r.OPP; }
           else { wd.src_mkt_cnt++; wd.src_mkt_sum+=r.OPP; }
