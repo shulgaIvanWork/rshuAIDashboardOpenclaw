@@ -127,7 +127,22 @@ async function renderFilteredData() {
   }
 
   // Пересчитываем KPI из отфильтрованных недель
-  var filteredData = buildFilteredData(d, filtered);
+  // Предыдущий период: те же N недель до выбранного диапазона
+  var prevFiltered = [];
+  if (filtered.length > 0) {
+    var firstIdx = allWeeks.indexOf(filtered[0]);
+    if (firstIdx > 0) {
+      // Предыдущий период внутри того же года
+      var prevStart = Math.max(0, firstIdx - filtered.length);
+      prevFiltered = allWeeks.slice(prevStart, firstIdx);
+    } else {
+      // Период начинается с первой недели — берём те же недели из предыдущего года
+      var prevYearWeeks = d.prev_weeks || [];
+      var filteredWkNums = new Set(filtered.map(function(w) { return w.week; }));
+      prevFiltered = prevYearWeeks.filter(function(w) { return filteredWkNums.has(w.week); });
+    }
+  }
+  var filteredData = buildFilteredData(d, filtered, prevFiltered);
 
   // Воронка регистраций — фильтруется по DATE_CREATE через отдельный endpoint
   try {
@@ -137,6 +152,21 @@ async function renderFilteredData() {
     var regData = await api('/api/reg-funnel' + params);
     filteredData.reg_ytd = regData;
   } catch (e) { /* fallback: оставляем оригинальные данные */ }
+
+  // Воронка регистраций за предыдущий период (сдвиг на ту же длину назад)
+  try {
+    var msFrom = new Date(dateFrom).getTime();
+    var msTo   = new Date(dateTo).getTime();
+    var dur    = msTo - msFrom;
+    var ppTo   = new Date(msFrom - 86400000);
+    var ppFrom = new Date(ppTo.getTime() - dur);
+    var ppRegParams = '?from=' + ppFrom.toISOString().substring(0,10) + '&to=' + ppTo.toISOString().substring(0,10);
+    var ppRegData = await api('/api/reg-funnel' + ppRegParams);
+    ppRegData.avg_check  = ppRegData.total_paid > 0 ? Math.round(ppRegData.total_paid_sum / ppRegData.total_paid) : 0;
+    ppRegData.conv       = ppRegData.total > 0 ? parseFloat((ppRegData.total_paid / ppRegData.total * 100).toFixed(1)) : 0;
+    ppRegData.lose_pct   = ppRegData.total > 0 ? parseFloat((ppRegData.lose / ppRegData.total * 100).toFixed(1)) : 0;
+    filteredData.pp_reg_ytd = ppRegData;
+  } catch (e) { filteredData.pp_reg_ytd = null; }
 
   // Обновляем info
   var infoEl = document.getElementById('filterInfo');
@@ -149,7 +179,9 @@ async function renderFilteredData() {
   renderPageMainNew(filteredData);
 }
 
-function buildFilteredData(orig, filteredWeeks) {
+function buildFilteredData(orig, filteredWeeks, prevWeeks) {
+  prevWeeks = prevWeeks || [];
+  function sumPrev(f) { return prevWeeks.reduce(function(s, w) { return s + (w[f] || 0); }, 0); }
   var out = JSON.parse(JSON.stringify(orig));
   out.weeks = filteredWeeks;
 
@@ -232,6 +264,36 @@ function buildFilteredData(orig, filteredWeeks) {
   kom_ytd.won_relevant_cnt = komPay;
   kom_ytd.conv_deal_pct = (komPay + kom_ytd.lose_cnt) > 0 ? (komPay / (komPay + kom_ytd.lose_cnt)) * 100 : 0;
   out.kom_ytd = kom_ytd;
+
+  // Предыдущий период
+  if (prevWeeks.length > 0) {
+    var ppTotPay = sumPrev('oplata');
+    var ppOomPay = sumPrev('oom_won_cnt');
+    var ppKomPay = sumPrev('kom_won_cnt');
+    out.pp = {
+      ytd: {
+        postupleniya: sumPrev('postupleniya'), won_relevant_cnt: ppTotPay,
+        avg_check: ppTotPay > 0 ? Math.round(sumPrev('postupleniya') / ppTotPay) : 0,
+        avg_close_days_won: ppTotPay > 0 ? prevWeeks.reduce(function(s,w){return s+(w.avg_dur||0)*(w.oplata||0);},0)/ppTotPay : 0
+      },
+      oom_ytd: {
+        postupleniya: sumPrev('oom_postupleniya'), won_relevant_cnt: ppOomPay,
+        avg_check: ppOomPay > 0 ? Math.round(sumPrev('oom_postupleniya') / ppOomPay) : 0,
+        avg_close_days_won: ppOomPay > 0 ? prevWeeks.reduce(function(s,w){return s+(w.oom_avg_dur||0)*(w.oom_won_cnt||0);},0)/ppOomPay : 0
+      },
+      kom_ytd: {
+        postupleniya: sumPrev('kom_postupleniya'), won_relevant_cnt: ppKomPay,
+        avg_check: ppKomPay > 0 ? Math.round(sumPrev('kom_postupleniya') / ppKomPay) : 0,
+        avg_close_days_won: ppKomPay > 0 ? prevWeeks.reduce(function(s,w){return s+(w.kom_avg_dur||0)*(w.kom_won_cnt||0);},0)/ppKomPay : 0
+      },
+      leads_ytd: sumPrev('leads'), qual_lead_ytd: sumPrev('mql'),
+      oom_leads_ytd: sumPrev('oom_leads'), oom_qual_lead_ytd: sumPrev('oom_mql'),
+      kom_leads_ytd: sumPrev('leads') - sumPrev('oom_leads'), kom_qual_lead_ytd: sumPrev('mql') - sumPrev('oom_mql'),
+      label: prevWeeks[0] ? (prevWeeks[0].label_dates + ' — ' + prevWeeks[prevWeeks.length-1].label_dates) : ''
+    };
+  } else {
+    out.pp = null;
+  }
 
   // Форматы — пересчитываем из понедельных сумм
   var fmtKeyMap = { fmt_oom: 'ООМ (Очное)', fmt_om: 'ОМ (Онлайн)', fmt_sdo: 'СДО', fmt_kom: 'КОМ' };
@@ -344,19 +406,42 @@ async function renderPageMainNew(d) {
       var cl = p>0?'delta-up':(p<0?'delta-down':'delta-flat');
       return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
     }
-    function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev) {
+    function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev, ppYtd, ppLeads, ppQual) {
       var cc = cls==='kom'?'c-kom':(cls==='oom'?'c-oom':'c-total');
       var kc = cls==='kom'?'kpi-kom':(cls==='oom'?'kpi-oom':'kpi-total');
-      var weekDates = wkCur && wkCur.label_dates ? wkCur.label_dates : '';
+      function pctDelta(a, b) {
+        if (!b || b === 0) return '';
+        var p = ((a - b) / b * 100).toFixed(1);
+        var s = p > 0 ? '↑' : (p < 0 ? '↓' : '→');
+        var cl = p > 0 ? 'delta-up' : (p < 0 ? 'delta-down' : 'delta-flat');
+        return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
+      }
+      var ppL = ppYtd ? (ppLeads || 0) : 0, ppQ = ppYtd ? (ppQual || 0) : 0;
+      var curLeadsVal = leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt;
+      var curConv = leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0;
+      var ppConv  = ppYtd && ppL>0?(ppYtd.won_relevant_cnt/ppL*100):0;
+      var curMqlConv = qualLeads>0 ? (ytd.won_relevant_cnt/qualLeads*100) : 0;
+      var ppMqlConv  = ppYtd && ppQ>0 ? (ppYtd.won_relevant_cnt/ppQ*100) : 0;
+      // Ряд 1 — текущий период (7 карточек)
       var r = '<div class="kpis"><div class="kpi-header '+cc+'">'+title+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Поступления</div><div class="row"><div class="val-big">'+fmt(ytd.postupleniya)+' \u20bd</div><span class="si">('+fmt(ytd.won_relevant_cnt)+' сд.)</span></div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udccb Лиды всего</div><div class="row"><div class="val-big">'+fmt(leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt)+'</div><span class="si">'+((qualLeads/leadsYtd*100).toFixed(1))+'%</span></div><div class="lbl2">квал. лиды (MQL)</div><div class="val-big '+cc+'">'+fmt(qualLeads)+'</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcc8 Конверсия всего лидов</div><div class="val-big">'+fmtPct(leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0)+'%</div><div class="lbl2">Конверсия квал. лидов (MQL)</div><div class="val-big '+cc+'">'+fmtPct(qualLeads>0?(ytd.won_relevant_cnt/qualLeads*100):0)+'%</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">\ud83d\udcb0 Средний чек</div><div class="val-big">'+fmt(ytd.avg_check)+' \u20bd</div><div class="lbl2">Медианный чек</div><div class="val-big '+cc+'">'+fmt(ytd.median_check)+' \u20bd</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">\u0426\u0438\u043a\u043b сделки</div><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">'+ (weekDates ? weekDates+':' : '') +' поступления</div><div class="row"><div class="val-big">'+fmt(cur.postupleniya)+' \u20bd</div><span class="si">'+delta(cur.postupleniya, prev.postupleniya)+'</span></div><div class="lbl2">Оплачено сделок</div><div class="row"><div class="val-big '+cc+'">'+fmt(cur.won_relevant_cnt)+'</div></div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">'+ (weekDates ? weekDates+':' : '') +' лиды</div><div class="row"><div class="val-big">'+fmt(leadsCur != null ? leadsCur : cur.won_relevant_cnt)+'</div><span class="si">'+(leadsPrev != null ? delta(leadsCur, leadsPrev) : (prev ? delta(cur.won_relevant_cnt, prev.won_relevant_cnt) : ''))+'</span></div><div class="lbl2">квал. лиды (MQL)</div><div class="row"><div class="val-big '+cc+'">'+fmt(mqlCur != null ? mqlCur : (wkCur ? (wkCur.mql || 0) : 0))+'</div><span class="si">'+(mqlPrev != null ? delta(mqlCur||0, mqlPrev||0) : (wkPrev ? delta(wkCur ? (wkCur.mql||0) : 0, wkPrev ? (wkPrev.mql||0) : 0) : ''))+'</span></div></div>'
-        + '</div>';
+        + '<div class="kpi '+kc+'"><div class="lbl">Поступления</div><div class="val-big">'+fmt(ytd.postupleniya)+' ₽</div><div class="sub" style="display:flex;justify-content:space-between"><span>('+fmt(ytd.won_relevant_cnt)+' сд.)</span>'+(ppYtd?pctDelta(ytd.postupleniya,ppYtd.postupleniya):'')+'</div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">📋 Лиды</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(curLeadsVal)+'</div>'+(ppYtd?pctDelta(curLeadsVal,ppL):'')+'</div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">📈 Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curConv)+'%</div>'+(ppYtd?pctDelta(curConv,ppConv):'')+'</div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Квал. лиды (MQL)</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(qualLeads)+'</div>'+(ppYtd?pctDelta(qualLeads,ppQ):'')+'</div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Конверсия квал. лидов</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curMqlConv)+'%</div>'+(ppYtd&&ppQ>0?pctDelta(curMqlConv,ppMqlConv):'')+'</div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">💰 Средний чек</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+' ₽</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div></div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">⏱ Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDelta(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div></div>';
+      // Ряд 2 — предыдущий период (7 карточек, серые)
+      if (ppYtd) {
+        r += '<div class="kpi '+kc+'" style=""><div class="lbl">Поступления (пред.)</div><div class="val-big">'+fmt(ppYtd.postupleniya)+' ₽</div><div class="sub">('+fmt(ppYtd.won_relevant_cnt)+' сд.)</div></div>'
+          + '<div class="kpi '+kc+'" style=""><div class="lbl">📋 Лиды (пред.)</div><div class="val-big">'+fmt(ppL)+'</div></div>'
+          + '<div class="kpi '+kc+'" style=""><div class="lbl">📈 Конверсия (пред.)</div><div class="val-big">'+fmtPct(ppConv)+'%</div></div>'
+          + '<div class="kpi '+kc+'" style=""><div class="lbl">Квал. лиды (пред.)</div><div class="val-big">'+fmt(ppQ)+'</div></div>'
+          + '<div class="kpi '+kc+'" style=""><div class="lbl">Конв. квал. лидов (пред.)</div><div class="val-big">'+fmtPct(ppMqlConv)+'%</div></div>'
+          + '<div class="kpi '+kc+'" style=""><div class="lbl">💰 Средний чек (пред.)</div><div class="val-big">'+fmt(ppYtd.avg_check)+' ₽</div></div>'
+          + '<div class="kpi '+kc+'" style=""><div class="lbl">⏱ Цикл сделки (пред.)</div><div class="val-big">'+(ppYtd.avg_close_days_won||0).toFixed(1)+' дн.</div></div>';
+      }
+      r += '</div>';
       return r;
     }
 
@@ -386,12 +471,9 @@ async function renderPageMainNew(d) {
 
     var html = '';
     // KPI sections
-    html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0);
-    html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev);
-    html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev);
-    // Регистрация — сразу под KPI
-    html += '<div class="kpis" id="newRegKpis"></div>';
-
+    html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0, d.pp && d.pp.ytd, d.pp && d.pp.leads_ytd, d.pp && d.pp.qual_lead_ytd);
+    html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev, d.pp && d.pp.oom_ytd, d.pp && d.pp.oom_leads_ytd, d.pp && d.pp.oom_qual_lead_ytd);
+    html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
     // Поступления по неделям (на всю ширину)
     html += '<div class="card" style="margin-top:8px"><h2>Поступления по неделям</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
     // Форматы + Тип обучения
@@ -404,8 +486,10 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Тип клиента: B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
     html += '<div class="card"><h2>Источники: Внутренняя база vs Маркетинговые сделки</h2><div class="chartbox-sm"><canvas id="newChSrcSplit"></canvas></div><div id="newSrcSplitTable"></div></div>';
     html += '</div>';
+    // Регистрация — над воронкой
+    html += '<div class="kpis" id="newRegKpis" style="margin-top:16px"></div>';
     // Стеки воронок - на всю ширину, друг под другом
-    html += '<div class="card" style="margin-top:16px"><h2>Воронка по неделям <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии на той же неделе)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
+    html += '<div class="card" style="margin-top:8px"><h2>Воронка по неделям <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии на той же неделе)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     // Конверсии
 
     // Средний чек по неделям (на всю ширину)
@@ -507,13 +591,15 @@ async function renderPageMainNew(d) {
     // Now fill in table data (elements exist now)
     var fmtData = d.fmt_ytd||{};
     var fmtShort = function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};
+    var fmtRename = {'ООМ':'Очный','ОМ':'Онлайн','СДО':'Дистанционный','КОМ':'Корпоративное обучение'};
+    var fmtDisplay = function(n){var s=fmtShort(n);return fmtRename[s]||s;};
     var fmtTot = 0;
     for(var ftk in fmtData){if(ftk!=='period')fmtTot+=fmtData[ftk].sum||0;}
     var fmtStr = '<table style="font-size:11px"><tr><th>Формат</th><th>Сумма</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>';
     for (var fk in fmtData) {
       if (fk==='period') continue;
       var fv = fmtData[fk];
-      fmtStr += '<tr><td>'+fmtShort(escapeHtml(fk))+'</td><td>'+fmt(fv.sum)+' \u20bd</td><td>'+fv.cnt+'</td><td>'+fmt(Math.round(fv.sum/fv.cnt))+' \u20bd</td><td>'+(fmtTot>0?(fv.sum/fmtTot*100).toFixed(1):'0.0')+'%</td></tr>';
+      fmtStr += '<tr><td>'+fmtDisplay(escapeHtml(fk))+'</td><td>'+fmt(fv.sum)+' \u20bd</td><td>'+fv.cnt+'</td><td>'+fmt(Math.round(fv.sum/fv.cnt))+' \u20bd</td><td>'+(fmtTot>0?(fv.sum/fmtTot*100).toFixed(1):'0.0')+'%</td></tr>';
     }
     fmtStr += '</table>';
     var el = document.getElementById('newFmtTable');
@@ -523,15 +609,25 @@ async function renderPageMainNew(d) {
 
     // Регистрации: KPI
     var reg = d.reg_ytd||{};
-    var regConvSql = reg.total > 0 ? (reg.sql/reg.total*100).toFixed(1) : '0.0';
-    var regConvInv = reg.total > 0 ? (reg.invoice/reg.total*100).toFixed(1) : '0.0';
-    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div><div class="kpi kpi-reg"><div class="lbl">💰 Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL</div><div class="row"><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><span class="si">'+reg.sql+' сд.</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен</div><div class="row"><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><span class="si">'+reg.real_inv_cnt+' сд.</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату</div><div class="val-big">'+reg.conv+'%</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+reg.inv_conv+'%</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔴 Доля отказов</div><div class="val-big">'+reg.lose_pct+'%</div><div class="lbl2">'+reg.lose+' из '+reg.total+' сд.</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Средний чек</div><div class="val-big">'+fmt(reg.avg_check)+' ₽</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">⏱ Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+reg.avg_inv_dur+' дн.</div></div>';
+    var pp_reg = d.pp_reg_ytd||null;
+    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.'+(pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'')+'</span></div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL</div><div class="row"><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><span class="si">'+reg.sql+' сд.'+(pp_reg?delta(reg.sql_sum,pp_reg.sql_sum):'')+'</span></div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен</div><div class="row"><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><span class="si">'+reg.real_inv_cnt+' сд.'+(pp_reg?delta(reg.real_inv_sum,pp_reg.real_inv_sum):'')+'</span></div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату</div><div class="val-big">'+reg.conv+'%'+(pp_reg?delta(reg.conv,pp_reg.conv):'')+'</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+reg.inv_conv+'%'+(pp_reg?delta(reg.inv_conv,pp_reg.inv_conv):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔴 Доля отказов</div><div class="val-big">'+reg.lose_pct+'%'+(pp_reg?delta(reg.lose_pct,pp_reg.lose_pct):'')+'</div><div class="lbl2">'+reg.lose+' из '+reg.total+' сд.</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Средний чек</div><div class="val-big">'+fmt(reg.avg_check)+' ₽'+(pp_reg?delta(reg.avg_check,pp_reg.avg_check):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">⏱ Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.'+(pp_reg?delta(reg.avg_dur,pp_reg.avg_dur):'')+'</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+reg.avg_inv_dur+' дн.'+(pp_reg?delta(reg.avg_inv_dur,pp_reg.avg_inv_dur):'')+'</div></div>';
+    if (pp_reg) {
+      regKpis += '<div style="grid-column:1/-1;height:0"></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Поступления (пред. период)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_paid_sum)+' ₽</div><span class="si">'+pp_reg.total_paid+' сд.</span></div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.sql_sum)+' ₽</div><span class="si">'+pp_reg.sql+' сд.</span></div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.real_inv_sum)+' ₽</div><span class="si">'+pp_reg.real_inv_cnt+' сд.</span></div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату (пред.)</div><div class="val-big">'+pp_reg.conv+'%</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+pp_reg.inv_conv+'%</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔴 Доля отказов (пред.)</div><div class="val-big">'+pp_reg.lose_pct+'%</div><div class="lbl2">'+pp_reg.lose+' из '+pp_reg.total+' сд.</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Средний чек (пред.)</div><div class="val-big">'+fmt(pp_reg.avg_check)+' ₽</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">⏱ Цикл сделки (пред.)</div><div class="val-big">'+pp_reg.avg_dur+' дн.</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+pp_reg.avg_inv_dur+' дн.</div></div>';
+    }
     var regEl = document.getElementById('newRegKpis'); if(regEl) regEl.innerHTML = regKpis;
 
 
@@ -589,7 +685,7 @@ async function renderPageMainNew(d) {
           if (document.getElementById('ch_funnel_new_qual')) new Chart(document.getElementById('ch_funnel_new_qual'), {type:'bar', data:{labels:labels,datasets:[{label:'MQL',data:weeks.map(function(w){return w.mql||0;}),backgroundColor:'#3079D2',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.sql||0;}),backgroundColor:'#9A7B3F',borderRadius:4},{label:'Оплачено',data:weeks.map(function(w){return w.oplata||0;}),backgroundColor:'#2E7D32',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
           if (document.getElementById('ch_conv_new_qual')) new Chart(document.getElementById('ch_conv_new_qual'), {type:'line', data:{labels:labels,datasets:[{label:'MQL→SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL→Сделки %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
           try {
-          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtShort=function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtShort(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#2E7D32','#1976D2','#F57C00','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
+          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtRn={'ООМ':'Очный','ОМ':'Онлайн','СДО':'Дистанционный','КОМ':'Корпоративное обучение'};var fmtSh=function(n){var s=n.replace(' (Онлайн)','').replace(' (Очное)','');return fmtRn[s]||s;};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtSh(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#2E7D32','#1976D2','#F57C00','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
           // Тип обучения: пончик
           var eduData = d.edu_ytd||{}; var eduFl=[], eduFv=[], eduFsn=[];
           for(var ek in eduData){if(ek==='period')continue;eduFl.push(ek);eduFsn.push(ek);eduFv.push(eduData[ek].sum||0);}

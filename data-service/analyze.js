@@ -608,6 +608,53 @@ export async function analyze(onProgress) {
     for (const k of ['durs','chks','oom_durs','oom_chks','kom_durs','kom_chks','presale_durs']) delete wd[k];
   }
 
+  // ── Предыдущий год (YEAR-1) — упрощённые недельные данные для сравнения ──
+  const PREV_YEAR = YEAR - 1;
+  const prevWeekly = {};
+  for (let w = 1; w <= 53; w++) {
+    let mon; try { mon = fromISOCalendar(PREV_YEAR, w, 1); } catch { continue; }
+    const sun = fromISOCalendar(PREV_YEAR, w, 7);
+    prevWeekly[w] = {
+      week: w,
+      label_dates: `${fmt2(mon.getDate())}.${fmt2(mon.getMonth()+1)}—${fmt2(sun.getDate())}.${fmt2(sun.getMonth()+1)}`,
+      postupleniya: 0, oplata: 0, durs: [],
+      oom_postupleniya: 0, oom_won_cnt: 0, oom_durs: [],
+      kom_postupleniya: 0, kom_won_cnt: 0, kom_durs: [],
+      leads: 0, mql: 0, oom_leads: 0, oom_mql: 0,
+    };
+  }
+  for (const r of rows) {
+    if (!getPayDate(r) || r.PAY_DT.getFullYear() !== PREV_YEAR) continue;
+    if (!VALID_CATS.has(r.CAT_ID)) continue;
+    const [,wk] = isoCalendar(r.PAY_DT);
+    if (!(wk in prevWeekly)) continue;
+    const wd = prevWeekly[wk];
+    wd.postupleniya += r.OPP; wd.oplata++;
+    if (r.DC && r.CL) { const d = daysBetween(r.DC, r.CL); if (d >= 0) wd.durs.push(d); }
+    if (r.IS_KOM) {
+      wd.kom_postupleniya += r.OPP; wd.kom_won_cnt++;
+      if (r.DC && r.CL) { const d = daysBetween(r.DC, r.CL); if (d >= 0) wd.kom_durs.push(d); }
+    } else {
+      wd.oom_postupleniya += r.OPP; wd.oom_won_cnt++;
+      if (r.DC && r.CL) { const d = daysBetween(r.DC, r.CL); if (d >= 0) wd.oom_durs.push(d); }
+    }
+  }
+  for (const r of rows) {
+    if (!r.DC || r.DC.getFullYear() !== PREV_YEAR) continue;
+    const [,wk] = isoCalendar(r.DC);
+    if (!(wk in prevWeekly)) continue;
+    if (isAllLead(r))     { prevWeekly[wk].leads++;    if (r.IS_OOM) prevWeekly[wk].oom_leads++; }
+    if (isQualLeadW(r))   { prevWeekly[wk].mql++;      if (r.IS_OOM) prevWeekly[wk].oom_mql++; }
+  }
+  { const av = arr => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
+    for (const wd of Object.values(prevWeekly)) {
+      wd.avg_dur     = av(wd.durs);
+      wd.oom_avg_dur = av(wd.oom_durs);
+      wd.kom_avg_dur = av(wd.kom_durs);
+      delete wd.durs; delete wd.oom_durs; delete wd.kom_durs;
+    }
+  }
+
   // ── Стек 1 ────────────────────────────────────────────────────────────────
   for (const wIdx of Object.keys(weekly).map(Number).sort((a,b)=>a-b)) {
     const mon=fromISOCalendar(YEAR,wIdx,1);
@@ -894,6 +941,7 @@ export async function analyze(onProgress) {
     oom_qual_prev:oomQualPrev, oom_qual_cur:oomQualCur,
     kom_qual_prev:komQualPrev, kom_qual_cur:komQualCur,
     weeks:Object.keys(weekly).map(Number).sort((a,b)=>a-b).map(w=>weekly[w]),
+    prev_weeks:Object.keys(prevWeekly).map(Number).sort((a,b)=>a-b).map(w=>prevWeekly[w]),
     src_rating:srcRating,
     src_split_ytd:srcSplitYtd, src_split_prev:srcSplitPrev, src_split_cur:srcSplitCur,
     btype_ytd:btypeYtd, btype_prev:btypePrev, btype_cur:btypeCur,
