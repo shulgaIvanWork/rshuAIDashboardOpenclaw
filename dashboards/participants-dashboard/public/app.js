@@ -105,18 +105,20 @@ async function loadAll() {
 
 function buildParticipantsTable(res, tableId) {
   let html = '<table class="sortable" id="' + tableId + '"><thead><tr>' +
-    '<th class="sort" data-col="0">#</th>' +
-    '<th class="sort" data-col="1" style="text-align:left;min-width:180px">Программа (модуль)</th>' +
-    '<th class="sort" data-col="2" style="text-align:left;min-width:120px">Тема / Сделка</th>' +
-    '<th class="sort" data-col="3" style="text-align:left;min-width:80px">Формат</th>' +
-    '<th class="sort" data-col="4" style="text-align:left;min-width:140px">Участник</th>' +
-    '<th class="sort" data-col="5" style="text-align:left;min-width:100px">Регион</th>' +
-    '<th class="sort" data-col="6" style="text-align:left;min-width:200px">Компания</th>' +
+    '<th class="sort" data-col="0" style="text-align:left;min-width:120px">Программа (модуль)</th>' +
+    '<th class="sort" data-col="1" style="text-align:left;min-width:150px">Тема / Сделка</th>' +
+    '<th class="sort" data-col="2" style="text-align:left;min-width:80px">Формат</th>' +
+    '<th class="sort" data-col="3" style="text-align:left;min-width:120px">Участник</th>' +
+    '<th class="sort" data-col="4" style="text-align:left;min-width:100px">Регион</th>' +
+    '<th class="sort" data-col="5" style="text-align:left;min-width:150px">Компания</th>' +
+    '<th class="sort" data-col="6">Тип</th>' +
     '<th class="sort" data-col="7" style="text-align:right">Сумма, ₽</th>' +
-    '<th class="sort" data-col="8">Начало</th>' +
-    '<th class="sort" data-col="9">Конец</th>' +
-    '<th class="sort" data-col="10">Статус</th>' +
-    '<th class="sort" data-col="11" style="text-align:left">Менеджер</th>' +
+    '<th class="sort" data-col="8">Даты</th>' +
+    '<th class="sort" data-col="9" style="text-align:right">Длит., дн.</th>' +
+    '<th class="sort" data-col="10" style="text-align:right">Цикл, дн.</th>' +
+    '<th class="sort" data-col="11">Статус</th>' +
+    '<th class="sort" data-col="12" style="text-align:left">Менеджер</th>' +
+    '<th class="sort" data-col="13" style="text-align:left">Пред. обучение</th>' +
     '</tr></thead><tbody>';
 
   for (let i = 0; i < res.participants.length; i++) {
@@ -131,18 +133,20 @@ function buildParticipantsTable(res, tableId) {
     else if (p.stage === 'Частично оплачен') stageColor = '#FF9800';
 
     html += '<tr>' +
-      '<td>' + (i + 1) + '</td>' +
       '<td class="tdleft"><b>' + escapeHtml(p.program) + '</b></td>' +
       '<td class="tdleft" style="font-size:11px;color:#666">' + escapeHtml(p.title) + '</td>' +
       '<td><span style="color:' + fmtColor + ';font-weight:600">' + fmtLabel + '</span></td>' +
       '<td class="tdleft">' + escapeHtml(p.participant) + '</td>' +
       '<td class="tdleft">' + regionLabel + '</td>' +
       '<td class="tdleft">' + escapeHtml(p.company.substring(0, 60)) + (p.company.length > 60 ? '…' : '') + '</td>' +
+      '<td><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700;background:' + (p.clientType === 'B2B' ? '#E8F5E9' : '#E3F2FD') + ';color:' + (p.clientType === 'B2B' ? '#2E7D32' : '#1565C0') + '">' + (p.clientType || '—') + '</span></td>' +
       '<td class="tdright">' + amount + '</td>' +
-      '<td>' + p.date + '</td>' +
-      '<td>' + (p.dateEnd || '—') + '</td>' +
+      '<td style="font-size:11px;line-height:1.6">' + p.date + '<br>—<br>' + (p.dateEnd || '—') + '</td>' +
+      '<td class="tdright">' + (p.moduleDuration != null ? p.moduleDuration : '—') + '</td>' +
+      '<td class="tdright">' + (p.dealCycle != null ? p.dealCycle : '—') + '</td>' +
       '<td style="color:' + stageColor + ';font-weight:600">' + p.stage + '</td>' +
       '<td class="tdleft">' + escapeHtml(p.manager) + '</td>' +
+      '<td class="tdleft">' + (p.hadPrevTraining ? '<span style="color:#E65100;font-weight:600">Да</span>' + (p.prevTrainingDate ? ' <span style="color:#888;font-size:11px">' + p.prevTrainingDate + '</span>' : '') : '<span style="color:#999">нет</span>') + '</td>' +
       '</tr>';
   }
   return html + '</tbody></table>';
@@ -165,7 +169,7 @@ async function loadParticipants() {
       return;
     }
     document.getElementById('participantsTitle').textContent =
-      '👥 Участники Очно / Онлайн за ' + formatWeekTitle(res.weekLabel) + ' · всего ' + res.total + ' сделок';
+      '👥 Участники Очно / Онлайн за ' + formatWeekTitle(res.weekLabel) + ' · всего ' + res.total;
     wrap.innerHTML = buildParticipantsTable(res, 'participantsTable');
     setTimeout(() => initTableSort('participantsTable'), 100);
   } catch (e) {

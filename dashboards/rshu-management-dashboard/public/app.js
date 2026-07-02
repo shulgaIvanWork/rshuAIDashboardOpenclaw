@@ -422,26 +422,17 @@ async function renderPageMainNew(d) {
       var ppConv  = ppYtd && ppL>0?(ppYtd.won_relevant_cnt/ppL*100):0;
       var curMqlConv = qualLeads>0 ? (ytd.won_relevant_cnt/qualLeads*100) : 0;
       var ppMqlConv  = ppYtd && ppQ>0 ? (ppYtd.won_relevant_cnt/ppQ*100) : 0;
-      // Ряд 1 — текущий период (7 карточек)
-      var r = '<div class="kpis"><div class="kpi-header '+cc+'">'+title+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Поступления</div><div class="val-big">'+fmt(ytd.postupleniya)+' ₽</div><div class="sub" style="display:flex;justify-content:space-between"><span>('+fmt(ytd.won_relevant_cnt)+' сд.)</span>'+(ppYtd?pctDelta(ytd.postupleniya,ppYtd.postupleniya):'')+'</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">📋 Лиды</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(curLeadsVal)+'</div>'+(ppYtd?pctDelta(curLeadsVal,ppL):'')+'</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">📈 Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curConv)+'%</div>'+(ppYtd?pctDelta(curConv,ppConv):'')+'</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Квал. лиды (MQL)</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(qualLeads)+'</div>'+(ppYtd?pctDelta(qualLeads,ppQ):'')+'</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Конверсия квал. лидов</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curMqlConv)+'%</div>'+(ppYtd&&ppQ>0?pctDelta(curMqlConv,ppMqlConv):'')+'</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">💰 Средний чек</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+' ₽</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div></div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">⏱ Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDelta(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div></div>';
-      // Ряд 2 — предыдущий период (7 карточек, серые)
-      if (ppYtd) {
-        r += '<div class="kpi '+kc+'" style=""><div class="lbl">Поступления (пред.)</div><div class="val-big">'+fmt(ppYtd.postupleniya)+' ₽</div><div class="sub">('+fmt(ppYtd.won_relevant_cnt)+' сд.)</div></div>'
-          + '<div class="kpi '+kc+'" style=""><div class="lbl">📋 Лиды (пред.)</div><div class="val-big">'+fmt(ppL)+'</div></div>'
-          + '<div class="kpi '+kc+'" style=""><div class="lbl">📈 Конверсия (пред.)</div><div class="val-big">'+fmtPct(ppConv)+'%</div></div>'
-          + '<div class="kpi '+kc+'" style=""><div class="lbl">Квал. лиды (пред.)</div><div class="val-big">'+fmt(ppQ)+'</div></div>'
-          + '<div class="kpi '+kc+'" style=""><div class="lbl">Конв. квал. лидов (пред.)</div><div class="val-big">'+fmtPct(ppMqlConv)+'%</div></div>'
-          + '<div class="kpi '+kc+'" style=""><div class="lbl">💰 Средний чек (пред.)</div><div class="val-big">'+fmt(ppYtd.avg_check)+' ₽</div></div>'
-          + '<div class="kpi '+kc+'" style=""><div class="lbl">⏱ Цикл сделки (пред.)</div><div class="val-big">'+(ppYtd.avg_close_days_won||0).toFixed(1)+' дн.</div></div>';
-      }
-      r += '</div>';
+      function pp(val) { return ppYtd ? '<div class="pp-val">'+val+'</div>' : ''; }
+      var r = '<div class="kpis kpis-9"><div class="kpi-header '+cc+'">'+title+'</div>'
+        + '<div class="kpi '+kc+'" style="grid-column:span 2"><div class="lbl">Поступления</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.postupleniya)+' ₽</div>'+(ppYtd?pctDelta(ytd.postupleniya,ppYtd.postupleniya):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.postupleniya)+' ₽')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Сделок</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.won_relevant_cnt)+'</div>'+(ppYtd?pctDelta(ytd.won_relevant_cnt,ppYtd.won_relevant_cnt):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.won_relevant_cnt))+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">📋 Лиды</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(curLeadsVal)+'</div>'+(ppYtd?pctDelta(curLeadsVal,ppL):'')+'</div>'+pp(fmt(ppL))+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">📈 Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curConv)+'%</div>'+(ppYtd?pctDelta(curConv,ppConv):'')+'</div>'+pp(fmtPct(ppConv)+'%')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Квал. лиды (MQL)</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(qualLeads)+'</div>'+(ppYtd?pctDelta(qualLeads,ppQ):'')+'</div>'+pp(fmt(ppQ))+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Конв. MQL</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curMqlConv)+'%</div>'+(ppYtd&&ppQ>0?pctDelta(curMqlConv,ppMqlConv):'')+'</div>'+pp(fmtPct(ppMqlConv)+'%')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">💰 Средний чек</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+' ₽</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.avg_check)+' ₽')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">⏱ Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDelta(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div>'+pp((ppYtd&&ppYtd.avg_close_days_won||0).toFixed(1)+' дн.')+'</div>'
+        + '</div>';
       return r;
     }
 

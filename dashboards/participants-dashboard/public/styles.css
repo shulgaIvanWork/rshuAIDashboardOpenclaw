@@ -1,1 +1,5 @@
 /* Dashboard-specific: participants — all common styles in /shared.css */
+
+th { padding: 5px 6px !important; }
+td { padding: 4px 6px !important; }
+h2 { margin: 0 0 15px !important; }

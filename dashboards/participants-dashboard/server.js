@@ -245,6 +245,19 @@ async function buildParticipants(weekIndex) {
     return isRealTraining(d.TITLE, d.ID);
   });
 
+  // Build map: contactId → qualifying paid deals (sale funnel, >11₽, paid via 1C)
+  const contactTrainingDeals = new Map();
+  for (const d of deals) {
+    if (String(d.CATEGORY_ID) !== '0') continue;
+    if ((parseFloat(d.OPPORTUNITY) || 0) <= 11) continue;
+    if (!d.UF_DATE_PAY_1C) continue;
+    const ccinfo2 = cc[d.ID] || {};
+    const cid = String(ccinfo2.CONTACT_ID || d.CONTACT_ID || '0');
+    if (cid === '0') continue;
+    if (!contactTrainingDeals.has(cid)) contactTrainingDeals.set(cid, []);
+    contactTrainingDeals.get(cid).push({ id: d.ID, payDate: d.UF_DATE_PAY_1C.substring(0, 10) });
+  }
+
   const participants = [];
   const seen = new Set();
 
@@ -307,6 +320,24 @@ async function buildParticipants(weekIndex) {
       const modDisplayDate    = modStart ? modStart.toLocaleDateString('ru-RU') : '—';
       const modDisplayDateEnd = modEnd   ? modEnd.toLocaleDateString('ru-RU')   : '—';
 
+      // Длительность модуля в днях
+      let moduleDuration = null;
+      if (modStart && modEnd) {
+        moduleDuration = Math.round((modEnd - modStart) / 86400000) + 1;
+      }
+
+      // Тип клиента: компания или физик
+      const clientType = (coId && coId !== '0') ? 'B2B' : 'B2C';
+
+      // Цикл сделки: DATE_CREATE → UF_DATE_PAY_1C
+      let dealCycle = null;
+      if (d.DATE_CREATE && d.UF_DATE_PAY_1C) {
+        const created = new Date(d.DATE_CREATE.substring(0, 10));
+        const paid    = new Date(d.UF_DATE_PAY_1C.substring(0, 10));
+        const diff = Math.round((paid - created) / 86400000);
+        if (diff >= 0) dealCycle = diff;
+      }
+
       participants.push({
         id: did,
         title: d.TITLE || '—',
@@ -315,14 +346,24 @@ async function buildParticipants(weekIndex) {
         participant: contactName,
         company: companyName,
         companyId: coId,
+        clientType,
         amount: opp,
         date: modDisplayDate,
         dateEnd: modDisplayDateEnd,
+        moduleDuration,
         moduleDateStart: mod.date_start,
         moduleDateEnd: mod.date_end,
         manager,
-        hadPrevTraining: false,
-        prevTrainingDate: '',
+        dealCycle,
+        hadPrevTraining: (() => {
+          const history = contactTrainingDeals.get(contactId) || [];
+          return history.some(t => t.id !== did);
+        })(),
+        prevTrainingDate: (() => {
+          const history = contactTrainingDeals.get(contactId) || [];
+          const others = history.filter(t => t.id !== did).map(t => t.payDate).sort();
+          return others.length ? others[others.length - 1] : '';
+        })(),
         stage: stageLabel,
         isPaid,
         format: detectFormat(d.TITLE, cats[String(d.CATEGORY_ID || '0')], d.ID),
