@@ -3,11 +3,12 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getCacheAt } from '@rshu/data-service/agg-cache.js';
+// Единые бизнес-правила: отчётный год и КОМ-признак
+import { isKomDeal, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 3001;
 const DS_CACHE = path.resolve(__dirname, '../../data-service/cache');
-const YEAR = 2026; // Основной дашборд — только 2026
 // Для source-report используется yearFrom/yearTo
 
 // Только эти воронки участвуют в подсчётах
@@ -1004,7 +1005,7 @@ app.post('/api/refresh', (req, res) => {
 
 // API: месячный отчёт по новым правилам (вкладка Апрель)
 app.get('/api/month-report', (req, res) => {
-  const year = parseInt(req.query.year) || 2026;
+  const year = parseInt(req.query.year) || YEAR;
   const month = parseInt(req.query.month) || 4;
   if (!dataState.ready) {
     return res.json({ error: 'Data not loaded', ready: false });
@@ -1468,7 +1469,8 @@ app.get('/api/product-ranking', async (req, res) => {
 
 // ===== API: Рейтинг продуктов с начала года (Live B24) =====
 app.get('/api/product-ranking-year', async (req, res) => {
-  const WEBHOOK = 'https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/';
+  const WEBHOOK = process.env.BITRIX_BASE;
+  if (!WEBHOOK) return res.status(503).json({ error: 'BITRIX_BASE не задан в .env' });
   const fmtNames = { '19042467': 'Очный', '19042468': 'Онлайн', '19042469': 'СДО', '19042498': 'КОМ' };
   
   async function b24(method, params) {
@@ -1494,13 +1496,15 @@ app.get('/api/product-ranking-year', async (req, res) => {
   }
   
   try {
-    // Запрашиваем все оплаченные сделки Sale с начала 2026 года
+    // Запрашиваем все оплаченные сделки Sale с начала отчётного года
     const deals = await b24All('crm.deal.list', {
       'filter[CATEGORY_ID]': '0',
       'filter[>OPPORTUNITY]': '0',
-      'filter[>=UF_DATE_PAY_1C]': '2026-01-01',
-      'filter[<=UF_DATE_PAY_1C]': '2026-12-31',
-      'select[]': ['ID', 'TITLE', 'OPPORTUNITY', 'UF_DATE_PAY_1C', 'UF_FORMAT', 'UF_CRM_1744273716729', 'UF_CRM_1697096074', 'CATEGORY_ID', 'CLOSED', 'STAGE_SEMANTIC_ID', 'DATE_CREATE']
+      'filter[>=UF_DATE_PAY_1C]': YEAR + '-01-01',
+      'filter[<=UF_DATE_PAY_1C]': YEAR + '-12-31',
+      'select[]': ['ID', 'TITLE', 'OPPORTUNITY', 'UF_DATE_PAY_1C', 'UF_FORMAT', 'UF_CRM_1744273716729', 'UF_CRM_1697096074', 'CATEGORY_ID', 'CLOSED', 'STAGE_SEMANTIC_ID', 'DATE_CREATE',
+        // поля для канонического isKomDeal (deal-rules.js)
+        'UF_CRM_1683882427069', 'UF_CRM_1498466811', 'UF_CRM_1765896709800']
     });
     
     // Фильтр: только WON + с суммой
@@ -1540,7 +1544,7 @@ app.get('/api/product-ranking-year', async (req, res) => {
       const fmtId = String(d.UF_FORMAT || '');
       const fmtName = fmtNames[fmtId] || 'Другой';
       const naprav = String(d.UF_CRM_1744273716729 || '').trim();
-      const isKom = naprav === 'Корпоративное обучение' || fmtId === '19042498';
+      const isKom = isKomDeal(d) || naprav === 'Корпоративное обучение';
       
       allItems.push({
         id: d.ID,
@@ -1584,8 +1588,8 @@ app.get('/api/product-ranking-year', async (req, res) => {
     const byCnt = [...mainRanking].sort((a,b) => b.cnt - a.cnt || b.rev - a.rev).slice(0,20);
     
     res.json({
-      yearFrom: 2026,
-      yearTo: 2026,
+      yearFrom: YEAR,
+      yearTo: YEAR,
       total_all: allItems.length,
       main: { count: main.length, revenue: Math.round(main.reduce((s,d) => s + d.summa, 0)), byRev, byCnt },
       ilp: { count: ilp.length, revenue: Math.round(ilp.reduce((s,d) => s + d.summa, 0)), items: group(ilp) },

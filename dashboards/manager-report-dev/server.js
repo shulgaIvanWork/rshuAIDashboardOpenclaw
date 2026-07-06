@@ -3,6 +3,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
+// Единые бизнес-правила
+import { MIN_OPP, VALID_CATS, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DS_CACHE = path.resolve(__dirname, '../../data-service/cache');
@@ -39,10 +41,6 @@ function parseDT(s) {
 function cleanStage(sid) {
   return (sid || '').replace(/^C\d+:/, '');
 }
-
-const MIN_OPP = 11;
-const VALID_CATS = new Set([0, 8, 19]);
-const YEAR = 2026;
 
 const STAGE_RANK = {
   'NEW': 0, 'UC_1YW3V2': 1, 'UC_STZB49': 2, 'UC_838R2R': 3,
@@ -137,7 +135,7 @@ function calcManagers(deals, dicts, fromDate, toDate) {
     return mgrData[name];
   }
 
-  const YEAR_START = new Date(2026, 0, 1);
+  const YEAR_START = new Date(YEAR, 0, 1);
 
   for (const d of deals) {
     const cat = parseInt(d.CATEGORY_ID) || 0;

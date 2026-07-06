@@ -3,6 +3,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
+// Единые бизнес-правила: КОМ-признак, «настоящая оплата», отчётный год
+import { isKomDeal, isPaidDeal, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -72,15 +74,6 @@ app.get('/api/artifacts', async (req, res) => {
       .filter(d => !validCats.has(String(d.CATEGORY_ID)) && (parseFloat(d.OPPORTUNITY) || 0) > 0)
       .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, date: d.UF_DATE_PAY_1C, cat: d.CATEGORY_ID, sem: d.STAGE_SEMANTIC_ID }));
 
-    function isKomDeal(d) {
-      if (String(d.CATEGORY_ID) === '19') return true;
-      if (d.UF_CRM_1683882427069 === 'Y' || d.UF_CRM_1683882427069 === '1') return true;
-      if (String(d.UF_FORMAT) === '19042498') return true;
-      const dir = d.UF_CRM_1498466811;
-      if (dir && (Array.isArray(dir) ? dir.includes('1906') : String(dir) === '1906')) return true;
-      if (String(d.UF_CRM_1765896709800 || '') === '34765') return true;
-      return false;
-    }
     const komInPresale = deals
       .filter(d => String(d.CATEGORY_ID) === '8' && isKomDeal(d) && d.STAGE_SEMANTIC_ID !== 'S')
       .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, sem: d.STAGE_SEMANTIC_ID, stage: d.STAGE_ID }));
@@ -188,7 +181,7 @@ async function buildParticipants(weekIndex) {
     const [d1, d2] = parts.map(s => s.trim());
     const [dd1, mm1] = d1.split('.');
     const [dd2, mm2] = d2.split('.');
-    const y = 2026;
+    const y = YEAR;
     const m1 = parseInt(mm1), d1n = parseInt(dd1);
     const m2 = parseInt(mm2), d2n = parseInt(dd2);
     const start = new Date(y, m1 - 1, d1n);
@@ -245,12 +238,11 @@ async function buildParticipants(weekIndex) {
     return isRealTraining(d.TITLE, d.ID);
   });
 
-  // Build map: contactId → qualifying paid deals (sale funnel, >11₽, paid via 1C)
+  // Build map: contactId → qualifying paid deals (sale funnel, реальная оплата по правилам deal-rules)
   const contactTrainingDeals = new Map();
   for (const d of deals) {
     if (String(d.CATEGORY_ID) !== '0') continue;
-    if ((parseFloat(d.OPPORTUNITY) || 0) <= 11) continue;
-    if (!d.UF_DATE_PAY_1C) continue;
+    if (!isPaidDeal(d)) continue;
     const ccinfo2 = cc[d.ID] || {};
     const cid = String(ccinfo2.CONTACT_ID || d.CONTACT_ID || '0');
     if (cid === '0') continue;

@@ -1,64 +1,7 @@
-// Автоопределение пути — работает и самостоятельным сайтом, и как sub-app
-var _p = window.location.pathname;
-var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
-window.BASE_PATH = _m ? '/' + _m[1] : '';
+// api(), fmt(), escapeHtml(), initTableSort() — в /shared.js (общие для всех дашбордов)
 
 let dataCache = null;
 let currentTab = 'participants';
-
-// ── API ───────────────────────────────────────────────────────────────────────
-
-async function api(path) {
-  var url = (window.BASE_PATH || '') + path;
-  var controller = new AbortController();
-  var timeout = setTimeout(function() { controller.abort(); }, 30000);
-  try {
-    const r = await fetch(url, { signal: controller.signal });
-    if (r.redirected || r.url.endsWith('/login')) { window.location.href = '/login'; throw new Error('redirect'); }
-    var text = await r.text();
-    if (text.startsWith('<!DOCTYPE')) { window.location.href = '/login'; throw new Error('redirect'); }
-    return JSON.parse(text);
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmt(n) {
-  if (n === undefined || n === null || n === 0) return '0';
-  return Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-}
-
-function escapeHtml(s) {
-  return s ? String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
-}
-
-function initTableSort(tableId) {
-  const tbl = document.getElementById(tableId);
-  if (!tbl) return;
-  const ths = tbl.querySelectorAll('thead th.sort');
-  ths.forEach(th => {
-    th.addEventListener('click', () => {
-      const col = parseInt(th.dataset.col);
-      const tbody = tbl.querySelector('tbody');
-      if (!tbody) return;
-      const rows = Array.from(tbody.querySelectorAll('tr'));
-      const isAsc = th.classList.contains('asc');
-      ths.forEach(h => h.classList.remove('asc', 'desc'));
-      th.classList.add(isAsc ? 'desc' : 'asc');
-      rows.sort((a, b) => {
-        const va = (a.cells[col]?.innerText || '').trim();
-        const vb = (b.cells[col]?.innerText || '').trim();
-        const na = parseFloat(va.replace(/[^\d\-.,]/g, '').replace(',', ''));
-        const nb = parseFloat(vb.replace(/[^\d\-.,]/g, '').replace(',', ''));
-        if (!isNaN(na) && !isNaN(nb)) return isAsc ? na - nb : nb - na;
-        return isAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-      });
-      rows.forEach(r => tbody.appendChild(r));
-    });
-  });
-}
 
 // ── Tab switching ─────────────────────────────────────────────────────────────
 

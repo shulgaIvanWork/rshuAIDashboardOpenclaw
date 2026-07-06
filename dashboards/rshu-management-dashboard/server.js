@@ -4,6 +4,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
+// Единые бизнес-правила (isKomDeal, границы сумм, источник «Регистрация»)
+import { isKomDeal, MIN_OPP, REG_SRC_ID, VALID_CATS } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -34,8 +36,6 @@ app.get('/api/data', async (req, res) => {
 app.get('/api/reg-funnel', async (req, res) => {
   try {
     const { from, to } = req.query;
-    const REG_SRC_ID = '79641902890';
-    const VALID_CATS = new Set([0, 8, 19]);
 
     const deals = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
 
@@ -57,7 +57,6 @@ app.get('/api/reg-funnel', async (req, res) => {
       });
     }
 
-    const MIN_OPP = 11.0;
     function getOpp(d) { return parseFloat(d.OPPORTUNITY || 0); }
     function getPayDate(d) {
       const s = d.UF_DATE_PAY_1C || d.CLOSEDATE;
@@ -166,18 +165,9 @@ app.get('/api/artifacts', async (req, res) => {
       .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, sem: d.STAGE_SEMANTIC_ID, cat: d.CATEGORY_ID, manager: d.ASSIGNED_BY_ID, created: d.DATE_CREATE }));
 
     const formatRule2 = withPay
-      .filter(d => (parseFloat(d.OPPORTUNITY || 0) >= 11) && ['0','8','19'].includes(String(d.CATEGORY_ID)) && !d.UF_FORMAT)
+      .filter(d => (parseFloat(d.OPPORTUNITY || 0) >= MIN_OPP) && VALID_CATS.has(parseInt(d.CATEGORY_ID || 0)) && !d.UF_FORMAT)
       .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, date: d.UF_DATE_PAY_1C, cat: d.CATEGORY_ID }));
 
-    function isKomDeal(d) {
-      if (String(d.CATEGORY_ID) === '19') return true;
-      if (d.UF_CRM_1683882427069 === 'Y' || d.UF_CRM_1683882427069 === '1') return true;
-      if (String(d.UF_FORMAT) === '19042498') return true;
-      const dir = d.UF_CRM_1498466811;
-      if (dir && (Array.isArray(dir) ? dir.includes('1906') : String(dir) === '1906')) return true;
-      if (String(d.UF_CRM_1765896709800) === '34765') return true;
-      return false;
-    }
     const komInPresale = deals
       .filter(d => String(d.CATEGORY_ID) === '8' && isKomDeal(d) && d.STAGE_SEMANTIC_ID !== 'S')
       .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, sem: d.STAGE_SEMANTIC_ID, stage: d.STAGE_ID }));
@@ -204,12 +194,12 @@ app.get('/api/artifacts', async (req, res) => {
     const noTypeEdu = withPay
       .filter(d => {
         try { if (parseInt(d.UF_DATE_PAY_1C.substring(0, 4)) !== new Date().getFullYear()) return false; } catch { return false; }
-        return (parseFloat(d.OPPORTUNITY) || 0) >= 11 && validCats.has(String(d.CATEGORY_ID)) && !String(d.UF_CRM_1765896709800 || '').trim();
+        return (parseFloat(d.OPPORTUNITY) || 0) >= MIN_OPP && validCats.has(String(d.CATEGORY_ID)) && !String(d.UF_CRM_1765896709800 || '').trim();
       })
       .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, pay: d.UF_DATE_PAY_1C }));
 
     const autopayDeals = withPay
-      .filter(d => String(d.UF_CRM_1765896709800 || '') !== '34765' && !String(d.UF_CRM_1753272713011 || '') && String(d.SOURCE_ID || '') === '79641902890' && (parseFloat(d.OPPORTUNITY) || 0) >= 11 && validCats.has(String(d.CATEGORY_ID)))
+      .filter(d => String(d.UF_CRM_1765896709800 || '') !== '34765' && !String(d.UF_CRM_1753272713011 || '') && String(d.SOURCE_ID || '') === REG_SRC_ID && (parseFloat(d.OPPORTUNITY) || 0) >= MIN_OPP && validCats.has(String(d.CATEGORY_ID)))
       .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, pay: d.UF_DATE_PAY_1C }));
 
     const sum = (arr) => arr.reduce((a, b) => a + (b.sum || 0), 0);

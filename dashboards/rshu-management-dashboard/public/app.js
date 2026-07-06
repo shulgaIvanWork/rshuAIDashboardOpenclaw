@@ -1,4 +1,4 @@
-function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+// escapeHtml(), api(), fmt(), fmtPct(), initTableSort() — в /shared.js
 
 function loadArtifacts() {
   fetch((window.BASE_PATH || '') + '/api/artifacts').then(function(r) {
@@ -33,11 +33,6 @@ function loadArtifacts() {
   }).catch(function() {});
 }
 
-// Автоопределение пути - работает и самостоятельным сайтом, и как sub-app
-var _p = window.location.pathname;
-var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
-window.BASE_PATH = _m ? '/' + _m[1] : '';
-
 // Защита от падения, если CDN с Chart.js не загрузился
 if (typeof Chart !== 'undefined' && Chart.register && typeof ChartDataLabels !== 'undefined') {
   try { Chart.register(ChartDataLabels); } catch(e) {}
@@ -65,21 +60,6 @@ function weeksInRange(weeks, dateFrom, dateTo) {
   });
 }
 
-async function api(path) {
-  var url = (typeof window.BASE_PATH !== 'undefined' ? (window.BASE_PATH || '') : '') + path;
-  var controller = new AbortController();
-  var timeout = setTimeout(function() { controller.abort(); }, 30000); // 30s timeout
-  try {
-    const r = await fetch(url, { signal: controller.signal });
-    if (r.redirected || r.url.endsWith('/login')) { window.location.href = '/login'; throw new Error('redirect'); }
-    var text = await r.text();
-    if (text.startsWith('<!DOCTYPE')) { window.location.href = '/login'; throw new Error('redirect'); }
-    return JSON.parse(text);
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 async function loadAll() {
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
@@ -98,7 +78,7 @@ async function loadAll() {
       dateEl.textContent = '(Данные на: ' + dtStr + ')';
     }
 
-    document.getElementById('dateFrom').value = '2026-01-01';
+    document.getElementById('dateFrom').value = (d.year || new Date().getFullYear()) + '-01-01';
     var todayStr = new Date().toISOString().substring(0, 10);
     document.getElementById('dateTo').value = todayStr;
     dateFromCache = document.getElementById('dateFrom').value;
@@ -346,47 +326,6 @@ function buildFilteredData(orig, filteredWeeks, prevWeeks) {
   out.edu_ytd = Object.assign({ period: 'YTD' }, edu_ytd);
 
   return out;
-}
-
-function fmt(n) {
-  if (n === undefined || n === null || n === 0) return '0';
-  return Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-}
-
-function fmtPct(n) {
-  if (n === undefined || n === null) return '0.0';
-  return Number(n).toFixed(1);
-}
-
-// === Сортировка таблиц (как в Excel) ===
-function initTableSort() {
-  document.querySelectorAll('table.sortable').forEach(tbl => {
-    const ths = tbl.querySelectorAll('thead th.sort');
-    ths.forEach(th => {
-      th.addEventListener('click', () => {
-        const col = parseInt(th.dataset.col);
-        const tbody = tbl.querySelector('tbody');
-        if (!tbody) return;
-        const rows = Array.from(tbody.querySelectorAll('tr:not(.total-row)'));
-        const totalRows = Array.from(tbody.querySelectorAll('tr.total-row'));
-        const isAsc = th.classList.contains('asc');
-        ths.forEach(h => h.classList.remove('asc', 'desc'));
-        th.classList.add(isAsc ? 'desc' : 'asc');
-        rows.sort((a, b) => {
-          const va = (a.cells[col]?.innerText || '').trim();
-          const vb = (b.cells[col]?.innerText || '').trim();
-          // Попробуем распарсить как число
-          const na = parseFloat(va.replace(/[^\d\-.,]/g, '').replace(',', ''));
-          const nb = parseFloat(vb.replace(/[^\d\-.,]/g, '').replace(',', ''));
-          if (!isNaN(na) && !isNaN(nb)) {
-            return isAsc ? na - nb : nb - na;
-          }
-          return isAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-        });
-        [...totalRows, ...rows].forEach(r => tbody.appendChild(r));
-      });
-    });
-  });
 }
 
 async function renderPageMainNew(d) {

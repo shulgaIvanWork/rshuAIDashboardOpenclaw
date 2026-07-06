@@ -32,28 +32,12 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_SERVICE_CACHE = path.join(__dirname, 'cache');
 
-const YEAR = 2026;
-const MIN_OPP = 11.0;
-const KOM_UF_FLAG      = 'UF_CRM_1683882427069';
-const KOM_FORMAT_ID    = '19042498';
-const KOM_DIRECTION_ID = '1906';
-const KOM_CATEGORY     = 19;
-const KOM_TRAINING_ID  = '34765';
-const VALID_CATS = new Set([0, 8, 19]);
-const REG_SRC_ID = '79641902890';
-const MBA_DIRECTION_IDS = new Set(['1917', '35288']);
-
-const MQL_SALE_STAGES = new Set(['UC_4RJOR4','DETAILS','PROPOSAL','2','6','WON','LOSE',
-  'UC_F2YC3N','UC_VKPN0N','UC_W6SCHG','UC_670ME2']);
-const NOT_MQL_SALE = new Set(['NEW','UC_1YW3V2','UC_STZB49','UC_838R2R']);
-const INTERNAL_SOURCE_IDS = new Set([
-  '79641902894','79641902977','79641902926','UC_7G65N9','79641902903','RECOMMENDATION',
-]);
-const EDU_TYPE_MAP = { '34699':'Повышение квалификации','34700':'Проф. переподготовка','34765':'Корпоративное обучение' };
-const FORMAT_MAP  = {
-  '19042467':'Очный','19042468':'Онлайн','19042469':'Видеокурс',
-  '19042498':'Корпоративное обучение','19042495':'MMBA','19042497':'Вечерний','19042496':'ГК',
-};
+// Все бизнес-константы и правила — в едином модуле deal-rules.js
+import {
+  YEAR, MIN_OPP, VALID_CATS, REG_SRC_ID, MBA_DIRECTION_IDS,
+  MQL_SALE_STAGES, NOT_MQL_SALE, EDU_TYPE_MAP,
+  isKomDeal, isInternalSource, detectFormat, detectB2b,
+} from './lib/deal-rules.js';
 
 // ── Даты ─────────────────────────────────────────────────────────────────────
 
@@ -109,18 +93,6 @@ function weekLabel(year, week, today) {
 
 // ── Бизнес-логика ─────────────────────────────────────────────────────────────
 
-function isKomDeal(x) {
-  if (x[KOM_UF_FLAG] === 'Y' || x[KOM_UF_FLAG] === '1' || x[KOM_UF_FLAG] === true) return true;
-  if (String(x.UF_FORMAT || '') === KOM_FORMAT_ID) return true;
-  const dir = x.UF_CRM_1498466811 || [];
-  if ((Array.isArray(dir) ? dir : [dir]).map(String).includes(KOM_DIRECTION_ID)) return true;
-  if (parseInt(x.CATEGORY_ID || 0) === KOM_CATEGORY) return true;
-  if (String(x.UF_CRM_1765896709800 || '') === KOM_TRAINING_ID) return true;
-  return false;
-}
-
-function isInternalSource(srcId) { return srcId ? INTERNAL_SOURCE_IDS.has(String(srcId)) : false; }
-
 const RE_COPY  = /^КОПИЯ для статистики:\s*/;
 const RE_KOMPFX = /^КОМ[.,\s]*/;
 const RE_GIFT  = /\bПодарок[_:\s]*/g;
@@ -138,21 +110,6 @@ function normalizeProduct(title) {
   t = t.replace(RE_CITY,'').replace(RE_DATE2,'').replace(RE_DATE,'').replace(RE_RANGE,'');
   t = t.replace(RE_PDATE,'').replace(RE_SDO,'').replace(/_+/g,' ').replace(/\s+/g,' ').trim();
   return t.replace(/^[ .,:;"«»()\-–—]+|[ .,:;"«»()\-–—]+$/g,'') || title;
-}
-
-function detectFormat(title, ufFormat) {
-  if (ufFormat && FORMAT_MAP[String(ufFormat)]) return FORMAT_MAP[String(ufFormat)];
-  const t = (title||'').toLowerCase();
-  if (t.includes('(сдо)') || t.includes(' сдо') || t.endsWith('сдо')) return 'Видеокурс';
-  if (t.includes('онлайн')) return 'Онлайн';
-  if (t.includes('в г.') || t.includes('москва')) return 'Очный';
-  return 'Онлайн';
-}
-
-function detectB2b(x) {
-  const cid = x.COMPANY_ID;
-  if (parseInt(x.CATEGORY_ID||0) === 19) return 'B2B';
-  return (cid && String(cid) !== '0') ? 'B2B' : 'B2C';
 }
 
 function isPaid(r) { return r.OPP >= MIN_OPP && r.PAY_DT !== null; }

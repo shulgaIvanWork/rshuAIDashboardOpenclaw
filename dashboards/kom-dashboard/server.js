@@ -3,28 +3,15 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
+// Единые бизнес-правила (раньше здесь была локальная копия isKomDeal
+// БЕЗ проверки направления 1906 — она расходилась с analyze.js)
+import { isKomDeal, MIN_OPP, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DS_CACHE = path.resolve(__dirname, '../../data-service/cache');
 
 const app = express();
 app.use(express.json());
-
-// ── KOM detection (mirrors analyze.js logic) ──────────────────────────────────
-const KOM_UF_FLAG    = 'UF_CRM_1683882427069';
-const KOM_FORMAT_ID  = '19042498';
-const KOM_CATEGORY   = 19;
-const KOM_TRAINING_ID = '34765';
-const MIN_OPP = 11.0;
-const YEAR = 2026;
-
-function isKomDeal(x) {
-  if (x[KOM_UF_FLAG] === 'Y' || x[KOM_UF_FLAG] === '1' || x[KOM_UF_FLAG] === true) return true;
-  if (String(x.UF_FORMAT || '') === KOM_FORMAT_ID) return true;
-  if (parseInt(x.CATEGORY_ID || 0) === KOM_CATEGORY) return true;
-  if (String(x.UF_CRM_1765896709800 || '') === KOM_TRAINING_ID) return true;
-  return false;
-}
 
 const MONTH_NAMES = ['','Январь','Февраль','Март','Апрель','Май','Июнь',
                      'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];

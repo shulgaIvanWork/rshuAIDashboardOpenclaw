@@ -6,6 +6,8 @@ import https from 'https';
 import fs from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
+// Единые бизнес-правила (КОМ-признак, воронки, отчётный год)
+import { isKomDeal, VALID_CATS, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DS_CACHE = path.resolve(__dirname, '../../data-service/cache');
@@ -314,10 +316,7 @@ app.get('/api/export-analysis', async (req, res) => {
     const users   = dicts.users   || {};
     const sources = dicts.sources || {};
 
-    const VALID_CATS = new Set([0, 8, 19]);
-    const YEAR = 2026;
-
-    // { "2026-01": { mgrId: { incoming, outgoing, kom, other, sources: { srcName: amount } } } }
+    // { "<год>-01": { mgrId: { incoming, outgoing, kom, other, sources: { srcName: amount } } } }
     const byMonthMgr = {};
 
     for (const d of deals) {
@@ -332,7 +331,7 @@ app.get('/api/export-analysis', async (req, res) => {
       const amount   = parseFloat(d.OPPORTUNITY || 0);
       const srcId    = String(d.SOURCE_ID || '');
       const srcName  = sources[srcId] || srcId || 'Не указан';
-      const isKom    = parseInt(d.CATEGORY_ID) === 19 || d.UF_FORMAT === '19042498';
+      const isKom    = isKomDeal(d);
       const isOut    = OUTGOING_SOURCE_IDS.has(srcId);
 
       if (!byMonthMgr[monthKey]) byMonthMgr[monthKey] = {};
@@ -479,9 +478,6 @@ app.get('/api/motivation-calc', async (req, res) => {
     const deals = JSON.parse(dealsRaw);
     const users = JSON.parse(dictsRaw).users || {};
     const plans = JSON.parse(plansRaw);
-
-    const VALID_CATS = new Set([0, 8, 19]);
-    const YEAR = 2026;
 
     // Факт: WON-сделки, группируем по менеджеру + месяц оплаты (UF_DATE_PAY_1C)
     const byMgrMonth = {};
