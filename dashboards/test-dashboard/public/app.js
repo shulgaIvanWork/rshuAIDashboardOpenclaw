@@ -655,6 +655,7 @@ document.getElementById('tabs').addEventListener('click', e => {
     if (contentEl && contentEl.innerHTML.indexOf('loading') !== -1) loadForecast();
   }
   if (tab.dataset.tab === 'products' && !productsData) loadProducts();
+  if (tab.dataset.tab === 'avg-check') loadAvgCheck();
 });
 
 // ============ Мотивация: фильтр по месяцам ============
@@ -674,6 +675,40 @@ document.getElementById('plansEditorToggle').addEventListener('click', () => {
   body.style.display  = open ? 'block' : 'none';
   arrow.textContent   = open ? '▲' : '▼';
 });
+
+// ============ СРЕДНИЙ ЧЕК ПО НЕДЕЛЯМ ============
+let avgCheckChart = null;
+
+async function loadAvgCheck() {
+  try {
+    const d = await safeFetch(BASE + '/data/new');
+    const weeks = d.weeks || [];
+    const labels = weeks.map(function(w) { return w.label_dates || ('Нед.' + w.week); });
+    const avOom = weeks.map(function(w) { return w.oom_avg_check || 0; });
+    const avKom = weeks.map(function(w) { return w.kom_avg_check || 0; });
+    const canvas = document.getElementById('avgCheckChart');
+    if (!canvas) return;
+    if (avgCheckChart) { avgCheckChart.destroy(); avgCheckChart = null; }
+    avgCheckChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'ООМ', data: avOom, borderColor: '#00bcd4', backgroundColor: 'rgba(0,188,212,.08)', tension: 0.3, fill: true },
+          { label: 'КОМ', data: avKom, borderColor: '#9C27B0', backgroundColor: 'rgba(156,39,176,.06)', tension: 0.3, fill: true }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' }, datalabels: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return v.toLocaleString('ru-RU') + ' ₽'; } } } }
+      }
+    });
+  } catch(e) {
+    var el = document.getElementById('avgCheckChart');
+    if (el && el.parentNode) el.parentNode.innerHTML = '<div class="error-state">Ошибка загрузки: ' + e.message + '</div>';
+  }
+}
 
 // ============ INIT ============
 loadAll();

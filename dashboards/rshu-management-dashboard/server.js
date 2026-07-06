@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила (isKomDeal, границы сумм, источник «Регистрация»)
 import { isKomDeal, MIN_OPP, REG_SRC_ID, VALID_CATS } from '@rshu/data-service/lib/deal-rules.js';
+import { enrichForKpi, calcPeriodKpi } from '@rshu/data-service/lib/period-kpi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -29,6 +30,36 @@ app.get('/api/data', async (req, res) => {
   } catch (e) {
     console.error('/api/data error:', e.message);
     res.status(503).json({ error: e.message });
+  }
+});
+
+// KPI за точный период дат + предыдущий период той же длины
+app.get('/api/kpi', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from и to обязательны (YYYY-MM-DD)' });
+    const dtFrom = new Date(from), dtTo = new Date(to);
+    if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
+      return res.status(400).json({ error: 'некорректный диапазон дат' });
+    }
+
+    const rows = enrichForKpi(JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8')));
+
+    // Предыдущий период той же длины, вплотную к текущему
+    const lenMs = dtTo - dtFrom + 86400000;
+    const ppTo   = new Date(dtFrom.getTime() - 86400000);
+    const ppFrom = new Date(dtFrom.getTime() - lenMs);
+
+    const iso = d => d.toISOString().substring(0, 10);
+    res.json({
+      period:      { from, to },
+      prev_period: { from: iso(ppFrom), to: iso(ppTo) },
+      current:  calcPeriodKpi(rows, dtFrom, dtTo),
+      previous: calcPeriodKpi(rows, ppFrom, ppTo),
+    });
+  } catch (e) {
+    console.error('/api/kpi error:', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 

@@ -43,23 +43,6 @@ let dataCache = null;
 let dateFromCache = null;
 let dateToCache = null;
 
-// --- Date helpers ---
-function getWeekNumber(d) {
-  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return { year: d.getUTCFullYear(), week: weekNo };
-}
-function weeksInRange(weeks, dateFrom, dateTo) {
-  if (!dateFrom || !dateTo) return weeks;
-  var wnFrom = getWeekNumber(new Date(dateFrom)).week;
-  var wnTo = getWeekNumber(new Date(dateTo)).week;
-  return weeks.filter(function(w) {
-    return w.week >= wnFrom && w.week <= wnTo;
-  });
-}
-
 async function loadAll() {
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
@@ -99,30 +82,16 @@ async function renderFilteredData() {
   dateFromCache = dateFrom;
   dateToCache = dateTo;
 
-  // Фильтруем недели по диапазону
-  var allWeeks = d.weeks || [];
-  var filtered = allWeeks;
-  if (dateFrom && dateTo) {
-    filtered = weeksInRange(allWeeks, dateFrom, dateTo);
-  }
+  // Недельные графики и таблица всегда показывают полный год — фильтр их не трогает.
+  // KPI-карточки и донаты считаются сервером точно по дням выбранного периода.
+  var filteredData = JSON.parse(JSON.stringify(d));
 
-  // Пересчитываем KPI из отфильтрованных недель
-  // Предыдущий период: те же N недель до выбранного диапазона
-  var prevFiltered = [];
-  if (filtered.length > 0) {
-    var firstIdx = allWeeks.indexOf(filtered[0]);
-    if (firstIdx > 0) {
-      // Предыдущий период внутри того же года
-      var prevStart = Math.max(0, firstIdx - filtered.length);
-      prevFiltered = allWeeks.slice(prevStart, firstIdx);
-    } else {
-      // Период начинается с первой недели — берём те же недели из предыдущего года
-      var prevYearWeeks = d.prev_weeks || [];
-      var filteredWkNums = new Set(filtered.map(function(w) { return w.week; }));
-      prevFiltered = prevYearWeeks.filter(function(w) { return filteredWkNums.has(w.week); });
-    }
+  if (dateFrom && dateTo) {
+    try {
+      var kpi = await api('/api/kpi?from=' + dateFrom + '&to=' + dateTo);
+      applyPeriodKpi(filteredData, kpi);
+    } catch (e) { console.error('/api/kpi error:', e); }
   }
-  var filteredData = buildFilteredData(d, filtered, prevFiltered);
 
   // Воронка регистраций — фильтруется по DATE_CREATE через отдельный endpoint
   try {
@@ -150,183 +119,48 @@ async function renderFilteredData() {
 
   // Обновляем info
   var infoEl = document.getElementById('filterInfo');
-  if (filtered.length === allWeeks.length) {
-    infoEl.textContent = 'все недели (' + allWeeks.length + ')';
-  } else {
-    infoEl.textContent = 'недели ' + String(filtered[0]?.week||'').padStart(2,'0') + '-' + String(filtered[filtered.length-1]?.week||'').padStart(2,'0') + ' (' + filtered.length + ' из ' + allWeeks.length + ')';
+  if (infoEl && dateFrom && dateTo) {
+    var days = Math.round((new Date(dateTo) - new Date(dateFrom)) / 86400000) + 1;
+    infoEl.textContent = 'период: ' + days + ' дн. (пред.: ' + (filteredData.pp && filteredData.pp.label || '—') + ')';
   }
 
   renderPageMainNew(filteredData);
 }
 
-function buildFilteredData(orig, filteredWeeks, prevWeeks) {
-  prevWeeks = prevWeeks || [];
-  function sumPrev(f) { return prevWeeks.reduce(function(s, w) { return s + (w[f] || 0); }, 0); }
-  var out = JSON.parse(JSON.stringify(orig));
-  out.weeks = filteredWeeks;
-
-  function sumField(f) {
-    return filteredWeeks.reduce(function(s, w) { return s + (w[f] || 0); }, 0);
-  }
-
-  // Общий YTD
-  var ytd = { postupleniya: sumField('postupleniya'), won_relevant_cnt: sumField('oplata') };
-  // Копируем все остальные поля из оригинала
-  var srcYtd = orig.ytd || {};
-  for (var k in srcYtd) {
-    if (ytd[k] === undefined) ytd[k] = srcYtd[k];
-  }
-  ytd.avg_check = ytd.won_relevant_cnt > 0 ? Math.round(ytd.postupleniya / ytd.won_relevant_cnt) : srcYtd.avg_check || 0;
-  out.ytd = ytd;
-
-  // ООМ YTD - берём из оригинала, переписываем только посчитанные поля
-  var oom_ytd = JSON.parse(JSON.stringify(orig.oom_ytd || {}));
-  oom_ytd.postupleniya = sumField('oom_postupleniya');
-  oom_ytd.won_relevant_cnt = sumField('oom_won_cnt');
-  oom_ytd.avg_check = oom_ytd.won_relevant_cnt > 0 ? Math.round(oom_ytd.postupleniya / oom_ytd.won_relevant_cnt) : oom_ytd.avg_check || 0;
-  out.oom_ytd = oom_ytd;
-
-  // КОМ YTD - берём из оригинала, переписываем только посчитанные поля
-  var kom_ytd = JSON.parse(JSON.stringify(orig.kom_ytd || {}));
-  kom_ytd.postupleniya = sumField('kom_postupleniya');
-  kom_ytd.won_relevant_cnt = sumField('kom_won_cnt');
-  kom_ytd.avg_check = kom_ytd.won_relevant_cnt > 0 ? Math.round(kom_ytd.postupleniya / kom_ytd.won_relevant_cnt) : kom_ytd.avg_check || 0;
-  out.kom_ytd = kom_ytd;
-
-  // cur = последняя неделя, prev = предпоследняя
-  var last = filteredWeeks[filteredWeeks.length - 1] || {};
-  var prev = filteredWeeks[filteredWeeks.length - 2] || {};
-  out.cur = { postupleniya: last.postupleniya || 0, won_relevant_cnt: last.oplata || 0 };
-  out.prev = { postupleniya: prev.postupleniya || 0, won_relevant_cnt: prev.oplata || 0 };
-  out.oom_cur = { postupleniya: last.oom_postupleniya || 0, won_relevant_cnt: last.oom_won_cnt || 0 };
-  out.oom_prev = { postupleniya: prev.oom_postupleniya || 0, won_relevant_cnt: prev.oom_won_cnt || 0 };
-  out.kom_cur = { postupleniya: last.kom_postupleniya || 0, won_relevant_cnt: last.kom_won_cnt || 0 };
-  out.kom_prev = { postupleniya: prev.kom_postupleniya || 0, won_relevant_cnt: prev.kom_won_cnt || 0 };
-  out.cur_week = last.week || orig.cur_week;
-  out.prev_week = prev.week || orig.prev_week;
-
-  // Лиды
-  out.leads_ytd = sumField('leads');
-  out.leads_cur = last.leads || 0;
-  out.leads_prev = prev.leads || 0;
-  out.oom_leads_ytd = sumField('oom_leads');
-  out.kom_leads_ytd = sumField('leads') - sumField('oom_leads');
-  out.qual_lead_ytd = sumField('mql');
-  out.oom_qual_lead_ytd = sumField('oom_mql');
-  out.kom_qual_lead_ytd = sumField('mql') - sumField('oom_mql');
-
-  // Медианный чек - взвешенный по количеству оплат в отфильтрованных неделях
-  var totPay = sumField('oplata');
-  if (totPay > 0) {
-    ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.median_check || 0) * (w.oplata || 0); }, 0) / totPay;
-    ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.avg_dur || 0) * (w.oplata || 0); }, 0) / totPay;
-  }
-  out.ytd = ytd;
-
-  // ООМ: пересчёт из понедельных полей
-  var oomPay = sumField('oom_won_cnt');
-  if (oomPay > 0) {
-    oom_ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.oom_median_check || 0) * (w.oom_won_cnt || 0); }, 0) / oomPay;
-    oom_ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.oom_avg_dur || 0) * (w.oom_won_cnt || 0); }, 0) / oomPay;
-  }
-  oom_ytd.lose_cnt = sumField('lost_cnt');
-  oom_ytd.won_relevant_cnt = oomPay;
-  oom_ytd.conv_deal_pct = (oomPay + oom_ytd.lose_cnt) > 0 ? (oomPay / (oomPay + oom_ytd.lose_cnt)) * 100 : 0;
-  out.oom_ytd = oom_ytd;
-
-  // КОМ: пересчёт из понедельных полей
-  var komPay = sumField('kom_won_cnt');
-  if (komPay > 0) {
-    kom_ytd.median_check = filteredWeeks.reduce(function(s, w) { return s + (w.kom_median_check || 0) * (w.kom_won_cnt || 0); }, 0) / komPay;
-    kom_ytd.avg_close_days_won = filteredWeeks.reduce(function(s, w) { return s + (w.kom_avg_dur || 0) * (w.kom_won_cnt || 0); }, 0) / komPay;
-  }
-  kom_ytd.lose_cnt = sumField('kom_lost_cnt');
-  kom_ytd.won_relevant_cnt = komPay;
-  kom_ytd.conv_deal_pct = (komPay + kom_ytd.lose_cnt) > 0 ? (komPay / (komPay + kom_ytd.lose_cnt)) * 100 : 0;
-  out.kom_ytd = kom_ytd;
-
-  // Предыдущий период
-  if (prevWeeks.length > 0) {
-    var ppTotPay = sumPrev('oplata');
-    var ppOomPay = sumPrev('oom_won_cnt');
-    var ppKomPay = sumPrev('kom_won_cnt');
-    out.pp = {
-      ytd: {
-        postupleniya: sumPrev('postupleniya'), won_relevant_cnt: ppTotPay,
-        avg_check: ppTotPay > 0 ? Math.round(sumPrev('postupleniya') / ppTotPay) : 0,
-        avg_close_days_won: ppTotPay > 0 ? prevWeeks.reduce(function(s,w){return s+(w.avg_dur||0)*(w.oplata||0);},0)/ppTotPay : 0
-      },
-      oom_ytd: {
-        postupleniya: sumPrev('oom_postupleniya'), won_relevant_cnt: ppOomPay,
-        avg_check: ppOomPay > 0 ? Math.round(sumPrev('oom_postupleniya') / ppOomPay) : 0,
-        avg_close_days_won: ppOomPay > 0 ? prevWeeks.reduce(function(s,w){return s+(w.oom_avg_dur||0)*(w.oom_won_cnt||0);},0)/ppOomPay : 0
-      },
-      kom_ytd: {
-        postupleniya: sumPrev('kom_postupleniya'), won_relevant_cnt: ppKomPay,
-        avg_check: ppKomPay > 0 ? Math.round(sumPrev('kom_postupleniya') / ppKomPay) : 0,
-        avg_close_days_won: ppKomPay > 0 ? prevWeeks.reduce(function(s,w){return s+(w.kom_avg_dur||0)*(w.kom_won_cnt||0);},0)/ppKomPay : 0
-      },
-      leads_ytd: sumPrev('leads'), qual_lead_ytd: sumPrev('mql'),
-      oom_leads_ytd: sumPrev('oom_leads'), oom_qual_lead_ytd: sumPrev('oom_mql'),
-      kom_leads_ytd: sumPrev('leads') - sumPrev('oom_leads'), kom_qual_lead_ytd: sumPrev('mql') - sumPrev('oom_mql'),
-      label: prevWeeks[0] ? (prevWeeks[0].label_dates + ' — ' + prevWeeks[prevWeeks.length-1].label_dates) : ''
+// Накладывает точные данные периода из /api/kpi поверх годовых агрегатов
+function applyPeriodKpi(out, kpi) {
+  var c = kpi.current, p = kpi.previous;
+  function block(t) {
+    return {
+      postupleniya: t.postupleniya, won_relevant_cnt: t.won_relevant_cnt,
+      avg_check: t.avg_check, avg_close_days_won: t.avg_close_days_won
     };
-  } else {
-    out.pp = null;
   }
+  out.ytd     = Object.assign({}, out.ytd,     block(c.total));
+  out.oom_ytd = Object.assign({}, out.oom_ytd, block(c.oom));
+  out.kom_ytd = Object.assign({}, out.kom_ytd, block(c.kom));
+  out.leads_ytd = c.total.leads;   out.qual_lead_ytd = c.total.mql;
+  out.oom_leads_ytd = c.oom.leads; out.oom_qual_lead_ytd = c.oom.mql;
+  out.kom_leads_ytd = c.kom.leads; out.kom_qual_lead_ytd = c.kom.mql;
 
-  // Форматы — пересчитываем из понедельных сумм
-  var fmtKeyMap = { fmt_oom: 'ООМ (Очное)', fmt_om: 'ОМ (Онлайн)', fmt_sdo: 'СДО', fmt_kom: 'КОМ' };
-  var fmt_ytd = {};
-  filteredWeeks.forEach(function(w) {
-    Object.keys(fmtKeyMap).forEach(function(f) {
-      var name = fmtKeyMap[f];
-      if (!fmt_ytd[name]) fmt_ytd[name] = { cnt: 0, sum: 0 };
-      fmt_ytd[name].sum += w[f] || 0;
-      fmt_ytd[name].cnt += w[f + '_cnt'] || 0;
-    });
-  });
-  out.fmt_ytd = Object.assign({ period: 'YTD' }, fmt_ytd);
+  function fmtD(s) { var p = s.split('-'); return p[2] + '.' + p[1] + '.' + p[0]; }
+  out.pp = {
+    ytd: block(p.total), oom_ytd: block(p.oom), kom_ytd: block(p.kom),
+    leads_ytd: p.total.leads, qual_lead_ytd: p.total.mql,
+    oom_leads_ytd: p.oom.leads, oom_qual_lead_ytd: p.oom.mql,
+    kom_leads_ytd: p.kom.leads, kom_qual_lead_ytd: p.kom.mql,
+    label: fmtD(kpi.prev_period.from) + ' — ' + fmtD(kpi.prev_period.to),
+    splits: p.splits || {}
+  };
 
-  // B2B/B2C — пересчитываем из понедельных
-  var btype = { B2B: { cnt: 0, sum: 0 }, B2C: { cnt: 0, sum: 0 } };
-  filteredWeeks.forEach(function(w) {
-    btype.B2B.cnt += w.btype_B2B_cnt || 0;
-    btype.B2B.sum += w.btype_B2B_sum || 0;
-    btype.B2C.cnt += w.btype_B2C_cnt || 0;
-    btype.B2C.sum += w.btype_B2C_sum || 0;
-  });
-  out.btype_ytd = Object.assign({ period: 'YTD' }, btype);
-
-  // Источники (внутренняя база vs маркетинг) — пересчитываем из понедельных
-  var srcIt = { cnt: sumField('src_internal_cnt'), sum: sumField('src_internal_sum') };
-  var srcMk = { cnt: sumField('src_mkt_cnt'), sum: sumField('src_mkt_sum') };
-  out.src_split_ytd = { period: 'YTD', internal: srcIt, marketing: srcMk };
-
-  // Регистрация — готовые данные из calc_reg_funnel, без пересчёта через недели
-  var regData = JSON.parse(JSON.stringify(orig.reg_ytd || {}));
-  if (Object.keys(regData).length > 0) {
-    // Поля уже заполнены calc_reg_funnel, используем как есть
-    regData.avg_check = regData.total_paid > 0 ? Math.round(regData.total_paid_sum / regData.total_paid) : 0;
-    regData.conv = regData.total > 0 ? parseFloat((regData.total_paid / regData.total * 100).toFixed(1)) : 0;
-    regData.lose_pct = regData.total > 0 ? parseFloat((regData.lose / regData.total * 100).toFixed(1)) : 0;
-  }
-  out.reg_ytd = regData;
-
-  // Тип обучения — пересчитываем из понедельных
-  var eduNameMap = { pk: 'Повышение квалификации', pp: 'Проф. переподготовка', ko: 'Корпоративное обучение' };
-  var edu_ytd = {};
-  Object.keys(eduNameMap).forEach(function(nk) {
-    var name = eduNameMap[nk];
-    var cnt = sumField('edu_' + nk + '_cnt');
-    var sum = sumField('edu_' + nk + '_sum');
-    if (cnt > 0 || sum > 0) edu_ytd[name] = { cnt: cnt, sum: sum };
-    else edu_ytd[name] = { cnt: 0, sum: 0 };
-  });
-  out.edu_ytd = Object.assign({ period: 'YTD' }, edu_ytd);
-
-  return out;
+  // Донаты — структура продаж за выбранный период
+  var s = c.splits || {};
+  out.fmt_ytd   = Object.assign({ period: 'период' }, s.fmt || {});
+  out.edu_ytd   = Object.assign({ period: 'период' }, s.edu || {});
+  out.btype_ytd = Object.assign({ period: 'период' }, s.btype || {});
+  out.src_split_ytd = { period: 'период', internal: (s.src || {}).internal || { cnt: 0, sum: 0 }, marketing: (s.src || {}).marketing || { cnt: 0, sum: 0 } };
 }
+
 
 async function renderPageMainNew(d) {
   var areaNew = document.getElementById('contentAreaNew');
@@ -363,6 +197,13 @@ async function renderPageMainNew(d) {
         var cl = p > 0 ? 'delta-up' : (p < 0 ? 'delta-down' : 'delta-flat');
         return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
       }
+      function pctDeltaInv(a, b) {
+        if (!b || b === 0) return '';
+        var p = ((a - b) / b * 100).toFixed(1);
+        var s = p > 0 ? '↑' : (p < 0 ? '↓' : '→');
+        var cl = p > 0 ? 'delta-down' : (p < 0 ? 'delta-up' : 'delta-flat');
+        return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
+      }
       var ppL = ppYtd ? (ppLeads || 0) : 0, ppQ = ppYtd ? (ppQual || 0) : 0;
       var curLeadsVal = leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt;
       var curConv = leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0;
@@ -378,7 +219,7 @@ async function renderPageMainNew(d) {
         + '<div class="kpi '+kc+'"><div class="lbl">Квал. лиды (MQL)</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(qualLeads)+'</div>'+(ppYtd?pctDelta(qualLeads,ppQ):'')+'</div>'+pp(fmt(ppQ))+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Конв. MQL</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curMqlConv)+'%</div>'+(ppYtd&&ppQ>0?pctDelta(curMqlConv,ppMqlConv):'')+'</div>'+pp(fmtPct(ppMqlConv)+'%')+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">💰 Средний чек</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+' ₽</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.avg_check)+' ₽')+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">⏱ Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDelta(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div>'+pp((ppYtd&&ppYtd.avg_close_days_won||0).toFixed(1)+' дн.')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">⏱ Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDeltaInv(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div>'+pp((ppYtd&&ppYtd.avg_close_days_won||0).toFixed(1)+' дн.')+'</div>'
         + '</div>';
       return r;
     }
@@ -430,39 +271,41 @@ async function renderPageMainNew(d) {
     html += '<div class="card" style="margin-top:8px"><h2>Воронка по неделям <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии на той же неделе)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     // Конверсии
 
-    // Средний чек по неделям (на всю ширину)
-    html += '<div class="card" style="margin-top:8px"><h2>Средний чек по неделям</h2><div style="height:440px;position:relative"><canvas id="newChAvg"></canvas></div></div>';
 
-    // B2B table (YTD + неделя)
-    var b2bCur = d.btype_cur||{}, b2bCurRow = (b2bCur.B2B||{cnt:0,sum:0}), b2cCurRow = (b2bCur.B2C||{cnt:0,sum:0}), totB2bCur = b2bCurRow.sum+b2cCurRow.sum||1;
-    var curB2bWeekLabel = wkCur && wkCur.label_dates ? 'Неделя '+(d.btype_cur?.period||'').replace('W','')+' ('+wkCur.label_dates+')' : (d.btype_cur?.period||'Неделя');
-    var avgB2bYtd = b2bRow.cnt > 0 ? Math.round(b2bRow.sum / b2bRow.cnt) : 0;
-    var avgB2cYtd = b2cRow.cnt > 0 ? Math.round(b2cRow.sum / b2cRow.cnt) : 0;
-    var avgB2bCur = b2bCurRow.cnt > 0 ? Math.round(b2bCurRow.sum / b2bCurRow.cnt) : 0;
-    var avgB2cCur = b2cCurRow.cnt > 0 ? Math.round(b2cCurRow.sum / b2cCurRow.cnt) : 0;
+    // Строка таблицы разбивки: период/пред.период
+    function splitRow(label, dotColor, name, row, tot, dashed) {
+      var avg = row.cnt > 0 ? Math.round(row.sum / row.cnt) : 0;
+      return '<tr'+(dashed?' style="border-top:1px dashed #ccc"':'')+'><td>'+label+'</td><td><span class="dot" style="background:'+dotColor+'"></span>'+name+'</td><td>'+row.cnt+'</td><td>'+fmt(row.sum)+'</td><td>'+fmt(avg)+'</td><td>'+(row.sum/tot*100).toFixed(1)+'%</td></tr>';
+    }
+    var ppSplits = (d.pp && d.pp.splits) || null;
+    var ppLbl = 'Пред. период' + (d.pp && d.pp.label ? '<br><span class="muted">' + d.pp.label + '</span>' : '');
+
+    // B2B: таблица под графиком — выбранный период + предыдущий
     var b2bTbl = '<table style="font-size:11px;margin-top:8px"><tr><th>Период</th><th>Тип</th><th>Шт</th><th>Сумма</th><th>Средний чек</th><th>Доля,%</th></tr>'
-      +'<tr><td>За весь период</td><td><span class="dot" style="background:#3079D2"></span>B2B</td><td>'+b2bRow.cnt+'</td><td>'+fmt(b2bRow.sum)+'</td><td>'+fmt(avgB2bYtd)+'</td><td>'+(b2bRow.sum/totB2b*100).toFixed(1)+'%</td></tr>'
-      +'<tr><td></td><td><span class="dot" style="background:#F57C00"></span>B2C</td><td>'+b2cRow.cnt+'</td><td>'+fmt(b2cRow.sum)+'</td><td>'+fmt(avgB2cYtd)+'</td><td>'+(b2cRow.sum/totB2b*100).toFixed(1)+'%</td></tr>'
-      +'<tr style="border-top:1px dashed #ccc"><td>'+curB2bWeekLabel+'</td><td><span class="dot" style="background:#3079D2"></span>B2B</td><td>'+b2bCurRow.cnt+'</td><td>'+fmt(b2bCurRow.sum)+'</td><td>'+fmt(avgB2bCur)+'</td><td>'+(b2bCurRow.sum/totB2bCur*100).toFixed(1)+'%</td></tr>'
-      +'<tr><td></td><td><span class="dot" style="background:#F57C00"></span>B2C</td><td>'+b2cCurRow.cnt+'</td><td>'+fmt(b2cCurRow.sum)+'</td><td>'+fmt(avgB2cCur)+'</td><td>'+(b2cCurRow.sum/totB2bCur*100).toFixed(1)+'%</td></tr>'
-      +'</table>';
+      + splitRow('За период', '#3079D2', 'B2B', b2bRow, totB2b, false)
+      + splitRow('', '#F57C00', 'B2C', b2cRow, totB2b, false);
+    if (ppSplits && ppSplits.btype) {
+      var ppB2b = ppSplits.btype.B2B || {cnt:0,sum:0}, ppB2c = ppSplits.btype.B2C || {cnt:0,sum:0};
+      var ppTotB2b = ppB2b.sum + ppB2c.sum || 1;
+      b2bTbl += splitRow(ppLbl, '#3079D2', 'B2B', ppB2b, ppTotB2b, true)
+              + splitRow('', '#F57C00', 'B2C', ppB2c, ppTotB2b, false);
+    }
+    b2bTbl += '</table>';
 
-    // Источники: таблица под графиком
-    var srcYtd = d.src_split_ytd||{}, srcCur = d.src_split_cur||{};
+    // Источники: таблица под графиком — выбранный период + предыдущий
+    var srcYtd = d.src_split_ytd||{};
     var srcInternal = srcYtd.internal||{cnt:0,sum:0}, srcMkt = srcYtd.marketing||{cnt:0,sum:0};
-    var srcIntCur = srcCur.internal||{cnt:0,sum:0}, srcMktCur = srcCur.marketing||{cnt:0,sum:0};
-    var srcTot = srcInternal.sum+srcMkt.sum||1, srcTotCur = srcIntCur.sum+srcMktCur.sum||1;
-    var curWeekLabel = wkCur && wkCur.label_dates ? 'Неделя '+(srcCur.period||'').replace('W','')+' ('+wkCur.label_dates+')' : (srcCur.period||'Неделя');
-    var avgIntYtd = srcInternal.cnt > 0 ? Math.round(srcInternal.sum / srcInternal.cnt) : 0;
-    var avgMktYtd = srcMkt.cnt > 0 ? Math.round(srcMkt.sum / srcMkt.cnt) : 0;
-    var avgIntCur = srcIntCur.cnt > 0 ? Math.round(srcIntCur.sum / srcIntCur.cnt) : 0;
-    var avgMktCur = srcMktCur.cnt > 0 ? Math.round(srcMktCur.sum / srcMktCur.cnt) : 0;
+    var srcTot = srcInternal.sum+srcMkt.sum||1;
     var srcTbl = '<table style="font-size:11px;margin-top:8px"><tr><th>Период</th><th>Тип</th><th>Шт</th><th>Сумма</th><th>Средний чек</th><th>Доля,%</th></tr>'
-      +'<tr><td>За весь период</td><td><span class="dot" style="background:#1f2a44"></span> Внутренняя база</td><td>'+srcInternal.cnt+'</td><td>'+fmt(srcInternal.sum)+'</td><td>'+fmt(avgIntYtd)+'</td><td>'+(srcInternal.sum/srcTot*100).toFixed(1)+'%</td></tr>'
-      +'<tr><td></td><td><span class="dot" style="background:#00bcd4"></span> Маркетинговые сделки</td><td>'+srcMkt.cnt+'</td><td>'+fmt(srcMkt.sum)+'</td><td>'+fmt(avgMktYtd)+'</td><td>'+(srcMkt.sum/srcTot*100).toFixed(1)+'%</td></tr>'
-      +'<tr style="border-top:1px dashed #ccc"><td>'+curWeekLabel+'</td><td><span class="dot" style="background:#1f2a44"></span> Внутренняя база</td><td>'+srcIntCur.cnt+'</td><td>'+fmt(srcIntCur.sum)+'</td><td>'+fmt(avgIntCur)+'</td><td>'+(srcIntCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
-      +'<tr><td></td><td><span class="dot" style="background:#00bcd4"></span> Маркетинговые сделки</td><td>'+srcMktCur.cnt+'</td><td>'+fmt(srcMktCur.sum)+'</td><td>'+fmt(avgMktCur)+'</td><td>'+(srcMktCur.sum/srcTotCur*100).toFixed(1)+'%</td></tr>'
-      +'</table>';
+      + splitRow('За период', '#1f2a44', ' Внутренняя база', srcInternal, srcTot, false)
+      + splitRow('', '#00bcd4', ' Маркетинговые сделки', srcMkt, srcTot, false);
+    if (ppSplits && ppSplits.src) {
+      var ppInt = ppSplits.src.internal || {cnt:0,sum:0}, ppMkt = ppSplits.src.marketing || {cnt:0,sum:0};
+      var ppSrcTot = ppInt.sum + ppMkt.sum || 1;
+      srcTbl += splitRow(ppLbl, '#1f2a44', ' Внутренняя база', ppInt, ppSrcTot, true)
+              + splitRow('', '#00bcd4', ' Маркетинговые сделки', ppMkt, ppSrcTot, false);
+    }
+    srcTbl += '</table>';
         // MBA — перенесён на ratings-dashboard
 
     html += '<div class="card"><h2>Недельная таблица</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
@@ -648,13 +491,6 @@ async function renderPageMainNew(d) {
           // Источники: таблица под графиком
           var srcEl = document.getElementById('newSrcSplitTable');
           if (srcEl) srcEl.innerHTML = srcTbl;
-        } catch(e){}
-        try {
-          if (document.getElementById('newChAvg')) {
-            var avOom = weeks.map(function(w){return w.oom_avg_check||0;});
-            var avKom = weeks.map(function(w){return w.kom_avg_check||0;});
-            new Chart(document.getElementById('newChAvg'),{type:'line',data:{labels:labels,datasets:[{label:'ООМ',data:avOom,borderColor:'#00bcd4',tension:0.3,fill:false},{label:'КОМ',data:avKom,borderColor:'#9C27B0',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
-          }
         } catch(e){}
         try {
           if (document.getElementById('newChDur')) new Chart(document.getElementById('newChDur'),{type:'line',data:{labels:labels,datasets:[{label:'Цикл сделки, дн.',data:weeks.map(function(w){return w.avg_dur||0;}),borderColor:'#9A7B3F',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
