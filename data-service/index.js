@@ -25,7 +25,7 @@
  * статуса загрузки.
  */
 
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, rename, mkdir } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { fetchDealsRest } from './lib/bitrix-rest.js';
@@ -44,6 +44,17 @@ if (!process.env.BITRIX_BASE) {
 
 function progress(msg) {
   process.stdout.write(`###PROGRESS:${JSON.stringify(msg)}\n`);
+}
+
+/**
+ * Атомарная запись: пишем во временный файл и переименовываем.
+ * Иначе analyze() мог прочитать полузаписанный deals.json во время
+ * 20-40-минутной выгрузки (rename на одном диске атомарен).
+ */
+async function writeFileAtomic(filePath, data) {
+  const tmp = filePath + '.tmp';
+  await writeFile(tmp, data, 'utf-8');
+  await rename(tmp, filePath);
 }
 
 const t0 = Date.now();
@@ -79,12 +90,12 @@ console.log(`  Из Export API: ${exportDeals.length} сделок`);
 const deals = mergeDeals(restDeals, exportDeals);
 console.log(`  После мержа: ${deals.length} сделок`);
 
-await writeFile(
+await writeFileAtomic(
   path.join(CACHE_DIR, 'deals.json'),
   JSON.stringify(deals),
   'utf-8'
 );
-await writeFile(
+await writeFileAtomic(
   path.join(CACHE_DIR, 'fetched_at.json'),
   JSON.stringify({ fetchedAt: new Date().toISOString() }),
   'utf-8'
@@ -98,7 +109,7 @@ progress({ type: 'step_start', idx: 2 });
 
 const dicts = await fetchDicts(deals);
 
-await writeFile(
+await writeFileAtomic(
   path.join(CACHE_DIR, 'dicts.json'),
   JSON.stringify(dicts, null, 2),
   'utf-8'
@@ -111,7 +122,7 @@ console.log('\n== Шаг 4/4: Контакты и компании ==');
 progress({ type: 'step_start', idx: 3 });
 
 const contacts = await fetchContacts(deals);
-await writeFile(
+await writeFileAtomic(
   path.join(CACHE_DIR, 'contacts.json'),
   JSON.stringify(contacts),
   'utf-8'
@@ -119,7 +130,7 @@ await writeFile(
 console.log(`  Сохранено: cache/contacts.json — ${Object.keys(contacts).length} контактов (${elapsed()})`);
 
 const companies = await fetchCompanies(deals);
-await writeFile(
+await writeFileAtomic(
   path.join(CACHE_DIR, 'companies.json'),
   JSON.stringify(companies),
   'utf-8'
@@ -140,7 +151,7 @@ try {
   await mkdirFs(path.dirname(MODULES_OUT), { recursive: true });
 
   const modules = await fetchModules(deals, msg => console.log(msg));
-  await writeFile(MODULES_OUT, JSON.stringify(modules));
+  await writeFileAtomic(MODULES_OUT, JSON.stringify(modules));
 
   const withMods = Object.values(modules).filter(v => v.length > 0).length;
   console.log(`  Сохранено: modules.json — ${withMods} сделок с модулями (${elapsed()})`);

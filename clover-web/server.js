@@ -51,7 +51,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: 'clover-web-secret-2026',
+  secret: process.env.SESSION_SECRET || 'clover-web-secret-2026',
   resave: false,
   saveUninitialized: false,
   store: new FileStoreSession({ path: path.join(DATA_DIR, 'sessions'), logFn: () => {} }),
@@ -237,9 +237,10 @@ app.use((err, req, res, next) => {
 
 // --------------- Start ---------------
 app.listen(PORT, '127.0.0.1', () => {
-  console.log('📊 РШУ дашборды на http://0.0.0.0:' + PORT);
-  console.log('   Логины: ivan, olga, anastasia');
-  console.log('   Пароли: {логин}123');
+  console.log('📊 РШУ дашборды на http://127.0.0.1:' + PORT);
+  if (!process.env.SESSION_SECRET) {
+    console.warn('⚠️  SESSION_SECRET не задан в .env — используется дефолтный (небезопасно)');
+  }
 });
 
 // ============== Helpers ==============
