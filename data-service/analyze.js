@@ -236,6 +236,38 @@ function getEffectiveStage(r, weekSun) {
   return r.STAGE||'';
 }
 
+// SQL по дате создания (единое правило для недель и месяцев)
+function isSqlByCreate(r) {
+  const st = r.STAGE;
+  if (['DETAILS','PROPOSAL','2','6','WON'].includes(st)) return true;
+  if (r.CAT_ID===19 && r.SEM!=='S') {
+    const ks=(st||'').replace('C19:','');
+    if (['EXECUTING','UC_C670BC','UC_I443UQ'].includes(ks)) return true;
+    if (r.UF_CRM_5D133690E1 && ['UC_ALOZ6B','UC_W4ML6H','LOSE'].includes(ks)) return true;
+  }
+  if (r.UF_CRM_1753272713011 && ['LOSE','UC_F2YC3N','UC_W6SCHG','UC_670ME2','UC_VKPN0N'].includes(st)) return true;
+  return false;
+}
+
+/**
+ * Сегмент стека-2 (создан в периоде → на какой стадии зафиксирован к концу периода).
+ * Возвращает 'pay'|'inv'|'rej_nq'|'rej'|'sql'|'mql'|'nq' или null (не входит в стек).
+ */
+function stack2Seg(r, start, end) {
+  if (!VALID_CATS.has(r.CAT_ID)) return null;
+  if (r.SEM==='S' && r.OPP<MIN_OPP) return null;
+  const dc=r.DC;
+  if (!dc || dateOnly(dc)<start || dateOnly(dc)>end) return null;
+  if (r.CAT_ID===8 && r.STAGE==='C8:WON') return null;
+  const pd=r.PAY_DT;
+  if (pd && dateOnly(pd)<=end && r.OPP>=MIN_OPP) return 'pay';
+  if (r.INV_DT && dateOnly(r.INV_DT)<=end) return 'inv';
+  if (r.CAT_ID===8 && r.STAGE==='C8:LOSE') return 'rej_nq';
+  if (r.SEM==='F' && r.CL && dateOnly(r.CL)<=end && r.CLOSED==='Y') return 'rej';
+  const eff=getEffectiveStage(r,end);
+  return isSql2(eff,r) ? 'sql' : isMql2(eff,r) ? 'mql' : 'nq';
+}
+
 // ── Регистрация ───────────────────────────────────────────────────────────────
 
 function regIsPaid(r) { return !!r.PAY_DT && r.OPP>=MIN_OPP; }
@@ -515,15 +547,7 @@ export async function analyze(onProgress) {
     }
 
     // SQL по DATE_CREATE
-    const st=r.STAGE;
-    let isSqlW = ['DETAILS','PROPOSAL','2','6','WON'].includes(st);
-    if (!isSqlW && r.CAT_ID===19 && r.SEM!=='S') {
-      const ks=(st||'').replace('C19:','');
-      if (['EXECUTING','UC_C670BC','UC_I443UQ'].includes(ks)) isSqlW=true;
-      else if (r.UF_CRM_5D133690E1 && ['UC_ALOZ6B','UC_W4ML6H','LOSE'].includes(ks)) isSqlW=true;
-    }
-    if (!isSqlW && r.UF_CRM_1753272713011 && ['LOSE','UC_F2YC3N','UC_W6SCHG','UC_670ME2','UC_VKPN0N'].includes(st)) isSqlW=true;
-    if (isSqlW && r.DC && r.DC.getFullYear()===YEAR) {
+    if (isSqlByCreate(r) && r.DC && r.DC.getFullYear()===YEAR) {
       const [,wk]=isoCalendar(r.DC);
       if (wk in weekly) weekly[wk].sql++;
     }
@@ -658,23 +682,9 @@ export async function analyze(onProgress) {
     const sun=new Date(Math.min(fromISOCalendar(YEAR,wIdx,7), TODAY));
 
     for (const r of rows) {
-      if (!VALID_CATS.has(r.CAT_ID)) continue;
-      if (r.SEM==='S' && r.OPP<MIN_OPP) continue;
-      const dc=r.DC;
-      if (!dc || dateOnly(dc)<mon || dateOnly(dc)>sun) continue;
-      if (r.CAT_ID===8 && r.STAGE==='C8:WON') continue;
-      let seg=null;
-      const pd=r.PAY_DT;
-      if (pd && dateOnly(pd)<=sun && r.OPP>=MIN_OPP) seg='stack2_pay';
-      if (!seg && r.INV_DT && dateOnly(r.INV_DT)<=sun) seg='stack2_inv';
-      if (!seg) {
-        if (r.CAT_ID===8 && r.STAGE==='C8:LOSE') seg='stack2_rej_nq';
-        else if (r.SEM==='F' && r.CL && dateOnly(r.CL)<=sun && r.CLOSED==='Y') seg='stack2_rej';
-      }
-      if (!seg) {
-        const eff=getEffectiveStage(r,sun);
-        seg = isSql2(eff,r) ? 'stack2_sql' : isMql2(eff,r) ? 'stack2_mql' : 'stack2_nq';
-      }
+      const s=stack2Seg(r,mon,sun);
+      if (!s) continue;
+      const seg='stack2_'+s;
       weekly[wIdx][seg]=(weekly[wIdx][seg]||0)+1;
       if (['stack2_pay','stack2_inv','stack2_sql'].includes(seg)) weekly[wIdx][seg+'_sum']=(weekly[wIdx][seg+'_sum']||0)+r.OPP;
     }
@@ -686,6 +696,84 @@ export async function analyze(onProgress) {
     'stack2_pay','stack2_pay_sum','stack2_inv','stack2_inv_sum','stack2_sql','stack2_sql_sum',
     'stack2_mql','stack2_nq','stack2_rej','stack2_rej_nq'];
   for (const wd of Object.values(weekly)) for (const k of stackKeys) if (!(k in wd)) wd[k]=0;
+
+  // ── Месячная воронка (переключатель Недели/Месяцы на управленческом) ──────
+  // Те же поля, что у недель (точно по календарным месяцам), чтобы фронтенд
+  // рендерил месяцы тем же кодом.
+  const MONTH_NAMES=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const monthly={};
+  const curM = (TODAY.getFullYear()===YEAR) ? TODAY.getMonth() : 11;
+  for (let m=0;m<=curM;m++) {
+    const start=new Date(YEAR,m,1);
+    const end=new Date(Math.min(new Date(YEAR,m+1,0), TODAY));
+    monthly[m]={
+      month:m+1, week:m+1, // week — для совместимости с рендером недель
+      start:start.toISOString().slice(0,10), end:end.toISOString().slice(0,10),
+      label_dates:MONTH_NAMES[m], label_short:MONTH_NAMES[m],
+      postupleniya:0, won_cnt:0, leads:0, oom_leads:0, mql:0, oom_mql:0, sql:0,
+      oplata:0, invoice_cnt:0,
+      oom_postupleniya:0, oom_won_cnt:0, kom_postupleniya:0, kom_won_cnt:0,
+      durs:[], chks:[],
+    };
+  }
+  const monthOf = d => { const x=dateOnly(d); return (x.getFullYear()===YEAR && x>=new Date(YEAR,0,1)) ? x.getMonth() : -1; };
+  for (const r of rows) {
+    // деньги по дате оплаты
+    if (payYtd(r) && VALID_CATS.has(r.CAT_ID)) {
+      const pd=getPayDate(r);
+      const m=pd?monthOf(pd):-1;
+      if (m in monthly) {
+        const md=monthly[m];
+        md.postupleniya+=r.OPP; md.oplata++;
+        if (r.IS_KOM) { md.kom_postupleniya+=r.OPP; md.kom_won_cnt++; }
+        else { md.oom_postupleniya+=r.OPP; md.oom_won_cnt++; md.won_cnt++; md.chks.push(r.OPP); }
+        if (r.DC&&r.PAY_DT) { const d=daysBetween(r.DC,r.PAY_DT); if(d>=0) md.durs.push(d); }
+      }
+    }
+    // счёт по дате счёта
+    if (r.UF_CRM_1753272713011) {
+      const inv=parseDt(r.UF_CRM_1753272713011);
+      const m=inv?monthOf(inv):-1;
+      if (m in monthly) monthly[m].invoice_cnt++;
+    }
+    // лиды/MQL/SQL по дате создания
+    if (r.DC) {
+      const m=monthOf(r.DC);
+      if (m in monthly) {
+        const md=monthly[m];
+        if (isAllLead(r))   { md.leads++; if(r.IS_OOM) md.oom_leads++; }
+        if (isQualLeadW(r)) { md.mql++;   if(r.IS_OOM) md.oom_mql++; }
+        if (isSqlByCreate(r)) md.sql++;
+      }
+    }
+  }
+  // стек-2 по месяцам
+  for (const m of Object.keys(monthly).map(Number)) {
+    const md=monthly[m];
+    const start=new Date(YEAR,m,1);
+    const end=new Date(Math.min(new Date(YEAR,m+1,0), TODAY));
+    for (const r of rows) {
+      const s=stack2Seg(r,start,end);
+      if (!s) continue;
+      const seg='stack2_'+s;
+      md[seg]=(md[seg]||0)+1;
+      if (['stack2_pay','stack2_inv','stack2_sql'].includes(seg)) md[seg+'_sum']=(md[seg+'_sum']||0)+r.OPP;
+    }
+    for (const k of stackKeys) if (!(k in md)) md[k]=0;
+  }
+  // финализация месяцев (те же формулы, что у недель)
+  for (const md of Object.values(monthly)) {
+    md.avg_check = md.won_cnt ? md.postupleniya/md.won_cnt : 0;
+    md.oom_avg_check = md.oom_won_cnt ? md.oom_postupleniya/md.oom_won_cnt : 0;
+    md.kom_avg_check = md.kom_won_cnt ? md.kom_postupleniya/md.kom_won_cnt : 0;
+    md.avg_dur = md.durs.length ? md.durs.reduce((s,x)=>s+x,0)/md.durs.length : 0;
+    md.conv_lead_mql       = md.leads       ? md.mql/md.leads*100 : 0;
+    md.conv_mql_sql        = md.mql         ? md.sql/md.mql*100 : 0;
+    md.conv_sql_invoice    = md.sql         ? md.invoice_cnt/md.sql*100 : 0;
+    md.conv_sql_oplata     = md.sql         ? md.oplata/md.sql*100 : 0;
+    md.conv_invoice_oplata = md.invoice_cnt ? md.oplata/md.invoice_cnt*100 : 0;
+    delete md.durs; delete md.chks;
+  }
 
   // ── Источники ─────────────────────────────────────────────────────────────
   const srcData={};
@@ -898,6 +986,7 @@ export async function analyze(onProgress) {
     oom_qual_prev:oomQualPrev, oom_qual_cur:oomQualCur,
     kom_qual_prev:komQualPrev, kom_qual_cur:komQualCur,
     weeks:Object.keys(weekly).map(Number).sort((a,b)=>a-b).map(w=>weekly[w]),
+    months:Object.keys(monthly).map(Number).sort((a,b)=>a-b).map(m=>monthly[m]),
     prev_weeks:Object.keys(prevWeekly).map(Number).sort((a,b)=>a-b).map(w=>prevWeekly[w]),
     src_rating:srcRating,
     src_split_ytd:srcSplitYtd, src_split_prev:srcSplitPrev, src_split_cur:srcSplitCur,
