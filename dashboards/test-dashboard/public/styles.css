@@ -39,8 +39,8 @@ h1 { font-size: 26px; font-weight: 700; margin: 0 0 4px; }
 .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .threecol { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { background: #093EB4; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; position: sticky; top: 0; }
-td { padding: 8px 12px; border-bottom: 1px solid #E2E8F0; }
+th { background: #093EB4; color: #fff; padding: 5px 6px; text-align: left; font-weight: 600; white-space: nowrap; position: sticky; top: 0; }
+td { padding: 4px 6px; border-bottom: 1px solid #E2E8F0; }
 tr:hover td { background: #F1F3F6; }
 tr.cur td { background: #F1F3F6; font-weight: 600; }
 .scroll-x { overflow-x: auto; }

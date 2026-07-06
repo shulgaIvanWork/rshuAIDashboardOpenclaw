@@ -345,6 +345,14 @@ async function renderPageMainNew(d) {
       var cl = p>0?'delta-up':(p<0?'delta-down':'delta-flat');
       return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
     }
+    // \u0418\u043d\u0432\u0435\u0440\u0441\u043d\u0430\u044f \u0434\u0435\u043b\u044c\u0442\u0430 \u0434\u043b\u044f \u043c\u0435\u0442\u0440\u0438\u043a \u00ab\u043c\u0435\u043d\u044c\u0448\u0435 = \u043b\u0443\u0447\u0448\u0435\u00bb (\u0446\u0438\u043a\u043b \u0441\u0434\u0435\u043b\u043a\u0438):
+    // \u0440\u043e\u0441\u0442 \u043f\u043e\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u044f \u2014 \u043a\u0440\u0430\u0441\u043d\u044b\u0439, \u0441\u043d\u0438\u0436\u0435\u043d\u0438\u0435 \u2014 \u0437\u0435\u043b\u0451\u043d\u044b\u0439
+    function deltaInv(a,b) {
+      if (!b) return '';
+      var p = b>0?((a-b)/b*100).toFixed(1):0, s=(p>0?'\u2191':(p<0?'\u2193':'\u2192'));
+      var cl = p>0?'delta-down':(p<0?'delta-up':'delta-flat');
+      return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
+    }
     function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev, ppYtd, ppLeads, ppQual) {
       var cc = cls==='kom'?'c-kom':(cls==='oom'?'c-oom':'c-total');
       var kc = cls==='kom'?'kpi-kom':(cls==='oom'?'kpi-oom':'kpi-total');
@@ -417,7 +425,7 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Источники: Внутренняя база vs Маркетинговые сделки</h2><div class="chartbox-sm"><canvas id="newChSrcSplit"></canvas></div><div id="newSrcSplitTable"></div></div>';
     html += '</div>';
     // Регистрация — над воронкой
-    html += '<div class="kpis" id="newRegKpis" style="margin-top:16px"></div>';
+    html += '<div class="kpis kpis-8" id="newRegKpis" style="margin-top:16px"></div>';
     // Стеки воронок - на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:8px"><h2>Воронка по неделям <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии на той же неделе)</span></h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     // Конверсии
@@ -542,15 +550,17 @@ async function renderPageMainNew(d) {
     var pp_reg = d.pp_reg_ytd||null;
     var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.'+(pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'')+'</span></div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">📥 Регистраций пришло</div><div class="row"><div class="val-big">'+fmt(reg.total_sum)+' ₽</div><span class="si">'+fmt(reg.total)+' сд.'+(pp_reg?delta(reg.total_sum,pp_reg.total_sum):'')+'</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL</div><div class="row"><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><span class="si">'+reg.sql+' сд.'+(pp_reg?delta(reg.sql_sum,pp_reg.sql_sum):'')+'</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен</div><div class="row"><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><span class="si">'+reg.real_inv_cnt+' сд.'+(pp_reg?delta(reg.real_inv_sum,pp_reg.real_inv_sum):'')+'</span></div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату</div><div class="val-big">'+reg.conv+'%'+(pp_reg?delta(reg.conv,pp_reg.conv):'')+'</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+reg.inv_conv+'%'+(pp_reg?delta(reg.inv_conv,pp_reg.inv_conv):'')+'</div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔴 Доля отказов</div><div class="val-big">'+reg.lose_pct+'%'+(pp_reg?delta(reg.lose_pct,pp_reg.lose_pct):'')+'</div><div class="lbl2">'+reg.lose+' из '+reg.total+' сд.</div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Средний чек</div><div class="val-big">'+fmt(reg.avg_check)+' ₽'+(pp_reg?delta(reg.avg_check,pp_reg.avg_check):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">⏱ Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.'+(pp_reg?delta(reg.avg_dur,pp_reg.avg_dur):'')+'</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+reg.avg_inv_dur+' дн.'+(pp_reg?delta(reg.avg_inv_dur,pp_reg.avg_inv_dur):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">⏱ Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.'+(pp_reg?deltaInv(reg.avg_dur,pp_reg.avg_dur):'')+'</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+reg.avg_inv_dur+' дн.'+(pp_reg?deltaInv(reg.avg_inv_dur,pp_reg.avg_inv_dur):'')+'</div></div>';
     if (pp_reg) {
       regKpis += '<div style="grid-column:1/-1;height:0"></div>';
       regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Поступления (пред. период)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_paid_sum)+' ₽</div><span class="si">'+pp_reg.total_paid+' сд.</span></div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">📥 Регистраций пришло (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_sum)+' ₽</div><span class="si">'+fmt(pp_reg.total)+' сд.</span></div></div>';
       regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.sql_sum)+' ₽</div><span class="si">'+pp_reg.sql+' сд.</span></div></div>';
       regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.real_inv_sum)+' ₽</div><span class="si">'+pp_reg.real_inv_cnt+' сд.</span></div></div>';
       regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату (пред.)</div><div class="val-big">'+pp_reg.conv+'%</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+pp_reg.inv_conv+'%</div></div>';

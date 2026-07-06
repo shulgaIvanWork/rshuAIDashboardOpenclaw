@@ -109,13 +109,15 @@ app.get('/api/reg-funnel', async (req, res) => {
     }
 
     const total = subset.length;
+    const totalSum = subset.reduce((s, d) => s + getOpp(d), 0);
     const totalPaid = paid;
     const totalPaidSum = paidSum;
     const avgDur    = paidDurs.length ? paidDurs.reduce((s, d) => s + d, 0) / paidDurs.length : 0;
     const avgInvDur = invDurs.length  ? invDurs.reduce((s, d) => s + d, 0)  / invDurs.length  : 0;
 
     res.json({
-      total, sql, sql_sum: Math.round(sqlSum),
+      total, total_sum: Math.round(totalSum),
+      sql, sql_sum: Math.round(sqlSum),
       invoice: inv, inv_sum: Math.round(invSum),
       paid, paid_sum: Math.round(paidSum),
       total_paid: totalPaid, total_paid_sum: Math.round(totalPaidSum),
