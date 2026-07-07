@@ -33,6 +33,7 @@ import { fetchDealsExport, mergeDeals } from './lib/bitrix-export.js';
 import { fetchDicts } from './lib/bitrix-dicts.js';
 import { fetchContacts, fetchCompanies } from './lib/bitrix-contacts.js';
 import { fetchModules } from './lib/fetch-modules.js';
+import { fetchInvoices } from './lib/fetch-invoices.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'cache');
@@ -160,6 +161,17 @@ try {
 }
 progress({ type: 'step_done', idx: 4 });
 
+// --- Шаг 6: Инвойсы (статусы счетов) ---
+console.log('\n== Шаг 6/6: Инвойсы ==');
+progress({ type: 'step_start', idx: 5 });
+
+try {
+  await fetchInvoices(deals);
+} catch (e) {
+  console.error(`  Ошибка выгрузки инвойсов: ${e.message}`);
+}
+progress({ type: 'step_done', idx: 5 });
+
 // --- Готово ---
 progress({ type: 'all_done' });
 console.log(`\n== Готово за ${elapsed()} ==`);
@@ -167,3 +179,7 @@ console.log(`  deals.json    — ${deals.length} сделок`);
 console.log(`  dicts.json    — ${Object.keys(dicts.categories).length} воронок, ${Object.keys(dicts.users).length} пользователей`);
 console.log(`  contacts.json — ${Object.keys(contacts).length} контактов`);
 console.log(`  companies.json — ${Object.keys(companies).length} компаний`);
+  try {
+    const inv = JSON.parse(require('fs').readFileSync(path.join(CACHE_DIR, 'invoices.json'), 'utf-8'));
+    console.log(`  invoices.json — ${Object.keys(inv).length} инвойсов`);
+  } catch {}

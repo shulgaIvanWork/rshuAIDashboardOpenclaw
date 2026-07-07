@@ -128,7 +128,7 @@ async function buildParticipants(weekIndex) {
     console.log('modules.json not found, skipping module check');
   }
 
-  const [dealsRaw, companiesRaw, contactsRaw, dictsRaw, ccRaw, contExtRaw, formatRaw, compExtRaw] = await Promise.all([
+  const [dealsRaw, companiesRaw, contactsRaw, dictsRaw, ccRaw, contExtRaw, formatRaw, compExtRaw, invoicesRaw] = await Promise.all([
     fs.readFile(path.join(DS_CACHE, 'deals.json'), 'utf-8').catch(() => '[]'),
     fs.readFile(path.join(DS_CACHE, 'companies.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(DS_CACHE, 'contacts.json'), 'utf-8').catch(() => '{}'),
@@ -137,6 +137,7 @@ async function buildParticipants(weekIndex) {
     fs.readFile(path.join(PARTS_CACHE, 'contacts_ext.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(PARTS_CACHE, 'deals_format.json'), 'utf-8').catch(() => '{}'),
     fs.readFile(path.join(PARTS_CACHE, 'companies_ext.json'), 'utf-8').catch(() => '{}'),
+    fs.readFile(path.join(DS_CACHE, 'invoices.json'), 'utf-8').catch(() => '{}'),
   ]);
 
   const deals = JSON.parse(dealsRaw);
@@ -147,9 +148,11 @@ async function buildParticipants(weekIndex) {
   const contactsExt = JSON.parse(contExtRaw);
   const dealsFormat = JSON.parse(formatRaw);
   const companiesExt = JSON.parse(compExtRaw);
+  const invoices = JSON.parse(invoicesRaw);
 
   const cats = dicts.categories || {};
   const users = dicts.users || {};
+  const directions = dicts.directions || {};
 
   const KOM_CATS = ['КОМ (Sale)', 'КОМ (Post Sale)'];
 
@@ -229,6 +232,7 @@ async function buildParticipants(weekIndex) {
 
   const candidateDeals = deals.filter(d => {
     if (String(d.CATEGORY_ID) !== '0') return false;
+    if (isKomDeal(d)) return false;
     if (!TARGET_STAGES.has(d.STAGE_ID)) return false;
     const catName = cats[String(d.CATEGORY_ID || '0')];
     const fmt = detectFormat(d.TITLE, catName, d.ID);
@@ -242,12 +246,27 @@ async function buildParticipants(weekIndex) {
   const contactTrainingDeals = new Map();
   for (const d of deals) {
     if (String(d.CATEGORY_ID) !== '0') continue;
+    if (isKomDeal(d)) continue;
     if (!isPaidDeal(d)) continue;
     const ccinfo2 = cc[d.ID] || {};
     const cid = String(ccinfo2.CONTACT_ID || d.CONTACT_ID || '0');
     if (cid === '0') continue;
     if (!contactTrainingDeals.has(cid)) contactTrainingDeals.set(cid, []);
     contactTrainingDeals.get(cid).push({ id: d.ID, payDate: d.UF_DATE_PAY_1C.substring(0, 10) });
+  }
+
+  // Build map: companyId → qualifying paid deals (для колонки «Последнее обучение от компании»)
+  const companyTrainingDeals = new Map();
+  for (const d of deals) {
+    if (String(d.CATEGORY_ID) !== '0') continue;
+    if (isKomDeal(d)) continue;
+    if (!isPaidDeal(d)) continue;
+    if (!d.UF_DATE_PAY_1C) continue;
+    const ccinfo2 = cc[d.ID] || {};
+    const coid = String(ccinfo2.COMPANY_ID || d.COMPANY_ID || '0');
+    if (coid === '0') continue;
+    if (!companyTrainingDeals.has(coid)) companyTrainingDeals.set(coid, []);
+    companyTrainingDeals.get(coid).push({ id: d.ID, payDate: d.UF_DATE_PAY_1C.substring(0, 10) });
   }
 
   const participants = [];
@@ -298,53 +317,80 @@ async function buildParticipants(weekIndex) {
 
     const isPaid = d.STAGE_SEMANTIC_ID === 'S' || d.STAGE_ID === 'WON' || d.STAGE_ID === 'C0:WON';
 
+    // ── Направление из сделки (UF_CRM_1498466811) ─────────────────────────
+    const dirRaw = d.UF_CRM_1498466811;
+    let dirName = '—';
+    if (dirRaw && Array.isArray(dirRaw) && dirRaw.length > 0) {
+      dirName = directions[String(dirRaw[0])] || '—';
+    }
+
+    // ── Тип клиента: компания или физик ────────────────────────────────────
+    const clientType = (coId && coId !== '0') ? 'B2B' : 'B2C';
+
+    // ── Цикл сделки: DATE_CREATE → UF_DATE_PAY_1C ──────────────────────────
+    let dealCycle = null;
+    if (d.DATE_CREATE && d.UF_DATE_PAY_1C) {
+      const created = new Date(d.DATE_CREATE.substring(0, 10));
+      const paid    = new Date(d.UF_DATE_PAY_1C.substring(0, 10));
+      const diff = Math.round((paid - created) / 86400000);
+      if (diff >= 0) dealCycle = diff;
+    }
+
+    // ── Группируем модули недели по product_id ─────────────────────────────
+    const groups = {};
     for (const mod of weekModules) {
-      const key = `${did}_${mod.product_id}`;
+      const pid = mod.product_id || '0';
+      if (!groups[pid]) groups[pid] = [];
+      groups[pid].push(mod);
+    }
+
+    for (const [pid, mods] of Object.entries(groups)) {
+      const key = `${did}_${pid}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const rawName = mod.original_name
-        || (mod.product_name ? mod.product_name.replace(/^Оказание образовательных услуг по теме "(.+?)".*$/, '$1').trim() : null);
-      const moduleName = rawName ? normalizeTitle(rawName) : '—';
+      // Название программы (из товара, без дат и оригинальных названий модулей)
+      const firstMod = mods[0];
+      const rawName = firstMod.product_name
+        ? firstMod.product_name.replace(/^Оказание образовательных услуг по теме "(.+?)".*$/, '$1').trim()
+        : null;
+      const programName = rawName ? normalizeTitle(rawName) : '—';
 
-      const modStart = parseModuleDate(mod.date_start);
-      const modEnd   = parseModuleDate(mod.date_end);
-      const modDisplayDate    = modStart ? modStart.toLocaleDateString('ru-RU') : '—';
-      const modDisplayDateEnd = modEnd   ? modEnd.toLocaleDateString('ru-RU')   : '—';
-
-      // Длительность модуля в днях
-      let moduleDuration = null;
-      if (modStart && modEnd) {
-        moduleDuration = Math.round((modEnd - modStart) / 86400000) + 1;
+      // Агрегированные даты: мин date_start, макс date_end, кол-во уникальных дней
+      const allDates = new Set();
+      let minStart = null, maxEnd = null;
+      for (const m of mods) {
+        if (m.date_start) {
+          allDates.add(m.date_start);
+          if (!minStart || m.date_start < minStart) minStart = m.date_start;
+        }
+        if (m.date_end) {
+          allDates.add(m.date_end);
+          if (!maxEnd || m.date_end > maxEnd) maxEnd = m.date_end;
+        }
       }
 
-      // Тип клиента: компания или физик
-      const clientType = (coId && coId !== '0') ? 'B2B' : 'B2C';
-
-      // Цикл сделки: DATE_CREATE → UF_DATE_PAY_1C
-      let dealCycle = null;
-      if (d.DATE_CREATE && d.UF_DATE_PAY_1C) {
-        const created = new Date(d.DATE_CREATE.substring(0, 10));
-        const paid    = new Date(d.UF_DATE_PAY_1C.substring(0, 10));
-        const diff = Math.round((paid - created) / 86400000);
-        if (diff >= 0) dealCycle = diff;
-      }
+      const displayDateStart = minStart
+        ? new Date(minStart + 'T00:00:00').toLocaleDateString('ru-RU')
+        : '—';
+      const displayDateEnd = maxEnd
+        ? new Date(maxEnd + 'T00:00:00').toLocaleDateString('ru-RU')
+        : '—';
+      const trainingDays = allDates.size;
 
       participants.push({
         id: did,
         title: d.TITLE || '—',
-        program: moduleName,
-        theme: moduleName,
+        direction: dirName,
+        program: programName,
         participant: contactName,
         company: companyName,
         companyId: coId,
         clientType,
         amount: opp,
-        date: modDisplayDate,
-        dateEnd: modDisplayDateEnd,
-        moduleDuration,
-        moduleDateStart: mod.date_start,
-        moduleDateEnd: mod.date_end,
+        date: displayDateStart,
+        dateEnd: displayDateEnd,
+        moduleDuration: trainingDays,
         manager,
         dealCycle,
         hadPrevTraining: (() => {
@@ -356,10 +402,31 @@ async function buildParticipants(weekIndex) {
           const others = history.filter(t => t.id !== did).map(t => t.payDate).sort();
           return others.length ? others[others.length - 1] : '';
         })(),
+        lastCompanyTraining: (() => {
+          if (coId === '0') return '';
+          const history = companyTrainingDeals.get(coId) || [];
+          const others = history.filter(t => t.id !== did).map(t => t.payDate).sort();
+          return others.length ? others[others.length - 1] : '';
+        })(),
         stage: stageLabel,
         isPaid,
         format: detectFormat(d.TITLE, cats[String(d.CATEGORY_ID || '0')], d.ID),
-        region
+        region,
+        // Новые поля
+        participantFlag: (() => {
+          const v = d.UF_CRM_1477555902;
+          if (v === true || v === '1' || v === 1) return 'Да';
+          if (v === false || v === '0' || v === 0) return 'Нет';
+          return '';
+        })(),
+        invoiceDiscount: (() => {
+          const v = d.UF_DISCOUNT;
+          return (v && parseFloat(v) > 0) ? parseFloat(v) : null;
+        })(),
+        invoiceStatus: (() => {
+          const inv = invoices[d.ID];
+          return inv ? inv.status_name || inv.status_id : '';
+        })(),
       });
     }
   }
