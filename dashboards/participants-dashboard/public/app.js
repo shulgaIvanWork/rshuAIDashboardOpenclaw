@@ -52,7 +52,7 @@ function buildParticipantsTable(res, tableId) {
     '<th class="sort" data-col="1" style="text-align:left;min-width:120px">Программа</th>' +
     '<th class="sort" data-col="2" style="text-align:left;min-width:150px">Тема / Сделка</th>' +
     '<th class="sort" data-col="3" style="text-align:left;min-width:80px">Формат</th>' +
-    '<th class="sort" data-col="4" style="text-align:left;min-width:120px">Участник</th>' +
+    '<th class="sort" data-col="4" style="text-align:left;min-width:120px">ФИО</th>' +
     '<th class="sort" data-col="5" style="text-align:left;min-width:100px">Регион</th>' +
     '<th class="sort" data-col="6" style="text-align:left;min-width:150px">Компания</th>' +
     '<th class="sort" data-col="7">Тип</th>' +

@@ -40,6 +40,8 @@ export const UF = {
   DIRECTION_CREATED: 'UF_CRM_1744273716729',     // Направление обучения (текст, при создании)
   AGREED_PAY_DATE:   'UF_CRM_1474975772',        // Согласованная дата оплаты
   DEAL_DOCUMENTS:    'UF_CRM_1519917152',        // Файлы на диске (JSON-массив с id_file_disk и ссылками)
+  PARTICIPANT_FLAG:  'UF_CRM_1477555902',        // «Участник» Да/Нет (галка на сделке)
+  INVOICE_DISCOUNT:  'UF_DISCOUNT',              // Скидка из счёта, %
 };
 
 // ── Воронки (CATEGORY_ID) ─────────────────────────────────────────────────────

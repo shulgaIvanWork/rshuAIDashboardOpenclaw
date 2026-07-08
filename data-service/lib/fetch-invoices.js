@@ -12,12 +12,13 @@
  */
 
 import path from 'path';
-import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { writeFileAtomic } from './fs-utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DS_CACHE = path.join(__dirname, '..', 'cache');
 const WEBHOOK = process.env.BITRIX_BASE;
+const MAX_RETRIES = 6;
 
 // Статусы инвойсов Bitrix24
 const INVOICE_STATUSES = {};
@@ -49,14 +50,28 @@ function sleep(ms) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+// Ретраи с экспоненциальной задержкой — как в bitrix-rest.js
 async function restCall(method, params = {}) {
   const url = WEBHOOK + method + '.json';
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  return res.json();
+  const body = JSON.stringify(params);
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      return await res.json();
+    } catch (e) {
+      if (attempt < MAX_RETRIES - 1) {
+        const wait = 10000 * (attempt + 1);
+        process.stderr.write(`    Retry ${attempt + 1}/${MAX_RETRIES - 1}: ${e.message} (wait ${wait / 1000}s)\n`);
+        await sleep(wait);
+      } else {
+        throw e;
+      }
+    }
+  }
 }
 
 export async function fetchInvoices(deals) {
@@ -113,9 +128,9 @@ export async function fetchInvoices(deals) {
 
   process.stdout.write(`    Найдено инвойсов: ${Object.keys(result).length}\n`);
 
-  // Сохраняем
+  // Сохраняем (атомарно, чтобы дашборды не прочитали полузаписанный файл)
   const outPath = path.join(DS_CACHE, 'invoices.json');
-  await fs.writeFile(outPath, JSON.stringify(result, null, 2), 'utf-8');
+  await writeFileAtomic(outPath, JSON.stringify(result, null, 2));
   process.stdout.write(`    → cache/invoices.json\n`);
 
   return result;

@@ -242,31 +242,26 @@ async function buildParticipants(weekIndex) {
     return isRealTraining(d.TITLE, d.ID);
   });
 
-  // Build map: contactId → qualifying paid deals (sale funnel, реальная оплата по правилам deal-rules)
+  // Оплаченные обучения по контактам («Пред. обучение») и по компаниям
+  // («Последнее обучение от компании») — один проход, условия одинаковые
   const contactTrainingDeals = new Map();
-  for (const d of deals) {
-    if (String(d.CATEGORY_ID) !== '0') continue;
-    if (isKomDeal(d)) continue;
-    if (!isPaidDeal(d)) continue;
-    const ccinfo2 = cc[d.ID] || {};
-    const cid = String(ccinfo2.CONTACT_ID || d.CONTACT_ID || '0');
-    if (cid === '0') continue;
-    if (!contactTrainingDeals.has(cid)) contactTrainingDeals.set(cid, []);
-    contactTrainingDeals.get(cid).push({ id: d.ID, payDate: d.UF_DATE_PAY_1C.substring(0, 10) });
-  }
-
-  // Build map: companyId → qualifying paid deals (для колонки «Последнее обучение от компании»)
   const companyTrainingDeals = new Map();
   for (const d of deals) {
     if (String(d.CATEGORY_ID) !== '0') continue;
     if (isKomDeal(d)) continue;
     if (!isPaidDeal(d)) continue;
-    if (!d.UF_DATE_PAY_1C) continue;
     const ccinfo2 = cc[d.ID] || {};
+    const entry = { id: d.ID, payDate: d.UF_DATE_PAY_1C.substring(0, 10) };
+    const cid = String(ccinfo2.CONTACT_ID || d.CONTACT_ID || '0');
+    if (cid !== '0') {
+      if (!contactTrainingDeals.has(cid)) contactTrainingDeals.set(cid, []);
+      contactTrainingDeals.get(cid).push(entry);
+    }
     const coid = String(ccinfo2.COMPANY_ID || d.COMPANY_ID || '0');
-    if (coid === '0') continue;
-    if (!companyTrainingDeals.has(coid)) companyTrainingDeals.set(coid, []);
-    companyTrainingDeals.get(coid).push({ id: d.ID, payDate: d.UF_DATE_PAY_1C.substring(0, 10) });
+    if (coid !== '0') {
+      if (!companyTrainingDeals.has(coid)) companyTrainingDeals.set(coid, []);
+      companyTrainingDeals.get(coid).push(entry);
+    }
   }
 
   const participants = [];

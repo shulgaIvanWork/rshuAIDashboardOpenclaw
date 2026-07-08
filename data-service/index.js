@@ -25,8 +25,9 @@
  * статуса загрузки.
  */
 
-import { writeFile, rename, mkdir } from 'fs/promises';
+import { readFile, mkdir } from 'fs/promises';
 import { fileURLToPath } from 'url';
+import { writeFileAtomic } from './lib/fs-utils.js';
 import path from 'path';
 import { fetchDealsRest } from './lib/bitrix-rest.js';
 import { fetchDealsExport, mergeDeals } from './lib/bitrix-export.js';
@@ -45,17 +46,6 @@ if (!process.env.BITRIX_BASE) {
 
 function progress(msg) {
   process.stdout.write(`###PROGRESS:${JSON.stringify(msg)}\n`);
-}
-
-/**
- * Атомарная запись: пишем во временный файл и переименовываем.
- * Иначе analyze() мог прочитать полузаписанный deals.json во время
- * 20-40-минутной выгрузки (rename на одном диске атомарен).
- */
-async function writeFileAtomic(filePath, data) {
-  const tmp = filePath + '.tmp';
-  await writeFile(tmp, data, 'utf-8');
-  await rename(tmp, filePath);
 }
 
 const t0 = Date.now();
@@ -179,7 +169,7 @@ console.log(`  deals.json    — ${deals.length} сделок`);
 console.log(`  dicts.json    — ${Object.keys(dicts.categories).length} воронок, ${Object.keys(dicts.users).length} пользователей`);
 console.log(`  contacts.json — ${Object.keys(contacts).length} контактов`);
 console.log(`  companies.json — ${Object.keys(companies).length} компаний`);
-  try {
-    const inv = JSON.parse(require('fs').readFileSync(path.join(CACHE_DIR, 'invoices.json'), 'utf-8'));
-    console.log(`  invoices.json — ${Object.keys(inv).length} инвойсов`);
-  } catch {}
+try {
+  const inv = JSON.parse(await readFile(path.join(CACHE_DIR, 'invoices.json'), 'utf-8'));
+  console.log(`  invoices.json — ${Object.keys(inv).length} инвойсов`);
+} catch { /* шаг 6 мог упасть — не критично */ }
