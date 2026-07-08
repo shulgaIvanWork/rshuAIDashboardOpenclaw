@@ -1,5 +1,10 @@
 /* Dashboard-specific: management */
 
+/* shared.css задаёт body{padding:24px} для трёх ещё не мигрировавших дашбордов
+   (kom/ratings/manager-report-dev) — здесь отступ уже даёт container-fluid p-4,
+   поэтому body-padding отменяем, чтобы не удвоился */
+body { padding: 0 !important; }
+
 /* Увеличенные карточки KPI */
 .kpi { padding: 7px 8px !important; }
 .kpi .lbl  { margin-bottom: 6px !important; }
@@ -8,24 +13,3 @@
 .kpi .sub  { margin-top: 6px !important; line-height: 1.5; }
 .pp-val { margin-top: 6px; font-size: 12px; color: #000; }
 
-.loading-bar { height: 3px; background: #e0e0e0; border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
-.loading-bar .fill { height: 100%; width: 0%; background: #093EB4; transition: width .5s; }
-
-.refresh-panel { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-.refresh-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-.refresh-title { font-size: 16px; font-weight: 600; color: #0F172A; }
-.refresh-elapsed { font-size: 14px; color: #475569; font-weight: 500; }
-.refresh-progress-bar { height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; margin-bottom: 14px; }
-.refresh-progress-bar .progress-fill { height: 100%; background: linear-gradient(90deg, #093EB4, #3079D2); border-radius: 4px; transition: width .8s ease; }
-.refresh-steps { margin-top: 4px; }
-.refresh-step { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #F1F3F6; }
-.refresh-step:last-child { border-bottom: none; }
-.refresh-step .step-icon { width: 28px; font-size: 16px; text-align: center; flex-shrink: 0; }
-.refresh-step .step-label { font-size: 14px; color: #0F172A; margin-left: 8px; }
-.refresh-step .step-weight { font-size: 12px; color: #888; font-weight: 400; }
-.refresh-step.step-active .step-label { font-weight: 600; color: #093EB4; }
-.refresh-step.step-done { opacity: 0.85; }
-.refresh-step.step-done .step-label { color: #475569; }
-.refresh-step.step-pending .step-label { color: #94A3B8; }
-.refresh-step.step-error .step-label { color: #C62828; font-weight: 500; }
-.refresh-deal-progress { font-size: 13px; color: #475569; margin-top: 10px; text-align: center; font-weight: 500; }

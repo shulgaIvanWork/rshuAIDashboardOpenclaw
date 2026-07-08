@@ -58,7 +58,6 @@ async function loadAll() {
   try {
     const d = await api('/api/data');
     if (!d || !d.ytd) return;
-    var _lf=document.getElementById('loadingFill');if(_lf)_lf.style.width='100%';
     dataCache = d;
 
     // Дата обновления в заголовке

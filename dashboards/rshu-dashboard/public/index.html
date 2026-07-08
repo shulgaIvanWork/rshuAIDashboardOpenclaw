@@ -9,40 +9,6 @@ var _p = window.location.pathname;
 var _m = _p.match(/^\/([^/]+)\//);
 window.BASE_PATH = _m ? '/' + _m[1] : '';
 
-var refreshStepsData = [
-  { key: 'fetch_data',   label: 'Загрузка данных',         weight: 50 },
-  { key: 'analyze',      label: 'Анализ данных',           weight: 50 },
-];
-
-var statusPanelHTML = '' +
-  '<div id="refreshStatusPanel" class="refresh-panel" style="display:none">' +
-    '<div class="refresh-header">' +
-      '<span class="refresh-title">🔄 Обновление данных</span>' +
-      '<span class="refresh-elapsed" id="statusElapsed">⏱ 0м 0с</span>' +
-    '</div>' +
-    '<div class="progress-bar refresh-progress-bar">' +
-      '<div class="progress-fill" id="statusProgressFill" style="width:0%"></div>' +
-    '</div>' +
-    '<div id="statusSteps" class="refresh-steps"></div>' +
-    '<div id="statusDealProgress" class="refresh-deal-progress"></div>' +
-  '</div>';
-
-function renderStepLines(curIdx, steps, progressPct) {
-  var h = '';
-  for (var i = 0; i < steps.length; i++) {
-    var s = steps[i];
-    var icon, cls, label;
-    if (i < curIdx) { icon = '\u2705'; cls = 'step-done'; label = s.label; }
-    else if (i === curIdx) { icon = '\u23f3'; cls = 'step-active'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
-    else { icon = '\u2b1c'; cls = 'step-pending'; label = s.label + ' <span class="step-weight">(' + s.weight + '%)</span>'; }
-    h += '<div class="refresh-step ' + cls + '">' +
-      '<span class="step-icon">' + icon + '</span>' +
-      '<span class="step-label">' + label + '</span>' +
-    '</div>';
-  }
-  return h;
-}
-
 async function safeFetch(url, opts) {
   var resp = await fetch(url, opts);
   if (resp.redirected || resp.url.endsWith('/login')) { window.location.href = '/login'; throw new Error('redirect'); }
@@ -64,7 +30,6 @@ async function safeFetch(url, opts) {
     .toolbar button:hover { background: #3079D2; }
     .toolbar button:disabled { background: #475569; cursor: wait; }
     .page-title-meta { font-size: 13px; font-weight: 400; color: #888; }
-    .loading-bar .fill { height: 100%; width: 0%; background: #093EB4; transition: width .5s; }
 
     .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
     .kpi { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
@@ -120,25 +85,6 @@ async function safeFetch(url, opts) {
     .deal-title { font-weight: 600; }
     .muted { color: #475569; font-size: 11px; }
     @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } .twocol, .threecol { grid-template-columns: 1fr; } }
-
-    .refresh-panel { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    .refresh-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
-    .refresh-title { font-size: 16px; font-weight: 600; color: #0F172A; }
-    .refresh-elapsed { font-size: 14px; color: #475569; font-weight: 500; }
-    .refresh-progress-bar { height: 8px; background: #E2E8F0; border-radius: 4px; overflow: hidden; margin-bottom: 14px; }
-    .refresh-progress-bar .progress-fill { height: 100%; background: linear-gradient(90deg, #093EB4, #3079D2); border-radius: 4px; transition: width .8s ease; }
-    .refresh-steps { margin-top: 4px; }
-    .refresh-step { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #F1F3F6; }
-    .refresh-step:last-child { border-bottom: none; }
-    .refresh-step .step-icon { width: 28px; font-size: 16px; text-align: center; flex-shrink: 0; }
-    .refresh-step .step-label { font-size: 14px; color: #0F172A; margin-left: 8px; }
-    .refresh-step .step-weight { font-size: 12px; color: #888; font-weight: 400; }
-    .refresh-step.step-active .step-label { font-weight: 600; color: #093EB4; }
-    .refresh-step.step-done { opacity: 0.85; }
-    .refresh-step.step-done .step-label { color: #475569; }
-    .refresh-step.step-pending .step-label { color: #94A3B8; }
-    .refresh-step.step-error .step-label { color: #C62828; font-weight: 500; }
-    .refresh-deal-progress { font-size: 13px; color: #475569; margin-top: 10px; text-align: center; font-weight: 500; }
   </style>
 </head>
 <body>
