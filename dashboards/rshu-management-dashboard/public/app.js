@@ -78,7 +78,7 @@ async function loadAll() {
     renderFilteredData();
   } catch (e) {
     console.error('loadAll error:', e);
-    if (areaNew) areaNew.innerHTML = '<div class="error-state">❌ Ошибка загрузки: '+escapeHtml(e.message)+'</div>';
+    if (areaNew) areaNew.innerHTML = '<div class="alert alert-danger">❌ Ошибка загрузки: '+escapeHtml(e.message)+'</div>';
   }
 }
 
@@ -176,7 +176,7 @@ async function renderPageMainNew(d) {
   if (!areaNew) return;
   try {
     if (!d) d = await api('/api/data');
-    if (!d || !d.ytd) { areaNew.innerHTML = '<div class="error-state">Нет данных</div>'; return; }
+    if (!d || !d.ytd) { areaNew.innerHTML = '<div class="alert alert-danger">Нет данных</div>'; return; }
 
         function kpi(label, val, sub, cls) {
       var kpiCls = cls === 'oom' ? 'kpi-oom' : (cls === 'kom' ? 'kpi-kom' : 'kpi-total');
@@ -185,7 +185,7 @@ async function renderPageMainNew(d) {
     function delta(a,b) {
       if (!b) return '';
       var p = b>0?((a-b)/b*100).toFixed(1):0, s=(p>0?'\u2191':(p<0?'\u2193':'\u2192'));
-      var cl = p>0?'delta-up':(p<0?'delta-down':'delta-flat');
+      var cl = p>0?'text-success':(p<0?'text-danger':'text-body-secondary');
       return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
     }
     // \u0418\u043d\u0432\u0435\u0440\u0441\u043d\u0430\u044f \u0434\u0435\u043b\u044c\u0442\u0430 \u0434\u043b\u044f \u043c\u0435\u0442\u0440\u0438\u043a \u00ab\u043c\u0435\u043d\u044c\u0448\u0435 = \u043b\u0443\u0447\u0448\u0435\u00bb (\u0446\u0438\u043a\u043b \u0441\u0434\u0435\u043b\u043a\u0438):
@@ -193,7 +193,7 @@ async function renderPageMainNew(d) {
     function deltaInv(a,b) {
       if (!b) return '';
       var p = b>0?((a-b)/b*100).toFixed(1):0, s=(p>0?'\u2191':(p<0?'\u2193':'\u2192'));
-      var cl = p>0?'delta-down':(p<0?'delta-up':'delta-flat');
+      var cl = p>0?'text-danger':(p<0?'text-success':'text-body-secondary');
       return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
     }
     function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev, ppYtd, ppLeads, ppQual) {
@@ -203,14 +203,14 @@ async function renderPageMainNew(d) {
         if (!b || b === 0) return '';
         var p = ((a - b) / b * 100).toFixed(1);
         var s = p > 0 ? '↑' : (p < 0 ? '↓' : '→');
-        var cl = p > 0 ? 'delta-up' : (p < 0 ? 'delta-down' : 'delta-flat');
+        var cl = p > 0 ? 'text-success' : (p < 0 ? 'text-danger' : 'text-body-secondary');
         return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
       }
       function pctDeltaInv(a, b) {
         if (!b || b === 0) return '';
         var p = ((a - b) / b * 100).toFixed(1);
         var s = p > 0 ? '↑' : (p < 0 ? '↓' : '→');
-        var cl = p > 0 ? 'delta-down' : (p < 0 ? 'delta-up' : 'delta-flat');
+        var cl = p > 0 ? 'text-danger' : (p < 0 ? 'text-success' : 'text-body-secondary');
         return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
       }
       var ppL = ppYtd ? (ppLeads || 0) : 0, ppQ = ppYtd ? (ppQual || 0) : 0;
@@ -384,7 +384,7 @@ async function renderPageMainNew(d) {
     html += '</div></div>';
 
     // Блок артефактов — виден только admin (403 для остальных обрабатывается внутри loadArtifacts)
-    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="loading-state"><div class="spinner"></div><div>Загрузка...</div></div></div></div>';
+    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="text-center text-secondary py-4"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка...</div></div></div></div>';
 
     // Batch update all at once
     areaNew.innerHTML = html;
@@ -525,7 +525,7 @@ async function renderPageMainNew(d) {
     }, 100);
 
   } catch(e) {
-    areaNew.innerHTML = '<div class="error-state" style="cursor:pointer" onclick="this.style.display=\'none\'\">\u274c <b>Ошибка вкладки «Новая логика»</b><br>'+escapeHtml(e.message)+'<br><br><small style="color:#999">(нажмите чтобы закрыть, время: ' + new Date().toLocaleTimeString('ru-RU') + ')</small></div>';
+    areaNew.innerHTML = '<div class="alert alert-danger" style="cursor:pointer" onclick="this.style.display=\'none\'\">\u274c <b>Ошибка вкладки «Новая логика»</b><br>'+escapeHtml(e.message)+'<br><br><small style="color:#999">(нажмите чтобы закрыть, время: ' + new Date().toLocaleTimeString('ru-RU') + ')</small></div>';
     console.error('renderPageMainNew error:', e);
   }
 }
@@ -548,5 +548,5 @@ document.getElementById('dateTo').addEventListener('change', function() {
 // Защищённый запуск: ошибка не должна блокировать UI
 loadAll().catch(function(e) {
   var areaNew = document.getElementById('contentAreaNew');
-  if (areaNew) areaNew.innerHTML = '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
+  if (areaNew) areaNew.innerHTML = '<div class="alert alert-danger">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
 });

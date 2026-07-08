@@ -14,9 +14,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .card h2 { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
 
-/* Table */
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { background: #093EB4; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; position: sticky; top: 0; }
+/* Table
+   border-collapse:collapse ломает position:sticky на th по спецификации
+   CSS Tables — separate + явный border-bottom на td (тот же фикс, что
+   и в participants-dashboard). */
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+th { background: #093EB4; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; position: sticky; top: 0; border-bottom: 1px solid #093EB4; }
 td { padding: 8px 12px; border-bottom: 1px solid #E2E8F0; }
 tr:hover td { background: #F1F3F6; }
 tr.cur td { background: #F1F3F6; font-weight: 600; }
