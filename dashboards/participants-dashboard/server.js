@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила: КОМ-признак, «настоящая оплата», отчётный год
 import { isKomDeal, isPaidDeal, YEAR } from '@rshu/data-service/lib/deal-rules.js';
+import { buildParticipantsWorkbook } from './lib/export-excel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -432,7 +433,17 @@ async function buildParticipants(weekIndex) {
     return b.date.localeCompare(a.date);
   });
 
-  return { participants, total: participants.length, weekLabel: wkLabel };
+  // Разбивка по направлениям — сколько участников в каждом
+  const byDirection = {};
+  for (const p of participants) {
+    const key = p.direction || '—';
+    byDirection[key] = (byDirection[key] || 0) + 1;
+  }
+  const directionCounts = Object.entries(byDirection)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, count }));
+
+  return { participants, total: participants.length, weekLabel: wkLabel, directionCounts };
 }
 
 app.get('/api/participants', async (req, res) => {
@@ -455,6 +466,25 @@ app.get('/api/participants/current', async (req, res) => {
     res.json(result);
   } catch (e) {
     console.error('/api/participants/current error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/export', async (req, res) => {
+  try {
+    const agg = await getAgg();
+    const weeks = agg.weeks || [];
+    const [prevResult, curResult] = await Promise.all([
+      buildParticipants(weeks.length - 2),
+      buildParticipants(weeks.length - 1),
+    ]);
+    const buffer = await buildParticipantsWorkbook(prevResult, curResult);
+    const fileName = `participants_${new Date().toISOString().substring(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(Buffer.from(buffer));
+  } catch (e) {
+    console.error('/api/export error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

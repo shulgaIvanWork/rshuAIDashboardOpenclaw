@@ -3,6 +3,9 @@
 let dataCache = null;
 let currentTab = 'participants';
 
+var exportBtn = document.getElementById('exportBtn');
+if (exportBtn) exportBtn.href = (window.BASE_PATH || '') + '/api/export';
+
 // ── Tab switching ─────────────────────────────────────────────────────────────
 
 document.getElementById('tabBar').addEventListener('click', function(e) {
@@ -12,8 +15,8 @@ document.getElementById('tabBar').addEventListener('click', function(e) {
   if (tabName === currentTab) return;
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   tab.classList.add('active');
-  document.getElementById('participantsArea').classList.toggle('active', tabName === 'participants');
-  document.getElementById('participantsCurArea').classList.toggle('active', tabName === 'participantsCur');
+  document.getElementById('participantsArea').classList.toggle('d-none', tabName !== 'participants');
+  document.getElementById('participantsCurArea').classList.toggle('d-none', tabName !== 'participantsCur');
   currentTab = tabName;
   if (tabName === 'participants') loadParticipants();
   if (tabName === 'participantsCur') loadParticipantsCurrent();
@@ -33,12 +36,9 @@ async function loadAll() {
       dateEl.textContent = '(Данные на: ' + dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')';
     }
 
-    var activeTab = document.querySelector('.tab.active');
-    if (activeTab) {
-      var tabName = activeTab.dataset.tab;
-      if (tabName === 'participants') loadParticipants();
-      if (tabName === 'participantsCur') loadParticipantsCurrent();
-    }
+    // Грузим оба таба сразу — иначе заголовок неактивной вкладки остаётся статичным текстом
+    loadParticipants();
+    loadParticipantsCurrent();
   } catch (e) {
     console.error('loadAll error:', e);
   }
@@ -47,86 +47,107 @@ async function loadAll() {
 // ── Participants table builder ─────────────────────────────────────────────────
 
 function buildParticipantsTable(res, tableId) {
-  let html = '<table class="sortable" id="' + tableId + '"><thead><tr>' +
-    '<th class="sort" data-col="0" style="text-align:left;min-width:100px">Направление</th>' +
-    '<th class="sort" data-col="1" style="text-align:left;min-width:120px">Программа</th>' +
-    '<th class="sort" data-col="2" style="text-align:left;min-width:150px">Тема / Сделка</th>' +
-    '<th class="sort" data-col="3" style="text-align:left;min-width:80px">Формат</th>' +
-    '<th class="sort" data-col="4" style="text-align:left;min-width:120px">ФИО</th>' +
-    '<th class="sort" data-col="5" style="text-align:left;min-width:100px">Регион</th>' +
-    '<th class="sort" data-col="6" style="text-align:left;min-width:150px">Компания</th>' +
-    '<th class="sort" data-col="7">Тип</th>' +
-    '<th class="sort" data-col="8" style="text-align:right">Сумма, ₽</th>' +
-    '<th class="sort" data-col="9">Даты</th>' +
-    '<th class="sort" data-col="10" style="text-align:right">Длит., дн.</th>' +
-    '<th class="sort" data-col="11" style="text-align:right">Цикл, дн.</th>' +
-    '<th class="sort" data-col="12">Статус</th>' +
-    '<th class="sort" data-col="13" style="text-align:left">Менеджер</th>' +
-    '<th class="sort" data-col="14" style="text-align:left">Пред. обучение</th>' +
-    '<th class="sort" data-col="15" style="text-align:left">Посл. обучение (компания)</th>' +
-    '<th class="sort" data-col="16">Участник</th>' +
-    '<th class="sort" data-col="17" style="text-align:right">Скидка, %</th>' +
-    '<th class="sort" data-col="18" style="text-align:left">Статус счета</th>' +
+  let html = '<table class="table table-sm table-hover align-middle sortable" id="' + tableId + '"><thead><tr>' +
+    '<th class="sort text-nowrap" data-col="0">Направление</th>' +
+    '<th class="sort text-nowrap" data-col="1">Программа</th>' +
+    '<th class="sort text-nowrap" data-col="2">Тема / Сделка</th>' +
+    '<th class="sort text-nowrap" data-col="3">Формат</th>' +
+    '<th class="sort text-nowrap" data-col="4">ФИО</th>' +
+    '<th class="sort text-nowrap" data-col="5">Регион</th>' +
+    '<th class="sort text-nowrap" data-col="6">Компания</th>' +
+    '<th class="sort text-nowrap" data-col="7">Тип</th>' +
+    '<th class="sort text-nowrap" data-col="8">Сумма, ₽</th>' +
+    '<th class="sort text-nowrap" data-col="9">Даты</th>' +
+    '<th class="sort text-nowrap" data-col="10">Длит., дн.</th>' +
+    '<th class="sort text-nowrap" data-col="11">Цикл, дн.</th>' +
+    '<th class="sort text-nowrap" data-col="12">Статус</th>' +
+    '<th class="sort text-nowrap" data-col="13">Менеджер</th>' +
+    '<th class="sort text-nowrap" data-col="14">Пред. обучение</th>' +
+    '<th class="sort text-nowrap" data-col="15">Посл. обучение (комп.)</th>' +
+    '<th class="sort text-nowrap" data-col="16">Участник</th>' +
+    '<th class="sort text-nowrap" data-col="17">Скидка, %</th>' +
+    '<th class="sort text-nowrap" data-col="18">Статус счета</th>' +
     '</tr></thead><tbody>';
 
   for (let i = 0; i < res.participants.length; i++) {
     const p = res.participants[i];
     const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
-    const fmtColor = p.format === 'Онлайн' ? '#1976D2' : '#2E7D32';
+    const fmtBadge = p.format === 'Онлайн' ? 'text-bg-primary' : 'text-bg-success';
     const fmtLabel = p.format === 'Онлайн' ? 'Онлайн' : 'Очно';
     const regionLabel = p.region ? escapeHtml(p.region) : '—';
-    let stageColor = '#2E7D32';
-    if (p.stage === 'Счёт отправлен') stageColor = '#9C27B0';
-    else if (p.stage === 'Постоплата') stageColor = '#1B5E20';
-    else if (p.stage === 'Частично оплачен') stageColor = '#FF9800';
+    let stageBadge = 'text-bg-success';    // Счёт оплачен (по умолчанию)
+    if (p.stage === 'Счёт отправлен') stageBadge = 'text-bg-info';
+    else if (p.stage === 'Постоплата') stageBadge = 'text-bg-primary';
+    else if (p.stage === 'Частично оплачен') stageBadge = 'text-bg-warning';
+    const typeBadge = p.clientType === 'B2B' ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-primary-subtle text-primary-emphasis';
+    const invStatusColors = {
+      'Черновик': 'text-secondary',
+      'Отправлен клиенту': 'text-info',
+      'Не принят 1С': 'text-danger',
+      'Принят 1С': 'text-primary',
+      'Частично оплачен': 'text-warning',
+      'Оплачен': 'text-success',
+      'Закрыт успешно': 'text-success fw-bold',
+      'Отклонён': 'text-danger fw-bold',
+    };
+    const invStatusClass = invStatusColors[p.invoiceStatus] || 'text-primary';
 
     html += '<tr>' +
-      '<td class="tdleft"><b>' + escapeHtml(p.direction || '—') + '</b></td>' +
-      '<td class="tdleft">' + escapeHtml(p.program) + '</td>' +
-      '<td class="tdleft" style="font-size:11px;color:#666">' + escapeHtml(p.title) + '</td>' +
-      '<td><span style="color:' + fmtColor + ';font-weight:600">' + fmtLabel + '</span></td>' +
-      '<td class="tdleft">' + escapeHtml(p.participant) + '</td>' +
-      '<td class="tdleft">' + regionLabel + '</td>' +
-      '<td class="tdleft">' + escapeHtml(p.company.substring(0, 60)) + (p.company.length > 60 ? '…' : '') + '</td>' +
-      '<td><span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:11px;font-weight:700;background:' + (p.clientType === 'B2B' ? '#E8F5E9' : '#E3F2FD') + ';color:' + (p.clientType === 'B2B' ? '#2E7D32' : '#1565C0') + '">' + (p.clientType || '—') + '</span></td>' +
-      '<td class="tdright">' + amount + '</td>' +
-      '<td style="font-size:11px;line-height:1.6">' + (p.date || '—') + '<br>—<br>' + (p.dateEnd || '—') + '</td>' +
-      '<td class="tdright">' + (p.moduleDuration != null ? p.moduleDuration : '—') + '</td>' +
-      '<td class="tdright">' + (p.dealCycle != null ? p.dealCycle : '—') + '</td>' +
-      '<td style="color:' + stageColor + ';font-weight:600">' + p.stage + '</td>' +
-      '<td class="tdleft">' + escapeHtml(p.manager) + '</td>' +
-      '<td class="tdleft">' + (p.hadPrevTraining ? '<span style="color:#E65100;font-weight:600">Да</span>' + (p.prevTrainingDate ? ' <span style="color:#888;font-size:11px">' + p.prevTrainingDate + '</span>' : '') : '<span style="color:#999">нет</span>') + '</td>' +
-      '<td class="tdleft">' + (p.lastCompanyTraining ? '<span style="color:#1565C0;font-size:11px">' + p.lastCompanyTraining + '</span>' : '<span style="color:#999">—</span>') + '</td>' +
-      '<td>' + (p.participantFlag === 'Да' ? '<span style="color:#2E7D32;font-weight:600">Да</span>' : p.participantFlag === 'Нет' ? '<span style="color:#C62828">Нет</span>' : '<span style="color:#999">—</span>') + '</td>' +
-      '<td class="tdright">' + (p.invoiceDiscount != null ? Number(p.invoiceDiscount).toLocaleString('ru-RU') : '—') + '</td>' +
-      '<td class="tdleft">' + (p.invoiceStatus ? '<span style="color:#1565C0">' + escapeHtml(p.invoiceStatus) + '</span>' : '<span style="color:#999">—</span>') + '</td>' +
+      '<td><strong>' + escapeHtml(p.direction || '—') + '</strong></td>' +
+      '<td>' + escapeHtml(p.program) + '</td>' +
+      '<td class="small text-secondary">' + escapeHtml(p.title) + '</td>' +
+      '<td><span class="badge ' + fmtBadge + '">' + fmtLabel + '</span></td>' +
+      '<td>' + escapeHtml(p.participant) + '</td>' +
+      '<td>' + regionLabel + '</td>' +
+      '<td>' + escapeHtml(p.company.substring(0, 60)) + (p.company.length > 60 ? '…' : '') + '</td>' +
+      '<td><span class="badge ' + typeBadge + '">' + (p.clientType || '—') + '</span></td>' +
+      '<td>' + amount + '</td>' +
+      '<td class="small">' + (p.date || '—') + '<br>—<br>' + (p.dateEnd || '—') + '</td>' +
+      '<td>' + (p.moduleDuration != null ? p.moduleDuration : '—') + '</td>' +
+      '<td>' + (p.dealCycle != null ? p.dealCycle : '—') + '</td>' +
+      '<td><span class="badge ' + stageBadge + '">' + p.stage + '</span></td>' +
+      '<td>' + escapeHtml(p.manager) + '</td>' +
+      '<td>' + (p.hadPrevTraining ? '<span class="badge text-bg-warning">Да</span>' + (p.prevTrainingDate ? ' <span class="text-secondary small">' + p.prevTrainingDate + '</span>' : '') : '<span class="text-secondary">нет</span>') + '</td>' +
+      '<td>' + (p.lastCompanyTraining ? '<span class="text-primary small">' + p.lastCompanyTraining + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +
+      '<td>' + (p.participantFlag === 'Да' ? '<span class="badge text-bg-success">Да</span>' : p.participantFlag === 'Нет' ? '<span class="badge text-bg-danger">Нет</span>' : '<span class="text-secondary">—</span>') + '</td>' +
+      '<td>' + (p.invoiceDiscount != null ? Number(p.invoiceDiscount).toLocaleString('ru-RU') + '%' : '—') + '</td>' +
+      '<td>' + (p.invoiceStatus ? '<span class="' + invStatusClass + '">' + escapeHtml(p.invoiceStatus) + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +
       '</tr>';
   }
   return html + '</tbody></table>';
 }
 
-function formatWeekTitle(weekLabel) {
+function renderDirectionCounts(directionCounts) {
+  if (!directionCounts || !directionCounts.length) return '';
+  return directionCounts.map(function(d) {
+    return '<span class="badge text-bg-light text-dark border me-1 mb-1">' + escapeHtml(d.name) + ': <strong>' + d.count + '</strong></span>';
+  }).join('');
+}
+
+function formatWeekTitle(weekLabel, which) {
   var m = weekLabel.match(/W(\d+) \((.*?)\)/);
-  return m ? m[1] + ' неделю (' + m[2] + ')' : weekLabel;
+  var label = which === 'prev' ? 'предыдущая неделя' : 'текущая неделя';
+  return m ? label + ' (' + m[2] + ')' : weekLabel;
 }
 
 // ── Load prev week ────────────────────────────────────────────────────────────
 
 async function loadParticipants() {
   const wrap = document.getElementById('participantsTableWrap');
-  wrap.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div>';
+  wrap.innerHTML = '<div class="text-center text-secondary py-5"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка участников…</div></div>';
   try {
     const res = await api('/api/participants');
     if (!res.participants) {
-      wrap.innerHTML = '<div class="error-state">❌ ' + (res.error || 'Нет данных') + '</div>';
+      wrap.innerHTML = '<div class="alert alert-danger">❌ ' + (res.error || 'Нет данных') + '</div>';
       return;
     }
     document.getElementById('participantsTitle').textContent =
-      '👥 Участники Очно / Онлайн за ' + formatWeekTitle(res.weekLabel) + ' · всего ' + res.total;
+      '👥 ' + formatWeekTitle(res.weekLabel, 'prev') + ' · всего ' + res.total;
+    document.getElementById('participantsDirections').innerHTML = renderDirectionCounts(res.directionCounts);
     wrap.innerHTML = buildParticipantsTable(res, 'participantsTable');
     setTimeout(() => initTableSort('participantsTable'), 100);
   } catch (e) {
-    wrap.innerHTML = '<div class="error-state">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
+    wrap.innerHTML = '<div class="alert alert-danger">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
   }
 }
 
@@ -134,19 +155,20 @@ async function loadParticipants() {
 
 async function loadParticipantsCurrent() {
   const wrap = document.getElementById('participantsCurTableWrap');
-  wrap.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div>';
+  wrap.innerHTML = '<div class="text-center text-secondary py-5"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка участников…</div></div>';
   try {
     const res = await api('/api/participants/current');
     if (!res.participants) {
-      wrap.innerHTML = '<div class="error-state">❌ ' + (res.error || 'Нет данных') + '</div>';
+      wrap.innerHTML = '<div class="alert alert-danger">❌ ' + (res.error || 'Нет данных') + '</div>';
       return;
     }
     document.getElementById('participantsCurTitle').textContent =
-      '👥 Участники Очно / Онлайн за ' + formatWeekTitle(res.weekLabel) + ' · всего ' + res.total + ' сделок';
+      '👥 ' + formatWeekTitle(res.weekLabel, 'cur') + ' · всего ' + res.total;
+    document.getElementById('participantsCurDirections').innerHTML = renderDirectionCounts(res.directionCounts);
     wrap.innerHTML = buildParticipantsTable(res, 'participantsCurTable');
     setTimeout(() => initTableSort('participantsCurTable'), 100);
   } catch (e) {
-    wrap.innerHTML = '<div class="error-state">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
+    wrap.innerHTML = '<div class="alert alert-danger">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
   }
 }
 

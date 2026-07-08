@@ -4,30 +4,47 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Участники 2026</title>
-  <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="wrap">
-  <h1>Участники 2026 <span id="updateDate" class="page-title-meta"></span></h1>
-
-  <div class="tabs" id="tabBar">
-    <div class="tab active" data-tab="participants">👥 Участники прошлой недели</div>
-    <div class="tab" data-tab="participantsCur">👥 Участники текущей недели</div>
+<div class="container-fluid p-2">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0">Участники 2026 <span id="updateDate" class="fs-6 fw-normal text-secondary"></span></h1>
+    <a href="/api/export" id="exportBtn" class="btn btn-success btn-sm" download>📥 Скачать Excel (2 листа)</a>
   </div>
+
+  <ul class="nav nav-tabs mb-3" id="tabBar">
+    <li class="nav-item">
+      <button class="nav-link active tab" data-tab="participants" id="participantsTitle">👥 предыдущая неделя</button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link tab" data-tab="participantsCur" id="participantsCurTitle">👥 текущая неделя</button>
+    </li>
+  </ul>
 
   <div id="participantsArea" class="tab-area active">
-      <h2 id="participantsTitle">Участники Очно / Онлайн за прошлую неделю</h2>
-      <div id="participantsTableWrap" style="overflow-x:auto">
-        <div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div>
-      </div>
+    <div>
+        <div id="participantsDirections" class="mb-3"></div>
+        <div id="participantsTableWrap" class="table-responsive">
+          <div class="text-center text-secondary py-5">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <div>Загрузка участников…</div>
+          </div>
+        </div>
+    </div>
   </div>
 
-  <div id="participantsCurArea" class="tab-area">
-      <h2 id="participantsCurTitle">👥 Участники Очно / Онлайн за текущую неделю</h2>
-      <div id="participantsCurTableWrap" style="overflow-x:auto">
-        <div class="loading-state"><div class="spinner"></div><div>Загрузка участников…</div></div>
-      </div>
+  <div id="participantsCurArea" class="tab-area d-none">
+    <div>
+        <div id="participantsCurDirections" class="mb-3"></div>
+        <div id="participantsCurTableWrap" class="table-responsive">
+          <div class="text-center text-secondary py-5">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <div>Загрузка участников…</div>
+          </div>
+        </div>
+    </div>
   </div>
 </div>
 
