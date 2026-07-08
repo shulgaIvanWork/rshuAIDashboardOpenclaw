@@ -47,26 +47,26 @@ async function loadAll() {
 // ── Participants table builder ─────────────────────────────────────────────────
 
 function buildParticipantsTable(res, tableId) {
-  let html = '<table class="table table-sm table-hover align-middle sortable" id="' + tableId + '"><thead><tr>' +
-    '<th class="sort text-nowrap" data-col="0">Направление</th>' +
-    '<th class="sort text-nowrap" data-col="1">Программа</th>' +
-    '<th class="sort text-nowrap" data-col="2">Тема / Сделка</th>' +
-    '<th class="sort text-nowrap" data-col="3">Формат</th>' +
-    '<th class="sort text-nowrap" data-col="4">ФИО</th>' +
-    '<th class="sort text-nowrap" data-col="5">Регион</th>' +
-    '<th class="sort text-nowrap" data-col="6">Компания</th>' +
-    '<th class="sort text-nowrap" data-col="7">Тип</th>' +
-    '<th class="sort text-nowrap" data-col="8">Сумма, ₽</th>' +
-    '<th class="sort text-nowrap" data-col="9">Даты</th>' +
-    '<th class="sort text-nowrap" data-col="10">Длит., дн.</th>' +
-    '<th class="sort text-nowrap" data-col="11">Цикл, дн.</th>' +
-    '<th class="sort text-nowrap" data-col="12">Статус</th>' +
-    '<th class="sort text-nowrap" data-col="13">Менеджер</th>' +
-    '<th class="sort text-nowrap" data-col="14">Пред. обучение</th>' +
-    '<th class="sort text-nowrap" data-col="15">Посл. обучение (комп.)</th>' +
-    '<th class="sort text-nowrap" data-col="16">Участник</th>' +
-    '<th class="sort text-nowrap" data-col="17">Скидка, %</th>' +
-    '<th class="sort text-nowrap" data-col="18">Статус счета</th>' +
+  let html = '<table class="table table-sm table-hover align-middle text-center sortable" id="' + tableId + '"><thead><tr>' +
+    '<th class="sort text-nowrap sticky-top" data-col="0">Направление</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="1">Программа</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="2">Тема / Сделка</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="3">Формат</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="4">ФИО</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="5">Регион</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="6">Компания</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="7">Тип</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="8">Сумма, ₽</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="9">Даты</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="10">Длит., дн.</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="11">Цикл, дн.</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="12">Статус</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="13">Менеджер</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="14">Пред. обучение</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="15">Посл. обучение (комп.)</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="16">Участник</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="17">Скидка, %</th>' +
+    '<th class="sort text-nowrap sticky-top" data-col="18">Статус счета</th>' +
     '</tr></thead><tbody>';
 
   for (let i = 0; i < res.participants.length; i++) {
