@@ -81,13 +81,27 @@ async function loadAll() {
   }
 }
 
+// Пересчитывает и показывает (disabled) конец периода сравнения по длине основного периода
+function updateCompareToField() {
+  var dateFrom = document.getElementById('dateFrom').value;
+  var dateTo = document.getElementById('dateTo').value;
+  var compareFrom = document.getElementById('compareFrom').value;
+  var compareToEl = document.getElementById('compareTo');
+  if (!dateFrom || !dateTo || !compareFrom) { compareToEl.value = ''; return; }
+  var lenMs = new Date(dateTo).getTime() - new Date(dateFrom).getTime();
+  var compareTo = new Date(new Date(compareFrom).getTime() + lenMs);
+  compareToEl.value = compareTo.toISOString().substring(0, 10);
+}
+
 async function renderFilteredData() {
   var d = dataCache;
   if (!d) return;
   var dateFrom = document.getElementById('dateFrom').value;
   var dateTo = document.getElementById('dateTo').value;
+  var compareFrom = document.getElementById('compareFrom').value;
   dateFromCache = dateFrom;
   dateToCache = dateTo;
+  updateCompareToField();
 
   // Недельные графики и таблица всегда показывают полный год — фильтр их не трогает.
   // KPI-карточки и донаты считаются сервером точно по дням выбранного периода.
@@ -95,7 +109,9 @@ async function renderFilteredData() {
 
   if (dateFrom && dateTo) {
     try {
-      var kpi = await api('/api/kpi?from=' + dateFrom + '&to=' + dateTo);
+      var kpiParams = '/api/kpi?from=' + dateFrom + '&to=' + dateTo;
+      if (compareFrom) kpiParams += '&compare_from=' + compareFrom;
+      var kpi = await api(kpiParams);
       applyPeriodKpi(filteredData, kpi);
     } catch (e) { console.error('/api/kpi error:', e); }
   }
@@ -109,13 +125,20 @@ async function renderFilteredData() {
     filteredData.reg_ytd = regData;
   } catch (e) { /* fallback: оставляем оригинальные данные */ }
 
-  // Воронка регистраций за предыдущий период (сдвиг на ту же длину назад)
+  // Воронка регистраций за период сравнения (по умолчанию — та же длина вплотную назад;
+  // если задан compareFrom — от него)
   try {
     var msFrom = new Date(dateFrom).getTime();
     var msTo   = new Date(dateTo).getTime();
     var dur    = msTo - msFrom;
-    var ppTo   = new Date(msFrom - 86400000);
-    var ppFrom = new Date(ppTo.getTime() - dur);
+    var ppFrom, ppTo;
+    if (compareFrom) {
+      ppFrom = new Date(compareFrom);
+      ppTo   = new Date(ppFrom.getTime() + dur);
+    } else {
+      ppTo   = new Date(msFrom - 86400000);
+      ppFrom = new Date(ppTo.getTime() - dur);
+    }
     var ppRegParams = '?from=' + ppFrom.toISOString().substring(0,10) + '&to=' + ppTo.toISOString().substring(0,10);
     var ppRegData = await api('/api/reg-funnel' + ppRegParams);
     ppRegData.avg_check  = ppRegData.total_paid > 0 ? Math.round(ppRegData.total_paid_sum / ppRegData.total_paid) : 0;
@@ -141,7 +164,8 @@ function applyPeriodKpi(out, kpi) {
   function block(t) {
     return {
       postupleniya: t.postupleniya, won_relevant_cnt: t.won_relevant_cnt,
-      avg_check: t.avg_check, avg_close_days_won: t.avg_close_days_won
+      avg_check: t.avg_check, avg_close_days_won: t.avg_close_days_won,
+      same_period_paid_pct: t.same_period_paid_pct, created_in_period: t.created_in_period, paid_same_period: t.paid_same_period
     };
   }
   out.ytd     = Object.assign({}, out.ytd,     block(c.total));
@@ -212,22 +236,19 @@ async function renderPageMainNew(d) {
         var cl = p > 0 ? 'text-danger' : (p < 0 ? 'text-success' : 'text-body-secondary');
         return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
       }
-      var ppL = ppYtd ? (ppLeads || 0) : 0, ppQ = ppYtd ? (ppQual || 0) : 0;
+      var ppL = ppYtd ? (ppLeads || 0) : 0;
       var curLeadsVal = leadsYtd != null ? leadsYtd : ytd.won_relevant_cnt;
       var curConv = leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0;
       var ppConv  = ppYtd && ppL>0?(ppYtd.won_relevant_cnt/ppL*100):0;
-      var curMqlConv = qualLeads>0 ? (ytd.won_relevant_cnt/qualLeads*100) : 0;
-      var ppMqlConv  = ppYtd && ppQ>0 ? (ppYtd.won_relevant_cnt/ppQ*100) : 0;
       function pp(val) { return ppYtd ? '<div class="pp-val">'+val+'</div>' : ''; }
-      var r = '<div class="kpis kpis-9"><div class="kpi-header '+cc+'">'+title+'</div>'
+      var r = '<div class="kpis kpis-8"><div class="kpi-header '+cc+'">'+title+'</div>'
         + '<div class="kpi '+kc+'" style="grid-column:span 2"><div class="lbl">Поступления</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.postupleniya)+' ₽</div>'+(ppYtd?pctDelta(ytd.postupleniya,ppYtd.postupleniya):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.postupleniya)+' ₽')+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Сделок</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.won_relevant_cnt)+'</div>'+(ppYtd?pctDelta(ytd.won_relevant_cnt,ppYtd.won_relevant_cnt):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.won_relevant_cnt))+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">📋 Лиды</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(curLeadsVal)+'</div>'+(ppYtd?pctDelta(curLeadsVal,ppL):'')+'</div>'+pp(fmt(ppL))+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">📈 Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curConv)+'%</div>'+(ppYtd?pctDelta(curConv,ppConv):'')+'</div>'+pp(fmtPct(ppConv)+'%')+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Квал. лиды (MQL)</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(qualLeads)+'</div>'+(ppYtd?pctDelta(qualLeads,ppQ):'')+'</div>'+pp(fmt(ppQ))+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Конв. MQL</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curMqlConv)+'%</div>'+(ppYtd&&ppQ>0?pctDelta(curMqlConv,ppMqlConv):'')+'</div>'+pp(fmtPct(ppMqlConv)+'%')+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">💰 Средний чек</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+' ₽</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.avg_check)+' ₽')+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">⏱ Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDeltaInv(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div>'+pp((ppYtd&&ppYtd.avg_close_days_won||0).toFixed(1)+' дн.')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Лиды</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(curLeadsVal)+'</div>'+(ppYtd?pctDelta(curLeadsVal,ppL):'')+'</div>'+pp(fmt(ppL))+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curConv)+'%</div>'+(ppYtd?pctDelta(curConv,ppConv):'')+'</div>'+pp(fmtPct(ppConv)+'%')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Оплачено в период</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(ytd.same_period_paid_pct)+'%</div>'+(ppYtd?pctDelta(ytd.same_period_paid_pct,ppYtd.same_period_paid_pct):'')+'</div>'+pp(fmtPct(ppYtd&&ppYtd.same_period_paid_pct)+'%')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Средний чек</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+' ₽</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.avg_check)+' ₽')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDeltaInv(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div>'+pp((ppYtd&&ppYtd.avg_close_days_won||0).toFixed(1)+' дн.')+'</div>'
         + '</div>';
       return r;
     }
@@ -414,24 +435,24 @@ async function renderPageMainNew(d) {
     var reg = d.reg_ytd||{};
     var pp_reg = d.pp_reg_ytd||null;
     var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.'+(pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'')+'</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">📥 Регистраций пришло</div><div class="row"><div class="val-big">'+fmt(reg.total_sum)+' ₽</div><span class="si">'+fmt(reg.total)+' сд.'+(pp_reg?delta(reg.total_sum,pp_reg.total_sum):'')+'</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL</div><div class="row"><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><span class="si">'+reg.sql+' сд.'+(pp_reg?delta(reg.sql_sum,pp_reg.sql_sum):'')+'</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен</div><div class="row"><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><span class="si">'+reg.real_inv_cnt+' сд.'+(pp_reg?delta(reg.real_inv_sum,pp_reg.real_inv_sum):'')+'</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату</div><div class="val-big">'+reg.conv+'%'+(pp_reg?delta(reg.conv,pp_reg.conv):'')+'</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+reg.inv_conv+'%'+(pp_reg?delta(reg.inv_conv,pp_reg.inv_conv):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔴 Доля отказов</div><div class="val-big">'+reg.lose_pct+'%'+(pp_reg?delta(reg.lose_pct,pp_reg.lose_pct):'')+'</div><div class="lbl2">'+reg.lose+' из '+reg.total+' сд.</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Средний чек</div><div class="val-big">'+fmt(reg.avg_check)+' ₽'+(pp_reg?delta(reg.avg_check,pp_reg.avg_check):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">⏱ Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.'+(pp_reg?deltaInv(reg.avg_dur,pp_reg.avg_dur):'')+'</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+reg.avg_inv_dur+' дн.'+(pp_reg?deltaInv(reg.avg_inv_dur,pp_reg.avg_inv_dur):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.'+(pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'')+'</span></div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло</div><div class="row"><div class="val-big">'+fmt(reg.total_sum)+' ₽</div><span class="si">'+fmt(reg.total)+' сд.'+(pp_reg?delta(reg.total_sum,pp_reg.total_sum):'')+'</span></div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Потенциал в SQL</div><div class="row"><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><span class="si">'+reg.sql+' сд.'+(pp_reg?delta(reg.sql_sum,pp_reg.sql_sum):'')+'</span></div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Счёт отправлен</div><div class="row"><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><span class="si">'+reg.real_inv_cnt+' сд.'+(pp_reg?delta(reg.real_inv_sum,pp_reg.real_inv_sum):'')+'</span></div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Конверсия в оплату</div><div class="val-big">'+reg.conv+'%'+(pp_reg?delta(reg.conv,pp_reg.conv):'')+'</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+reg.inv_conv+'%'+(pp_reg?delta(reg.inv_conv,pp_reg.inv_conv):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Доля отказов</div><div class="val-big">'+reg.lose_pct+'%'+(pp_reg?delta(reg.lose_pct,pp_reg.lose_pct):'')+'</div><div class="lbl2">'+reg.lose+' из '+reg.total+' сд.</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Средний чек</div><div class="val-big">'+fmt(reg.avg_check)+' ₽'+(pp_reg?delta(reg.avg_check,pp_reg.avg_check):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.'+(pp_reg?deltaInv(reg.avg_dur,pp_reg.avg_dur):'')+'</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+reg.avg_inv_dur+' дн.'+(pp_reg?deltaInv(reg.avg_inv_dur,pp_reg.avg_inv_dur):'')+'</div></div>';
     if (pp_reg) {
       regKpis += '<div style="grid-column:1/-1;height:0"></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Поступления (пред. период)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_paid_sum)+' ₽</div><span class="si">'+pp_reg.total_paid+' сд.</span></div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">📥 Регистраций пришло (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_sum)+' ₽</div><span class="si">'+fmt(pp_reg.total)+' сд.</span></div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔍 Потенциал в SQL (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.sql_sum)+' ₽</div><span class="si">'+pp_reg.sql+' сд.</span></div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">📄 Счёт отправлен (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.real_inv_sum)+' ₽</div><span class="si">'+pp_reg.real_inv_cnt+' сд.</span></div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">✅ Конверсия в оплату (пред.)</div><div class="val-big">'+pp_reg.conv+'%</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+pp_reg.inv_conv+'%</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">🔴 Доля отказов (пред.)</div><div class="val-big">'+pp_reg.lose_pct+'%</div><div class="lbl2">'+pp_reg.lose+' из '+pp_reg.total+' сд.</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">💰 Средний чек (пред.)</div><div class="val-big">'+fmt(pp_reg.avg_check)+' ₽</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">⏱ Цикл сделки (пред.)</div><div class="val-big">'+pp_reg.avg_dur+' дн.</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+pp_reg.avg_inv_dur+' дн.</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления (пред. период)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_paid_sum)+' ₽</div><span class="si">'+pp_reg.total_paid+' сд.</span></div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_sum)+' ₽</div><span class="si">'+fmt(pp_reg.total)+' сд.</span></div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Потенциал в SQL (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.sql_sum)+' ₽</div><span class="si">'+pp_reg.sql+' сд.</span></div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Счёт отправлен (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.real_inv_sum)+' ₽</div><span class="si">'+pp_reg.real_inv_cnt+' сд.</span></div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Конверсия в оплату (пред.)</div><div class="val-big">'+pp_reg.conv+'%</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+pp_reg.inv_conv+'%</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Доля отказов (пред.)</div><div class="val-big">'+pp_reg.lose_pct+'%</div><div class="lbl2">'+pp_reg.lose+' из '+pp_reg.total+' сд.</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Средний чек (пред.)</div><div class="val-big">'+fmt(pp_reg.avg_check)+' ₽</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Цикл сделки (пред.)</div><div class="val-big">'+pp_reg.avg_dur+' дн.</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+pp_reg.avg_inv_dur+' дн.</div></div>';
     }
     var regEl = document.getElementById('newRegKpis'); if(regEl) regEl.innerHTML = regKpis;
 
@@ -538,6 +559,9 @@ document.getElementById('dateFrom').addEventListener('change', function() {
 });
 document.getElementById('dateTo').addEventListener('change', function() {
   if (document.getElementById('dateFrom').value) renderFilteredData();
+});
+document.getElementById('compareFrom').addEventListener('change', function() {
+  if (document.getElementById('dateFrom').value && document.getElementById('dateTo').value) renderFilteredData();
 });
 
 

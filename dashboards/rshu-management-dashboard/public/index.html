@@ -25,6 +25,13 @@
     <input type="date" id="dateTo">
     <span id="filterInfo" class="filter-info"></span>
   </div>
+  <div id="compareFilterBar" class="date-filter-bar">
+    <label>🔁 Сравнить с:</label>
+    <input type="date" id="compareFrom">
+    <span class="date-sep">—</span>
+    <input type="date" id="compareTo" disabled>
+    <span class="filter-info">(по умолчанию — предыдущий период той же длины; можно задать свою дату начала)</span>
+  </div>
   <div id="contentAreaNew">
     <div class="text-center text-secondary py-5" id="loadingStateNew"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка данных…</div></div>
   </div>

@@ -58,6 +58,7 @@ function isQualLead(r) {
 
 function blockMetrics(rows, from, to, filterFn) {
   let sum = 0, cnt = 0, durSum = 0, durCnt = 0, leads = 0, mql = 0;
+  let createdInPeriod = 0, paidSameAsCreated = 0;
   for (const r of rows) {
     if (filterFn && !filterFn(r)) continue;
     if (isPaid(r) && r.PAY_DT >= from && r.PAY_DT <= to) {
@@ -70,6 +71,11 @@ function blockMetrics(rows, from, to, filterFn) {
     if (r.DC && r.DC >= from && r.DC <= to) {
       if (isAllLead(r))  leads++;
       if (isQualLead(r)) mql++;
+      // Созданные в периоде сделки, которые тоже оплачены (по 1С) в этом же периоде
+      if (VALID_CATS.has(r.CAT_ID)) {
+        createdInPeriod++;
+        if (isPaid(r) && r.PAY_DT >= from && r.PAY_DT <= to) paidSameAsCreated++;
+      }
     }
   }
   return {
@@ -78,6 +84,9 @@ function blockMetrics(rows, from, to, filterFn) {
     avg_check: cnt ? Math.round(sum / cnt) : 0,
     avg_close_days_won: durCnt ? Math.round(durSum / durCnt * 10) / 10 : 0,
     leads, mql,
+    created_in_period: createdInPeriod,
+    paid_same_period: paidSameAsCreated,
+    same_period_paid_pct: createdInPeriod ? Math.round(paidSameAsCreated / createdInPeriod * 1000) / 10 : 0,
   };
 }
 

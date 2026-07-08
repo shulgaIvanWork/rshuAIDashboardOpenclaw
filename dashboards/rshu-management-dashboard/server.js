@@ -36,7 +36,7 @@ app.get('/api/data', async (req, res) => {
 // KPI за точный период дат + предыдущий период той же длины
 app.get('/api/kpi', async (req, res) => {
   try {
-    const { from, to } = req.query;
+    const { from, to, compare_from } = req.query;
     if (!from || !to) return res.status(400).json({ error: 'from и to обязательны (YYYY-MM-DD)' });
     const dtFrom = new Date(from), dtTo = new Date(to);
     if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
@@ -45,10 +45,18 @@ app.get('/api/kpi', async (req, res) => {
 
     const rows = enrichForKpi(JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8')));
 
-    // Предыдущий период той же длины, вплотную к текущему
     const lenMs = dtTo - dtFrom + 86400000;
-    const ppTo   = new Date(dtFrom.getTime() - 86400000);
-    const ppFrom = new Date(dtFrom.getTime() - lenMs);
+    let ppFrom, ppTo;
+    if (compare_from) {
+      // Ручной период сравнения той же длины
+      ppFrom = new Date(compare_from);
+      if (isNaN(ppFrom)) return res.status(400).json({ error: 'некорректная compare_from' });
+      ppTo = new Date(ppFrom.getTime() + lenMs - 86400000);
+    } else {
+      // По умолчанию — предыдущий период той же длины, вплотную к текущему
+      ppTo   = new Date(dtFrom.getTime() - 86400000);
+      ppFrom = new Date(dtFrom.getTime() - lenMs);
+    }
 
     const iso = d => d.toISOString().substring(0, 10);
     res.json({
