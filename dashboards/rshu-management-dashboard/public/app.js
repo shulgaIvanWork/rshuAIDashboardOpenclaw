@@ -391,8 +391,8 @@ async function renderPageMainNew(d) {
     html += '<div class="card" style="background:linear-gradient(135deg,#f8f9ff,#eef1f8)">';
     html += '<h2>📋 Ключевые выводы</h2>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">';
-    // YTD
-    html += '<div><b>📊 YTD:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    // Выбранный период
+    html += '<div><b>📊 В выбранном периоде:</b><ul style="margin:6px 0 0 18px;color:#444">';
     html += '<li>Поступления: <b>'+fmt(ytd.postupleniya)+' ₽</b> ('+ytd.won_relevant_cnt+' сделок)</li>';
     html += '<li>Средний чек: <b>'+fmt(ytd.avg_check)+' ₽</b></li>';
     html += '<li>Медиана закрытия: <b>'+(ytd.median_close_days_won||0)+' дн.</b> · Взвешенный: <b>'+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн.</b></li>';
@@ -400,8 +400,9 @@ async function renderPageMainNew(d) {
     html += '<li>B2B <b>'+b2bPct+'%</b> ('+fmt(b2b.sum)+' ₽) / B2C <b>'+b2cPct+'%</b> ('+fmt(b2c.sum)+' ₽)</li>';
     html += '</ul></div>';
     // Неделя
-    var wkLabel = last.label_short || 'W'+String(last.week||'');
-    html += '<div><b>📈 Текущая неделя '+wkLabel+':</b><ul style="margin:6px 0 0 18px;color:#444">';
+    var wkLabel = '№'+String(last.week||'');
+    var wkDates = last.label_dates || '';
+    html += '<div><b>📈 Текущая неделя '+wkLabel+' ('+wkDates+'):</b><ul style="margin:6px 0 0 18px;color:#444">';
     html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(wkDelta>=0?'📈 +':'📉 ')+Math.abs(wkDelta).toFixed(1)+'% к прошлой</li>';
     html += '<li>Сделок: <b>'+(last.won_cnt||0)+'</b> · Лидов: <b>'+(last.leads||0)+'</b></li>';
     html += '</ul></div>';
