@@ -524,9 +524,10 @@ export async function analyze(onProgress) {
           // by_prod: только ООМ
           if (!r.IS_KOM && r.FORMAT!=='КОМ') {
             const pk=r.PRODUCT.slice(0,90);
-            if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
+            if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
             wd.by_prod[pk].deals++; wd.by_prod[pk].sum+=r.OPP;
             if (r.FORMAT==='Очный') { wd.by_prod[pk].fmt_ochn_cnt++; wd.by_prod[pk].fmt_ochn_sum+=r.OPP; }
+            else if (r.FORMAT==='Онлайн') { wd.by_prod[pk].fmt_om_cnt++; wd.by_prod[pk].fmt_om_sum+=r.OPP; }
             else { wd.by_prod[pk].fmt_sdo_cnt++; wd.by_prod[pk].fmt_sdo_sum+=r.OPP; }
             if (r.DC&&r.PAY_DT) { const d=daysBetween(r.DC,r.PAY_DT); if(d>=0) wd.by_prod[pk].durs.push(d); }
           }
@@ -535,7 +536,7 @@ export async function analyze(onProgress) {
           // by_company
           { const cid=r.COMPANY_ID; if(cid&&cid!=='0'){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
           // by_mba
-          { const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}}}}
+          { const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else if(r.FORMAT==='Онлайн'){wd.by_mba[mt].fmt_om_cnt++;wd.by_mba[mt].fmt_om_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}}}}
         }
       }
     }
