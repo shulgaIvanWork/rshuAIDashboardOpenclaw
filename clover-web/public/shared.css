@@ -130,3 +130,25 @@ h1 { font-size: 26px; font-weight: 700; margin: 0 0 20px; }
   .twocol, .threecol { grid-template-columns: 1fr; }
   .tabs { flex-direction: column; }
 }
+
+/* ── App chrome (страницы-оболочки: вход / список дашбордов / админка) ────────
+   Вёрстка на Bootstrap; здесь только фирменная специфика, которой нет
+   в палитре Bootstrap без пересборки SCSS. Раньше жила в отдельном style.css. */
+body.app-chrome { padding: 0; }                 /* убираем глобальный body{padding:24px} для полноэкранной оболочки */
+
+/* Перекрас primary-кнопки в бренд-синий (Bootstrap primary — другой синий) */
+.btn-primary {
+  --bs-btn-bg: #093EB4; --bs-btn-border-color: #093EB4;
+  --bs-btn-hover-bg: #3079D2; --bs-btn-hover-border-color: #3079D2;
+  --bs-btn-active-bg: #3079D2; --bs-btn-active-border-color: #3079D2;
+  --bs-btn-disabled-bg: #475569; --bs-btn-disabled-border-color: #475569;
+}
+
+/* Экран входа — полноэкранный по центру на бренд-фоне (fixed перекрывает body-padding) */
+.login-page { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #093EB4; }
+
+/* Топбар-навигация */
+.app-navbar { background: #093EB4; }
+.app-navbar .navbar-brand, .app-navbar .nav-link { color: rgba(255,255,255,.8); }
+.app-navbar .nav-link:hover, .app-navbar .nav-link.active { color: #fff; background: rgba(255,255,255,.14); border-radius: 6px; }
+.app-navbar .nav-link.logout-link:hover { background: rgba(231,76,60,.18); color: #ffd; }

@@ -4,69 +4,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>РШУ дашборды — админка</title>
-  <link rel="stylesheet" href="/style.css?v=5">
+  <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/shared.css">
   <style>
-    .admin-page { padding: 24px; max-width: 1200px; margin: 0 auto; }
-    .admin-page h1 { font-size: 24px; margin-bottom: 20px; }
-    .users-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    .users-table th { background: #093EB4; color: #fff; padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; }
-    .users-table td { padding: 10px 12px; border-bottom: 1px solid #E2E8F0; font-size: 13px; }
-    .users-table tr:hover td { background: #F1F3F6; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-    .badge-admin { background: #093EB4; color: #fff; }
-    .badge-guest { background: #DBEAFE; color: #1D4ED8; }
-    .badge-dash { background: #DCFCE7; color: #166534; font-size: 10px; margin: 1px 2px; padding: 1px 5px; border-radius: 3px; }
-    .btn { padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
-    .btn-primary { background: #093EB4; color: #fff; }
-    .btn-primary:hover { background: #3079D2; }
-    .btn-danger { background: #e53935; color: #fff; }
-    .btn-danger:hover { background: #c62828; }
-    .btn-sm { padding: 4px 10px; font-size: 12px; }
-    .btn-outline { background: transparent; border: 1px solid #ccc; color: #475569; }
-    .btn-outline:hover { background: #F1F3F6; }
-    .actions { display: flex; gap: 6px; }
+    /* Модалка и тост — локально: их show/hide реализован на classList,
+       без bootstrap.bundle.js штатные Modal/Toast не поднять. */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000; align-items: center; justify-content: center; }
     .modal-overlay.active { display: flex; }
-    .modal { background: #fff; border-radius: 16px; padding: 28px; width: 500px; max-width: 90vw; box-shadow: 0 8px 32px rgba(0,0,0,.15); max-height: 80vh; overflow-y: auto; }
-    .modal h2 { margin: 0 0 16px; font-size: 20px; }
-    .modal label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; color: #475569; }
-    .modal input, .modal select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
-    .modal input:focus, .modal select:focus { outline: none; border-color: #093EB4; }
-    .modal .form-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
-    .modal .checkbox-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0; }
-    .modal .checkbox-group label { font-weight: 400; font-size: 13px; display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 2px 0; }
-    .modal .checkbox-group input { width: auto; }
-    .password-display { background: #FEF9C3; border: 1px solid #FDE68A; border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
-    .password-display .pwd { font-size: 18px; font-weight: 700; font-family: monospace; letter-spacing: 2px; color: #0F172A; }
-    .password-display .hint { font-size: 11px; color: #475569; margin-top: 4px; }
-    .empty-state { padding: 40px; text-align: center; color: #94A3B8; }
-    .toast { position: fixed; bottom: 24px; right: 24px; background: #093EB4; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 2000; opacity: 0; transition: opacity .3s; }
-    .toast.show { opacity: 1; }
+    .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 500px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
+    .app-toast { position: fixed; bottom: 24px; right: 24px; background: #093EB4; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 2000; opacity: 0; transition: opacity .3s; }
+    .app-toast.show { opacity: 1; }
   </style>
 </head>
-<body>
-  <div class="app-layout">
-    <header class="topbar">
-      <div class="topbar-left">
-        <span class="topbar-logo">📊 РШУ</span>
-        <span class="topbar-separator">|</span>
-        <span class="topbar-user"><%= user.name %></span>
-      </div>
-      <nav class="topbar-nav">
-        <a href="/dashboards" class="topbar-link">📊 Дашборды</a>
-        <a href="/admin" class="topbar-link active">👥 Пользователи</a>
-        <a href="/logout" class="topbar-link logout-link">🚪 Выйти</a>
-      </nav>
-    </header>
+<body class="app-chrome">
+  <nav class="app-navbar navbar navbar-expand px-4">
+    <span class="navbar-brand text-white fw-bold mb-0">📊 РШУ</span>
+    <span class="text-white-50 small me-auto"><%= user.name %></span>
+    <div class="navbar-nav flex-row gap-2">
+      <a href="/dashboards" class="nav-link">📊 Дашборды</a>
+      <a href="/admin" class="nav-link active">👥 Пользователи</a>
+      <a href="/logout" class="nav-link logout-link">🚪 Выйти</a>
+    </div>
+  </nav>
 
-    <main class="main-content">
-      <div class="admin-page">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-          <h1>👥 Управление пользователями</h1>
-          <button class="btn btn-primary" onclick="openCreate()">➕ Создать</button>
-        </div>
+  <main class="container py-4" style="max-width:1200px">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h4 mb-0">👥 Управление пользователями</h1>
+      <button class="btn btn-primary" onclick="openCreate()">➕ Создать</button>
+    </div>
 
-        <table class="users-table">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
           <thead>
             <tr>
               <th>Логин</th>
@@ -81,23 +50,23 @@
             <tr data-id="<%= u.id %>">
               <td><code><%= u.id %></code></td>
               <td><%= u.name %></td>
-              <td><span class="badge <%= u.role === 'admin' ? 'badge-admin' : 'badge-guest' %>"><%= u.role === 'admin' ? 'Админ' : 'Гость' %></span></td>
+              <td><span class="badge <%= u.role === 'admin' ? 'text-bg-primary badge-admin' : 'text-bg-info badge-guest' %>"><%= u.role === 'admin' ? 'Админ' : 'Гость' %></span></td>
               <td>
                 <% if (u.role === 'admin') { %>
-                  <span style="color:#888;font-size:12px;">все</span>
+                  <span class="text-secondary small">все</span>
                 <% } else if (u.dashboards && u.dashboards.length > 0) { %>
                   <% u.dashboards.forEach(function(d) { %>
-                    <span class="badge badge-dash"><%= d %></span>
+                    <span class="badge text-bg-success badge-dash me-1"><%= d %></span>
                   <% }); %>
                 <% } else { %>
-                  <span style="color:#888;font-size:12px;">все</span>
+                  <span class="text-secondary small">все</span>
                 <% } %>
               </td>
               <td>
-                <div class="actions">
-                  <button class="btn btn-sm btn-outline" onclick="openEdit('<%= u.id %>')">✏️</button>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-outline-secondary" onclick="openEdit('<%= u.id %>')">✏️</button>
                   <% if (u.role !== 'admin') { %>
-                  <button class="btn btn-sm btn-outline" onclick="resetPassword('<%= u.id %>')">🔑</button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="resetPassword('<%= u.id %>')">🔑</button>
                   <button class="btn btn-sm btn-danger" onclick="deleteUser('<%= u.id %>')">🗑️</button>
                   <% } %>
                 </div>
@@ -107,58 +76,60 @@
           </tbody>
         </table>
       </div>
-    </main>
-  </div>
+    </div>
+  </main>
 
   <!-- Modal: Create/Edit -->
   <div class="modal-overlay" id="userModal">
-    <div class="modal">
-      <h2 id="modalTitle">Создать пользователя</h2>
+    <div class="modal-box">
+      <h2 class="h5 mb-3" id="modalTitle">Создать пользователя</h2>
       <input type="hidden" id="editId">
-      
-      <label for="modalId">Логин</label>
-      <input type="text" id="modalId" placeholder="client_name" pattern="[a-zA-Z0-9_-]+" required>
-      
-      <label for="modalName">Имя</label>
-      <input type="text" id="modalName" placeholder="ООО Клиент">
 
-      <label for="modalRole">Роль</label>
-      <select id="modalRole" onchange="toggleDashboardsField()">
+      <label for="modalId" class="form-label">Логин</label>
+      <input type="text" id="modalId" class="form-control mb-2" placeholder="client_name" pattern="[a-zA-Z0-9_-]+" required>
+
+      <label for="modalName" class="form-label">Имя</label>
+      <input type="text" id="modalName" class="form-control mb-2" placeholder="ООО Клиент">
+
+      <label for="modalRole" class="form-label">Роль</label>
+      <select id="modalRole" class="form-select mb-2" onchange="toggleDashboardsField()">
         <option value="guest">Гость</option>
         <option value="admin">Админ</option>
       </select>
 
       <div id="dashboardsField">
-        <label>Доступ к дашбордам</label>
-        <div class="checkbox-group" id="dashboardsCheckboxes">
+        <label class="form-label">Доступ к дашбордам</label>
+        <div class="row row-cols-2 g-1" id="dashboardsCheckboxes">
           <% dashboards.forEach(function(d) { %>
-            <label>
-              <input type="checkbox" class="dash-chk" value="<%= d.name %>">
-              <%= d.label %>
-            </label>
+            <div class="col">
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input dash-chk" id="chk_<%= d.name %>" value="<%= d.name %>">
+                <label class="form-check-label" for="chk_<%= d.name %>"><%= d.label %></label>
+              </div>
+            </div>
           <% }); %>
         </div>
-        <div style="font-size:11px;color:#888;margin-top:4px;">оставьте пустым — будут видны все дашборды</div>
+        <div class="form-text">оставьте пустым — будут видны все дашборды</div>
       </div>
 
-      <div id="passwordDisplay" class="password-display" style="display:none;">
-        <div class="hint">🔑 Сгенерированный пароль (показывается один раз):</div>
-        <div class="pwd" id="generatedPassword"></div>
+      <div id="passwordDisplay" class="alert alert-warning mt-3" style="display:none;">
+        <div class="small">🔑 Сгенерированный пароль (показывается один раз):</div>
+        <div class="fs-5 fw-bold font-monospace" id="generatedPassword"></div>
       </div>
 
-      <div class="form-actions">
-        <button class="btn btn-outline" onclick="closeModal()">Отмена</button>
+      <div class="d-flex gap-2 justify-content-end mt-3">
+        <button class="btn btn-outline-secondary" onclick="closeModal()">Отмена</button>
         <button class="btn btn-primary" id="modalSaveBtn" onclick="saveUser()">Сохранить</button>
       </div>
     </div>
   </div>
 
   <!-- Toast -->
-  <div class="toast" id="toast"></div>
+  <div class="app-toast" id="toast"></div>
 
   <script>
     const allDashboards = <%- JSON.stringify(dashboards.map(d => ({ name: d.name, label: d.label }))) %>;
-    
+
     function openCreate() {
       document.getElementById('modalTitle').textContent = '➕ Создать пользователя';
       document.getElementById('editId').value = '';
@@ -186,11 +157,11 @@
       const row = document.querySelector(`tr[data-id="${id}"]`);
       const name = row.querySelector('td:nth-child(2)').textContent;
       const isAdmin = row.querySelector('.badge-admin') !== null;
-      
+
       document.getElementById('modalName').value = name;
       document.getElementById('modalRole').value = isAdmin ? 'admin' : 'guest';
       toggleDashboardsField();
-      
+
       // Check the appropriate dashboards
       document.querySelectorAll('.dash-chk').forEach(c => c.checked = false);
       if (!isAdmin) {
@@ -199,7 +170,7 @@
           if (chk) chk.checked = true;
         });
       }
-      
+
       document.getElementById('userModal').classList.add('active');
     }
 
@@ -235,7 +206,7 @@
         });
         const data = await res.json();
         if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
-        
+
         if (data.generatedPassword) {
           document.getElementById('generatedPassword').textContent = data.generatedPassword;
           document.getElementById('passwordDisplay').style.display = 'block';
@@ -261,7 +232,7 @@
 
     async function resetPassword(id) {
       if (!confirm('Сбросить пароль для "' + id + '"?')) return;
-      
+
       const newPassword = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 4);
       const res = await fetch('/api/admin/users/' + encodeURIComponent(id), {
         method: 'PUT',
@@ -270,17 +241,17 @@
       });
       const data = await res.json();
       if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
-      
+
       showToast('🔑 Новый пароль для ' + id + ': ' + newPassword, 15000);
     }
 
     async function deleteUser(id) {
       if (!confirm('Удалить пользователя "' + id + '"? Это действие необратимо.')) return;
-      
+
       const res = await fetch('/api/admin/users/' + encodeURIComponent(id), { method: 'DELETE' });
       const data = await res.json();
       if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
-      
+
       showToast('✅ Пользователь удалён');
       setTimeout(() => location.reload(), 500);
     }

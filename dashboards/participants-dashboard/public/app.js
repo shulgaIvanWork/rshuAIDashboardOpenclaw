@@ -84,11 +84,11 @@ function buildParticipantsTable(res, tableId) {
     '<th class="sort text-nowrap sticky-top" data-col="6">Тип</th>' +
     '<th class="sort text-nowrap sticky-top" data-col="7">Сумма, ₽</th>' +
     '<th class="sort text-nowrap sticky-top" data-col="8">Даты</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="9">Длит., дн.</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="10">Цикл, дн.</th>' +
+    '<th class="sort sticky-top" data-col="9" style="white-space:normal;min-width:60px">Длит. дней</th>' +
+    '<th class="sort sticky-top" data-col="10" style="white-space:normal;min-width:60px">Цикл дней</th>' +
     '<th class="sort text-nowrap sticky-top" data-col="11">Статус</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="12">Пред. обучение</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="13">Посл. обучение (комп.)</th>' +
+    '<th class="sort sticky-top" data-col="12" style="white-space:normal;min-width:90px">Пред. обуч.</th>' +
+    '<th class="sort sticky-top" data-col="13" style="white-space:normal;min-width:90px">Посл. обуч. в комп.</th>' +
     '<th class="sort text-nowrap sticky-top" data-col="14">Участник</th>' +
     '<th class="sort text-nowrap sticky-top" data-col="15">Скидка, %</th>' +
     '<th class="sort text-nowrap sticky-top" data-col="16">Статус счета</th>' +
@@ -132,7 +132,7 @@ function buildParticipantsTable(res, tableId) {
       '<td>' + (p.dealCycle != null ? p.dealCycle : '—') + '</td>' +
       '<td><span class="badge ' + stageBadge + '">' + p.stage + '</span></td>' +
 
-      '<td>' + (p.hadPrevTraining ? '<span class="badge text-bg-warning">Да</span>' + (p.prevTrainingDate ? ' <span class="text-secondary small">' + p.prevTrainingDate + '</span>' : '') : '<span class="text-secondary">нет</span>') + '</td>' +
+      '<td>' + (p.hadPrevTraining ? '<span class="badge text-bg-warning">Да</span>' + (p.prevTrainingDate ? ' <span class="small">' + p.prevTrainingDate + '</span>' : '') : '<span class="">нет</span>') + '</td>' +
       '<td>' + (p.lastCompanyTraining ? '<span class="small">' + p.lastCompanyTraining + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +
       '<td>' + (p.participantFlag === 'Да' ? '<span class="badge text-bg-success">Да</span>' : p.participantFlag === 'Нет' ? '<span class="badge text-bg-danger">Нет</span>' : '<span class="text-secondary">—</span>') + '</td>' +
       '<td>' + (p.invoiceDiscount != null ? Number(p.invoiceDiscount).toLocaleString('ru-RU') + '%' : '—') + '</td>' +

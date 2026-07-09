@@ -11,6 +11,10 @@
 .table thead th { background: #093EB4; color: #fff; border-bottom-color: #093EB4; }
 .table-responsive { overflow-y: visible; }
 
+/* align-middle на <table> не действует на th/td (Bootstrap-утилита работает
+   только на самих ячейках) — заголовки в 2 строки иначе прижаты к верху */
+.table th, .table td { vertical-align: middle; }
+
 /* Сортировка таблиц (initTableSort из shared.js) — визуальные подсказки */
 th.sort { cursor: pointer; user-select: none; }
 th.sort::after { content: ' ⇅'; font-size: 10px; opacity: .4; font-weight: 400; }
