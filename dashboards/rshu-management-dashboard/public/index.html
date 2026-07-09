@@ -8,29 +8,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Управленческий дашборд РШУ 2026</title>
   <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/vendor/range-calendar/range-calendar.css">
   <link rel="stylesheet" href="/shared.css">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="/vendor/range-calendar/range-calendar.js"></script>
   <script src="/shared.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
 <div class="container-fluid p-4">
   <h1>Управленческий дашборд РШУ 2026 <span id="updateDate" class="page-title-meta"></span></h1>
-  <div id="dateFilterBar" class="date-filter-bar">
-    <label>📅 Период:</label>
-    <input type="date" id="dateFrom">
-    <span class="date-sep">—</span>
-    <input type="date" id="dateTo">
-    <span id="filterInfo" class="filter-info"></span>
-  </div>
-  <div id="compareFilterBar" class="date-filter-bar">
-    <label>🔁 Сравнить с:</label>
-    <input type="date" id="compareFrom">
-    <span class="date-sep">—</span>
-    <input type="date" id="compareTo" disabled>
-    <span class="filter-info">(по умолчанию — предыдущий период той же длины; можно задать свою дату начала)</span>
+  <div class="date-filter-bar">
+    <div class="date-filter-group">
+      <div class="date-filter-row">
+        <label>📅 Период:</label>
+        <input type="text" id="periodDisplay" class="rc-input" readonly autocomplete="off">
+        <input type="hidden" id="dateFrom">
+        <input type="hidden" id="dateTo">
+      </div>
+      <div id="filterInfo" class="filter-info"></div>
+    </div>
+    <div class="date-filter-group">
+      <div class="date-filter-row">
+        <label>🔁 Сравнить с:</label>
+        <input type="text" id="compareDisplay" class="rc-input" readonly autocomplete="off">
+        <input type="hidden" id="compareFrom">
+      </div>
+      <div class="filter-info">(по умолчанию — предыдущий период той же длины; можно задать свою дату начала)</div>
+    </div>
   </div>
   <div id="contentAreaNew">
     <div class="text-center text-secondary py-5" id="loadingStateNew"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка данных…</div></div>

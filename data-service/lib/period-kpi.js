@@ -86,7 +86,8 @@ function blockMetrics(rows, from, to, filterFn) {
     leads, mql,
     created_in_period: createdInPeriod,
     paid_same_period: paidSameAsCreated,
-    same_period_paid_pct: createdInPeriod ? Math.round(paidSameAsCreated / createdInPeriod * 1000) / 10 : 0,
+    // Доля оплаченных сделок периода, которые и созданы в этом же периоде
+    // (карточка «Оплаченные в периоде» на управленческом дашборде)
     paid_created_same_pct: cnt ? Math.round(paidSameAsCreated / cnt * 1000) / 10 : 0,
   };
 }

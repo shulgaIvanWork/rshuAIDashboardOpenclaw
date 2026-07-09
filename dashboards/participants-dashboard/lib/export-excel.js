@@ -8,7 +8,6 @@ import ExcelJS from 'exceljs';
 const COLUMNS = [
   { header: 'Направление', key: 'direction', width: 18 },
   { header: 'Программа', key: 'program', width: 28 },
-  { header: 'Тема / Сделка', key: 'title', width: 34 },
   { header: 'Формат', key: 'format', width: 10 },
   { header: 'ФИО', key: 'participant', width: 22 },
   { header: 'Регион', key: 'region', width: 14 },
@@ -20,7 +19,6 @@ const COLUMNS = [
   { header: 'Длит., дн.', key: 'moduleDuration', width: 10 },
   { header: 'Цикл, дн.', key: 'dealCycle', width: 10 },
   { header: 'Статус', key: 'stage', width: 16 },
-  { header: 'Менеджер', key: 'manager', width: 18 },
   { header: 'Пред. обучение', key: 'prevTrainingDate', width: 14 },
   { header: 'Посл. обучение (комп.)', key: 'lastCompanyTraining', width: 16 },
   { header: 'Участник', key: 'participantFlag', width: 10 },
@@ -39,7 +37,6 @@ function addSheet(workbook, sheetName, participants) {
     sheet.addRow({
       direction: p.direction || '—',
       program: p.program,
-      title: p.title,
       format: p.format,
       participant: p.participant,
       region: p.region || '—',
@@ -51,7 +48,6 @@ function addSheet(workbook, sheetName, participants) {
       moduleDuration: p.moduleDuration != null ? p.moduleDuration : '—',
       dealCycle: p.dealCycle != null ? p.dealCycle : '—',
       stage: p.stage,
-      manager: p.manager,
       prevTrainingDate: p.hadPrevTraining ? (p.prevTrainingDate || 'Да') : 'нет',
       lastCompanyTraining: p.lastCompanyTraining || '—',
       participantFlag: p.participantFlag || '—',

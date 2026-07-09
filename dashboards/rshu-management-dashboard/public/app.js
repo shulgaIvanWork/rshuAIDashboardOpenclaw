@@ -43,6 +43,25 @@ let dataCache = null;
 let dateFromCache = null;
 let dateToCache = null;
 
+// Календарики на полях периода/сравнения (свой RangeCalendar, /vendor/range-calendar/)
+// #dateFrom/#dateTo/#compareFrom — скрытые поля с ISO-значением (как и раньше читает весь код ниже);
+// периодDisplay/compareDisplay — видимые поля, на которые повешен попап-календарь.
+var rcPeriod = RangeCalendar.attach(document.getElementById('periodDisplay'), {
+  mode: 'range',
+  onApply: function(startISO, endISO) {
+    document.getElementById('dateFrom').value = startISO;
+    document.getElementById('dateTo').value = endISO;
+    renderFilteredData();
+  }
+});
+var rcCompare = RangeCalendar.attach(document.getElementById('compareDisplay'), {
+  mode: 'single',
+  onApply: function(startISO) {
+    document.getElementById('compareFrom').value = startISO;
+    renderFilteredData();
+  }
+});
+
 // Переключатель Недели/Месяцы для понедельных графиков и таблицы
 window.periodModes = window.periodModes || { pos: 'weeks', funnel: 'weeks', table: 'weeks' };
 let lastRenderData = null;
@@ -68,11 +87,13 @@ async function loadAll() {
       dateEl.textContent = '(Данные на: ' + dtStr + ')';
     }
 
-    document.getElementById('dateFrom').value = (d.year || new Date().getFullYear()) + '-01-01';
+    var yearFrom = (d.year || new Date().getFullYear()) + '-01-01';
     var todayStr = new Date().toISOString().substring(0, 10);
+    document.getElementById('dateFrom').value = yearFrom;
     document.getElementById('dateTo').value = todayStr;
-    dateFromCache = document.getElementById('dateFrom').value;
-    dateToCache = document.getElementById('dateTo').value;
+    rcPeriod.setRange(yearFrom, todayStr);
+    dateFromCache = yearFrom;
+    dateToCache = todayStr;
 
     renderFilteredData();
   } catch (e) {
@@ -81,16 +102,23 @@ async function loadAll() {
   }
 }
 
-// Пересчитывает и показывает (disabled) конец периода сравнения по длине основного периода
+function fmtDMY(iso) {
+  var p = iso.split('-');
+  return p[2] + '.' + p[1] + '.' + p[0];
+}
+
+// Пересчитывает конец периода сравнения по длине основного периода и показывает
+// весь диапазон «start—end» в одном поле compareDisplay (как и «Период»)
 function updateCompareToField() {
   var dateFrom = document.getElementById('dateFrom').value;
   var dateTo = document.getElementById('dateTo').value;
   var compareFrom = document.getElementById('compareFrom').value;
-  var compareToEl = document.getElementById('compareTo');
-  if (!dateFrom || !dateTo || !compareFrom) { compareToEl.value = ''; return; }
+  var compareDisplayEl = document.getElementById('compareDisplay');
+  if (!dateFrom || !dateTo || !compareFrom) { compareDisplayEl.value = ''; return; }
   var lenMs = new Date(dateTo).getTime() - new Date(dateFrom).getTime();
   var compareTo = new Date(new Date(compareFrom).getTime() + lenMs);
-  compareToEl.value = compareTo.toISOString().substring(0, 10);
+  var compareToIso = compareTo.toISOString().substring(0, 10);
+  compareDisplayEl.value = fmtDMY(compareFrom) + '—' + fmtDMY(compareToIso);
 }
 
 async function renderFilteredData() {
@@ -241,13 +269,13 @@ async function renderPageMainNew(d) {
       var curConv = leadsYtd>0?(ytd.won_relevant_cnt/leadsYtd*100):0;
       var ppConv  = ppYtd && ppL>0?(ppYtd.won_relevant_cnt/ppL*100):0;
       function pp(val) { return ppYtd ? '<div class="pp-val">'+val+'</div>' : ''; }
-      var r = '<div class="kpis kpis-8"><div class="kpi-header '+cc+'">'+title+'</div>'
-        + '<div class="kpi '+kc+'" style="grid-column:span 2"><div class="lbl">Поступления</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.postupleniya)+' ₽</div>'+(ppYtd?pctDelta(ytd.postupleniya,ppYtd.postupleniya):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.postupleniya)+' ₽')+'</div>'
+      var r = '<div class="kpis"><div class="kpi-header '+cc+'">'+title+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Поступления, ₽</div><div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.postupleniya)+'</div>'+(ppYtd?pctDelta(ytd.postupleniya,ppYtd.postupleniya):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.postupleniya))+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.won_relevant_cnt)+'</div>'+(ppYtd?pctDelta(ytd.won_relevant_cnt,ppYtd.won_relevant_cnt):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.won_relevant_cnt))+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Лиды</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(curLeadsVal)+'</div>'+(ppYtd?pctDelta(curLeadsVal,ppL):'')+'</div>'+pp(fmt(ppL))+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curConv)+'%</div>'+(ppYtd?pctDelta(curConv,ppConv):'')+'</div>'+pp(fmtPct(ppConv)+'%')+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Оплаченные в&nbsp;периоде</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(ytd.paid_created_same_pct)+'%</div>'+(ppYtd?pctDelta(ytd.paid_created_same_pct,ppYtd.paid_created_same_pct):'')+'</div>'+pp(fmtPct(ppYtd&&ppYtd.paid_created_same_pct)+'%')+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Средний чек</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+' ₽</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.avg_check)+' ₽')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Средний чек, ₽</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+'</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.avg_check))+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDeltaInv(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div>'+pp((ppYtd&&ppYtd.avg_close_days_won||0).toFixed(1)+' дн.')+'</div>'
         + '</div>';
       return r;
@@ -413,7 +441,10 @@ async function renderPageMainNew(d) {
     // Лидеры
     html += '<div><b>🏆 Лидеры:</b><ul style="margin:6px 0 0 18px;color:#444">';
     html += '<li>Формат: <b>'+(topFmtSum ? escapeHtml(topFmtSum[0]) : '-')+'</b> ('+fmt(topFmtSum ? topFmtSum[1].sum : 0)+' ₽)'+(topFmtCnt && topFmtCnt[0] !== topFmtSum[0] ? ' · <b>'+escapeHtml(topFmtCnt[0])+'</b> ('+topFmtCnt[1].cnt+' сд.)' : '')+'</li>';
-    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '-')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽) · Регистрация: <b>'+fmt(srcTop[2] ? srcTop[2].postupleniya : 0)+' ₽</b></li>';
+    // src_rating отсортирован по сумме ([0] — ИТОГО); Регистрацию ищем по имени,
+    // а не по индексу — её место в рейтинге меняется
+    var srcReg = srcTop.find(function(s){ return s.name === 'Регистрация'; });
+    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '-')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽) · Регистрация: <b>'+fmt(srcReg ? srcReg.postupleniya : 0)+' ₽</b></li>';
     html += '<li>'+(mgrTop.length > 0 ? 'Менеджер: <b>'+escapeHtml(mgrTop[0].name)+'</b> ('+fmt(mgrTop[0].postupleniya)+' ₽)' : '')+'</li>';
     html += '</ul></div>';
     // Выводы
@@ -463,29 +494,25 @@ async function renderPageMainNew(d) {
     var el2 = document.getElementById('newFmtTableUnderChart');
     if (el2) el2.innerHTML = fmtStr;
 
-    // Регистрации: KPI
-    var reg = d.reg_ytd||{};
+    // Регистрации: KPI (reg уже объявлен выше, в «Ключевых выводах»).
+    // Тот же вид, что у верхних KPI-блоков: значение + дельта, предыдущий период серым снизу.
     var pp_reg = d.pp_reg_ytd||null;
-    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло</div><div class="val-big">'+fmt(reg.total)+' шт.'+(pp_reg?delta(reg.total,pp_reg.total):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло</div><div class="val-big">'+fmt(reg.total_sum)+' ₽'+(pp_reg?delta(reg.total_sum,pp_reg.total_sum):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления в периоде</div><div class="val-big">'+reg.total_paid+' шт.'+(pp_reg?delta(reg.total_paid,pp_reg.total_paid):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления в периоде</div><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽'+(pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Конверсия в сделку</div><div class="val-big">'+reg.conv+'%'+(pp_reg?delta(reg.conv,pp_reg.conv):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Доля отказов</div><div class="val-big">'+reg.lose_pct+'%'+(pp_reg?delta(reg.lose_pct,pp_reg.lose_pct):'')+'</div><div class="lbl2">'+reg.lose+' из '+reg.total+' сд.</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Средний чек</div><div class="val-big">'+fmt(reg.avg_check)+' ₽'+(pp_reg?delta(reg.avg_check,pp_reg.avg_check):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.'+(pp_reg?deltaInv(reg.avg_dur,pp_reg.avg_dur):'')+'</div></div>';
-    if (pp_reg) {
-      regKpis += '<div style="grid-column:1/-1;height:0"></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло (пред.)</div><div class="val-big">'+fmt(pp_reg.total)+' шт.</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло (пред.)</div><div class="val-big">'+fmt(pp_reg.total_sum)+' ₽</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления (пред. период)</div><div class="val-big">'+pp_reg.total_paid+' шт.</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления (пред. период)</div><div class="val-big">'+fmt(pp_reg.total_paid_sum)+' ₽</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Конверсия в сделку (пред.)</div><div class="val-big">'+pp_reg.conv+'%</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Доля отказов (пред.)</div><div class="val-big">'+pp_reg.lose_pct+'%</div><div class="lbl2">'+pp_reg.lose+' из '+pp_reg.total+' сд.</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Средний чек (пред.)</div><div class="val-big">'+fmt(pp_reg.avg_check)+' ₽</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Цикл сделки (пред.)</div><div class="val-big">'+pp_reg.avg_dur+' дн.</div></div>';
+    function regCard(lbl, val, deltaHtml, ppVal, extra) {
+      return '<div class="kpi kpi-reg"><div class="lbl">'+lbl+'</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+val+'</div>'+(deltaHtml||'')+'</div>'
+        + (extra||'')
+        + (pp_reg?'<div class="pp-val">'+ppVal+'</div>':'')
+        + '</div>';
     }
+    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>'
+      + regCard('Регистраций пришло, шт.', fmt(reg.total), pp_reg?delta(reg.total,pp_reg.total):'', pp_reg?fmt(pp_reg.total):'')
+      + regCard('Регистраций пришло, ₽', fmt(reg.total_sum), pp_reg?delta(reg.total_sum,pp_reg.total_sum):'', pp_reg?fmt(pp_reg.total_sum):'')
+      + regCard('Поступления, шт.', fmt(reg.total_paid), pp_reg?delta(reg.total_paid,pp_reg.total_paid):'', pp_reg?fmt(pp_reg.total_paid):'')
+      + regCard('Поступления, ₽', fmt(reg.total_paid_sum), pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'', pp_reg?fmt(pp_reg.total_paid_sum):'')
+      + regCard('Конверсия в сделку', reg.conv+'%', pp_reg?delta(reg.conv,pp_reg.conv):'', pp_reg?pp_reg.conv+'%':'')
+      + regCard('Доля отказов', reg.lose_pct+'%', pp_reg?delta(reg.lose_pct,pp_reg.lose_pct):'', pp_reg?pp_reg.lose_pct+'%':'')
+      + regCard('Средний чек, ₽', fmt(reg.avg_check), pp_reg?delta(reg.avg_check,pp_reg.avg_check):'', pp_reg?fmt(pp_reg.avg_check):'')
+      + regCard('Цикл сделки', reg.avg_dur+' дн.', pp_reg?deltaInv(reg.avg_dur,pp_reg.avg_dur):'', pp_reg?pp_reg.avg_dur+' дн.':'');
     var regEl = document.getElementById('newRegKpis'); if(regEl) regEl.innerHTML = regKpis;
 
 
@@ -519,7 +546,7 @@ async function renderPageMainNew(d) {
     // Недели
     for(var wi=tblBuckets.length-1; wi>=0; wi--){
       var w = tblBuckets[wi];
-      weekStr += '<tr><td><b>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</b></td><td>'+w.leads+'</td><td>'+w.mql+'</td><td>'+w.sql+'</td><td><b>'+(w.invoice_cnt||0)+'</b></td><td><b>'+w.oplata+'</b></td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td><td>'+(w.leads>0?(w.oplata/w.leads*100).toFixed(1):'0.0')+'%</td></tr>';
+      weekStr += '<tr><td>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</td><td>'+w.leads+'</td><td>'+w.mql+'</td><td>'+w.sql+'</td><td>'+(w.invoice_cnt||0)+'</td><td>'+w.oplata+'</td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td><td>'+(w.leads>0?(w.oplata/w.leads*100).toFixed(1):'0.0')+'%</td></tr>';
     }
     weekStr += '</tbody></table>';
     el = document.getElementById('newWeekTable'); if(el) { el.innerHTML = weekStr; initTableSort('newWeekTable'); }
@@ -593,16 +620,8 @@ async function renderPageMainNew(d) {
 
 
 
-// --- Date filter ---
-document.getElementById('dateFrom').addEventListener('change', function() {
-  if (document.getElementById('dateTo').value) renderFilteredData();
-});
-document.getElementById('dateTo').addEventListener('change', function() {
-  if (document.getElementById('dateFrom').value) renderFilteredData();
-});
-document.getElementById('compareFrom').addEventListener('change', function() {
-  if (document.getElementById('dateFrom').value && document.getElementById('dateTo').value) renderFilteredData();
-});
+// Обработка выбора дат теперь внутри onApply у RangeCalendar (см. начало файла) —
+// отдельные change-слушатели больше не нужны.
 
 
 // --- Запуск при загрузке страницы ---

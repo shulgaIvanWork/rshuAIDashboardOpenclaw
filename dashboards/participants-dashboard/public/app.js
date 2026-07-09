@@ -2,30 +2,30 @@
 
 let dataCache = null;
 
+// Сокращение организационно-правовых форм: «ОБЩЕСТВО С ОГРАНИЧЕННОЙ …» → «ООО»
+var COMPANY_PREFIXES = [
+  ['ИНОСТРАННОЕ ПРЕДПРИЯТИЕ ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ', 'ИП ООО'],
+  ['ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ', 'ФГБОУ'],
+  ['ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ', 'ООО'],
+  ['МУНИЦИПАЛЬНОЕ УНИТАРНОЕ ПРЕДПРИЯТИЕ', 'МУП'],
+  ['ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО', 'ПАО'],
+  ['ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ', 'ИП'],
+  ['ЗАКРЫТОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО', 'ЗАО'],
+  ['АКЦИОНЕРНОЕ ОБЩЕСТВО', 'АО'],
+];
+
 function shortCompany(name) {
   if (!name) return name;
   var s = name.toUpperCase();
-  if (s.startsWith('ИНОСТРАННОЕ ПРЕДПРИЯТИЕ ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ'))
-    return 'ИП ООО' + name.substring(64);
-  if (s.startsWith('ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ'))
-    return 'ООО' + name.substring(40);
-  if (s.startsWith('ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО'))
-    return 'ПАО' + name.substring(30);
-  if (s.startsWith('АКЦИОНЕРНОЕ ОБЩЕСТВО'))
-    return 'АО' + name.substring(20);
-  if (s.startsWith('ЗАКРЫТОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО'))
-    return 'ЗАО' + name.substring(29);
-  if (s.startsWith('МУНИЦИПАЛЬНОЕ УНИТАРНОЕ ПРЕДПРИЯТИЕ'))
-    return 'МУП' + name.substring(35);
-  if (s.startsWith('ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ'))
-    return 'ФГБОУ' + name.substring(64);
-  if (s.startsWith('ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ'))
-    return 'ИП' + name.substring(30);
-  // Сокращение в скобках в конце: Банк ВТБ (публичное акционерное общество) → Банк ВТБ (ПАО)
-  name = name.replace(/\(публичное акционерное общество\)/gi, '(ПАО)');
-  name = name.replace(/\(акционерное общество\)/gi, '(АО)');
-  name = name.replace(/\(общество с ограниченной ответственностью\)/gi, '(ООО)');
-  return name;
+  for (var i = 0; i < COMPANY_PREFIXES.length; i++) {
+    var full = COMPANY_PREFIXES[i][0], short = COMPANY_PREFIXES[i][1];
+    if (s.startsWith(full)) return short + name.substring(full.length);
+  }
+  // Форма в скобках в конце: Банк ВТБ (публичное акционерное общество) → Банк ВТБ (ПАО)
+  return name
+    .replace(/\(публичное акционерное общество\)/gi, '(ПАО)')
+    .replace(/\(акционерное общество\)/gi, '(АО)')
+    .replace(/\(общество с ограниченной ответственностью\)/gi, '(ООО)');
 }
 let currentTab = 'participants';
 
@@ -124,7 +124,7 @@ function buildParticipantsTable(res, tableId) {
       '<td><span class="badge ' + fmtBadge + '">' + fmtLabel + '</span></td>' +
       '<td>' + escapeHtml(p.participant) + '</td>' +
       '<td>' + regionLabel + '</td>' +
-      '<td>' + (function(c){c=escapeHtml(shortCompany(c));return c.length>60?c.substring(0,60)+'…':c;})(p.company) + '</td>' +
+      '<td>' + escapeHtml(shortCompany(p.company)) + '</td>' +
       '<td><span class="badge ' + typeBadge + '">' + (p.clientType || '—') + '</span></td>' +
       '<td>' + amount + '</td>' +
       '<td class="small">' + (p.date || '—') + '<br>—<br>' + (p.dateEnd || '—') + '</td>' +
