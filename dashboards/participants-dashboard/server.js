@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила: КОМ-признак, «настоящая оплата», отчётный год
 import { isKomDeal, isPaidDeal, YEAR } from '@rshu/data-service/lib/deal-rules.js';
-import { buildParticipantsWorkbook } from './lib/export-excel.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -478,6 +477,7 @@ app.get('/api/export', async (req, res) => {
       buildParticipants(weeks.length - 2),
       buildParticipants(weeks.length - 1),
     ]);
+    const { buildParticipantsWorkbook } = await import('./lib/export-excel.js');
     const buffer = await buildParticipantsWorkbook(prevResult, curResult);
     const fileName = `participants_${new Date().toISOString().substring(0, 10)}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
