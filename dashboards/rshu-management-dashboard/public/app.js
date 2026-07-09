@@ -165,7 +165,7 @@ function applyPeriodKpi(out, kpi) {
     return {
       postupleniya: t.postupleniya, won_relevant_cnt: t.won_relevant_cnt,
       avg_check: t.avg_check, avg_close_days_won: t.avg_close_days_won,
-      same_period_paid_pct: t.same_period_paid_pct, created_in_period: t.created_in_period, paid_same_period: t.paid_same_period
+      paid_created_same_pct: t.paid_created_same_pct
     };
   }
   out.ytd     = Object.assign({}, out.ytd,     block(c.total));
@@ -243,10 +243,10 @@ async function renderPageMainNew(d) {
       function pp(val) { return ppYtd ? '<div class="pp-val">'+val+'</div>' : ''; }
       var r = '<div class="kpis kpis-8"><div class="kpi-header '+cc+'">'+title+'</div>'
         + '<div class="kpi '+kc+'" style="grid-column:span 2"><div class="lbl">Поступления</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.postupleniya)+' ₽</div>'+(ppYtd?pctDelta(ytd.postupleniya,ppYtd.postupleniya):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.postupleniya)+' ₽')+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Сделок</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.won_relevant_cnt)+'</div>'+(ppYtd?pctDelta(ytd.won_relevant_cnt,ppYtd.won_relevant_cnt):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.won_relevant_cnt))+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.won_relevant_cnt)+'</div>'+(ppYtd?pctDelta(ytd.won_relevant_cnt,ppYtd.won_relevant_cnt):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.won_relevant_cnt))+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Лиды</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(curLeadsVal)+'</div>'+(ppYtd?pctDelta(curLeadsVal,ppL):'')+'</div>'+pp(fmt(ppL))+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curConv)+'%</div>'+(ppYtd?pctDelta(curConv,ppConv):'')+'</div>'+pp(fmtPct(ppConv)+'%')+'</div>'
-        + '<div class="kpi '+kc+'"><div class="lbl">Оплачено в период</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(ytd.same_period_paid_pct)+'%</div>'+(ppYtd?pctDelta(ytd.same_period_paid_pct,ppYtd.same_period_paid_pct):'')+'</div>'+pp(fmtPct(ppYtd&&ppYtd.same_period_paid_pct)+'%')+'</div>'
+        + '<div class="kpi '+kc+'"><div class="lbl">Оплаченные в&nbsp;периоде</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(ytd.paid_created_same_pct)+'%</div>'+(ppYtd?pctDelta(ytd.paid_created_same_pct,ppYtd.paid_created_same_pct):'')+'</div>'+pp(fmtPct(ppYtd&&ppYtd.paid_created_same_pct)+'%')+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Средний чек</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(ytd.avg_check)+' ₽</div>'+(ppYtd?pctDelta(ytd.avg_check,ppYtd.avg_check):'')+'</div>'+pp(fmt(ppYtd&&ppYtd.avg_check)+' ₽')+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Цикл сделки</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</div>'+(ppYtd?pctDeltaInv(ytd.avg_close_days_won||0,ppYtd.avg_close_days_won||0):'')+'</div>'+pp((ppYtd&&ppYtd.avg_close_days_won||0).toFixed(1)+' дн.')+'</div>'
         + '</div>';
@@ -354,7 +354,6 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>'+(isMonths('table')?'Таблица по месяцам':'Недельная таблица')+perToggle('table')+'</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
     // --- Ключевые выводы ---
-    var cw = d.weeks ? d.weeks.length : 0;
     var weeks = d.weeks || [];
     var lastIdx = weeks.length - 1;
     while (lastIdx > 0 && weeks[lastIdx] && weeks[lastIdx].postupleniya === 0 && weeks[lastIdx].oplata === 0) {
@@ -372,34 +371,62 @@ async function renderPageMainNew(d) {
     var srcTop = d.src_rating || [];
     var fmtData = Object.entries(d.fmt_ytd || {}).filter(function(e){return e[0] !== 'period';}).sort(function(a,b){return (b[1].sum||0) - (a[1].sum||0);});
     var mgrTop = d.mgr_top || [];
+    var btypeAll = d.btype_ytd || {};
+    var b2b = btypeAll.B2B || {cnt:0,sum:0};
+    var b2c = btypeAll.B2C || {cnt:0,sum:0};
+    var totSum = b2b.sum + b2c.sum || 1;
+    var b2bPct = (b2b.sum / totSum * 100).toFixed(0);
+    var b2cPct = (b2c.sum / totSum * 100).toFixed(0);
+    var reg = d.reg_ytd || {};
+    var regConv = reg.conv || 0;
+    var regPaid = reg.total_paid || 0;
+    var regTotal = reg.total || 0;
+
+    // Форматы по сумме и по количеству
+    var fmtSumSorted = fmtData.slice().sort(function(a,b){return (b[1].sum||0) - (a[1].sum||0);});
+    var fmtCntSorted = fmtData.slice().sort(function(a,b){return (b[1].cnt||0) - (a[1].cnt||0);});
+    var topFmtSum = fmtSumSorted.length > 0 ? fmtSumSorted[0] : null;
+    var topFmtCnt = fmtCntSorted.length > 0 ? fmtCntSorted[0] : null;
 
     html += '<div class="card" style="background:linear-gradient(135deg,#f8f9ff,#eef1f8)">';
     html += '<h2>📋 Ключевые выводы</h2>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">';
-    // Общая картина
-    html += '<div><b>📊 Общая картина YTD:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    // YTD
+    html += '<div><b>📊 YTD:</b><ul style="margin:6px 0 0 18px;color:#444">';
     html += '<li>Поступления: <b>'+fmt(ytd.postupleniya)+' ₽</b> ('+ytd.won_relevant_cnt+' сделок)</li>';
     html += '<li>Средний чек: <b>'+fmt(ytd.avg_check)+' ₽</b></li>';
-    html += '<li>Срок WON: простой <b>'+(ytd.avg_close_days_won||0).toFixed(1)+' дн.</b> · взвешенный <b>'+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн.</b></li>';
-    html += '<li>Лидов: <b>'+fmt(d.leads_ytd)+'</b></li>';
+    html += '<li>Медиана закрытия: <b>'+(ytd.median_close_days_won||0)+' дн.</b> · Взвешенный: <b>'+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн.</b></li>';
+    html += '<li>Конверсия лид→сделка: <b>'+(ytd.conv_deal_pct||0).toFixed(1)+'%</b></li>';
+    html += '<li>B2B <b>'+b2bPct+'%</b> ('+fmt(b2b.sum)+' ₽) / B2C <b>'+b2cPct+'%</b> ('+fmt(b2c.sum)+' ₽)</li>';
     html += '</ul></div>';
     // Неделя
-    html += '<div><b>📈 Неделя W'+cw+':</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(wkDelta>0?'📈 +':'📉 ')+Math.abs(wkDelta).toFixed(1)+'% к прошлой</li>';
-    html += '<li>Сделок: <b>'+(last.won_cnt||0)+'</b></li>';
-    html += '<li>Лидов: <b>'+fmt(d.leads_cur||0)+'</b></li>';
+    var wkLabel = last.label_short || 'W'+String(last.week||'');
+    html += '<div><b>📈 Текущая неделя '+wkLabel+':</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(wkDelta>=0?'📈 +':'📉 ')+Math.abs(wkDelta).toFixed(1)+'% к прошлой</li>';
+    html += '<li>Сделок: <b>'+(last.won_cnt||0)+'</b> · Лидов: <b>'+(last.leads||0)+'</b></li>';
+    html += '</ul></div>';
+    // Регистрация
+    html += '<div><b>📥 Регистрация:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<li>Пришло: <b>'+fmt(regTotal)+'</b> · Оплачено: <b>'+regPaid+'</b> (<b>'+regConv+'%</b>)</li>';
+    html += '<li>Средний чек: <b>'+fmt(reg.avg_check || 0)+' ₽</b> · Цикл: <b>'+(reg.avg_dur||0).toFixed(1)+' дн.</b></li>';
     html += '</ul></div>';
     // Лидеры
     html += '<div><b>🏆 Лидеры:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '-')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽)</li>';
-    html += '<li>Формат: <b>'+(fmtData.length > 0 ? escapeHtml(fmtData[0][0]) : '-')+'</b> ('+fmt(fmtData.length > 0 ? fmtData[0][1].sum : 0)+' ₽)</li>';
+    html += '<li>Формат: <b>'+(topFmtSum ? escapeHtml(topFmtSum[0]) : '-')+'</b> ('+fmt(topFmtSum ? topFmtSum[1].sum : 0)+' ₽)'+(topFmtCnt && topFmtCnt[0] !== topFmtSum[0] ? ' · <b>'+escapeHtml(topFmtCnt[0])+'</b> ('+topFmtCnt[1].cnt+' сд.)' : '')+'</li>';
+    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '-')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽) · Регистрация: <b>'+fmt(srcTop[2] ? srcTop[2].postupleniya : 0)+' ₽</b></li>';
     html += '<li>'+(mgrTop.length > 0 ? 'Менеджер: <b>'+escapeHtml(mgrTop[0].name)+'</b> ('+fmt(mgrTop[0].postupleniya)+' ₽)' : '')+'</li>';
     html += '</ul></div>';
-    // Рекомендации
-    html += '<div><b>💡 Рекомендации:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += (wkDelta < 0 ? '<li>⚠️ Падение недели к прошлой - проанализировать причины</li>' : '<li>✅ Неделя стабильна или растёт</li>');
-    html += (srcTop.length > 1 && srcTop[1].conv_lead_deals < 5) ? '<li>🎯 Низкая конверсия лид→сделка - поработать с качеством лидов</li>' : '';
-    html += '<li>📌 Средняя скорость закрытия: '+(ytd.median_close_days_won||0)+' дн. (медиана)</li>';
+    // Выводы
+    html += '<div style="grid-column:1/-1"><b>💡 Выводы:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<li>🔵 Медиана закрытия <b>'+(ytd.median_close_days_won||0)+' дн.</b> — быстрые сделки, но взвешенный '+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн. — крупные КОМ растягивают среднюю</li>';
+    html += '<li>🟢 Регистрация: <b>'+regConv+'%</b> конверсии в сделку — лучшая среди всех источников</li>';
+    if (wkDelta < -20) {
+      html += '<li>🔴 Резкое падение ('+Math.abs(wkDelta).toFixed(0)+'% к прошлой неделе) — на фоне '+(last.leads||0)+' лидов может быть эффектом конца периода, а не просадкой спроса</li>';
+    }
+    html += '<li>📌 <b>'+escapeHtml(topFmtSum?topFmtSum[0]:'')+'</b> лидирует по сумме, <b>'+escapeHtml(topFmtCnt?topFmtCnt[0]:'')+'</b> — по количеству ('+(topFmtCnt?topFmtCnt[1].cnt:0)+' сд.)</li>';
+    if (ytd.conv_deal_pct < 25) {
+      html += '<li>🎯 Конверсия лид→сделка <b>'+(ytd.conv_deal_pct||0).toFixed(1)+'%</b> — ниже 25%, потенциал в улучшении качества лидов</li>';
+    }
     html += '</ul></div>';
     html += '</div></div>';
 
@@ -417,12 +444,17 @@ async function renderPageMainNew(d) {
     var fmtShort = function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};
     var fmtRename = {'ООМ':'Очный','ОМ':'Онлайн','СДО':'Дистанционный','КОМ':'Корпоративное обучение'};
     var fmtDisplay = function(n){var s=fmtShort(n);return fmtRename[s]||s;};
-    var fmtTot = 0;
-    for(var ftk in fmtData){if(ftk!=='period')fmtTot+=fmtData[ftk].sum||0;}
+    var fmtOrder = ['Очный','Онлайн','Видеокурс','Корпоративное обучение'];
+    var fmtTot = 0, fmtEntries = [];
+    for(var ftk in fmtData){if(ftk!=='period'){fmtTot+=fmtData[ftk].sum||0;fmtEntries.push([ftk, fmtData[ftk]]);}}
+    fmtEntries.sort(function(a,b){
+      var ai = fmtOrder.indexOf(fmtDisplay(a[0])); if(ai===-1) ai=99;
+      var bi = fmtOrder.indexOf(fmtDisplay(b[0])); if(bi===-1) bi=99;
+      return ai - bi;
+    });
     var fmtStr = '<table style="font-size:11px"><tr><th>Формат</th><th>Сумма</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>';
-    for (var fk in fmtData) {
-      if (fk==='period') continue;
-      var fv = fmtData[fk];
+    for (var fi = 0; fi < fmtEntries.length; fi++) {
+      var fk = fmtEntries[fi][0], fv = fmtEntries[fi][1];
       fmtStr += '<tr><td>'+fmtDisplay(escapeHtml(fk))+'</td><td>'+fmt(fv.sum)+' \u20bd</td><td>'+fv.cnt+'</td><td>'+fmt(Math.round(fv.sum/fv.cnt))+' \u20bd</td><td>'+(fmtTot>0?(fv.sum/fmtTot*100).toFixed(1):'0.0')+'%</td></tr>';
     }
     fmtStr += '</table>';
@@ -435,24 +467,24 @@ async function renderPageMainNew(d) {
     var reg = d.reg_ytd||{};
     var pp_reg = d.pp_reg_ytd||null;
     var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления в периоде</div><div class="row"><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽</div><span class="si">'+reg.total_paid+' сд.'+(pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'')+'</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло</div><div class="row"><div class="val-big">'+fmt(reg.total_sum)+' ₽</div><span class="si">'+fmt(reg.total)+' сд.'+(pp_reg?delta(reg.total_sum,pp_reg.total_sum):'')+'</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Потенциал в SQL</div><div class="row"><div class="val-big">'+fmt(reg.sql_sum)+' ₽</div><span class="si">'+reg.sql+' сд.'+(pp_reg?delta(reg.sql_sum,pp_reg.sql_sum):'')+'</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Счёт отправлен</div><div class="row"><div class="val-big">'+fmt(reg.real_inv_sum)+' ₽</div><span class="si">'+reg.real_inv_cnt+' сд.'+(pp_reg?delta(reg.real_inv_sum,pp_reg.real_inv_sum):'')+'</span></div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Конверсия в оплату</div><div class="val-big">'+reg.conv+'%'+(pp_reg?delta(reg.conv,pp_reg.conv):'')+'</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+reg.inv_conv+'%'+(pp_reg?delta(reg.inv_conv,pp_reg.inv_conv):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло</div><div class="val-big">'+fmt(reg.total)+' шт.'+(pp_reg?delta(reg.total,pp_reg.total):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло</div><div class="val-big">'+fmt(reg.total_sum)+' ₽'+(pp_reg?delta(reg.total_sum,pp_reg.total_sum):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления в периоде</div><div class="val-big">'+reg.total_paid+' шт.'+(pp_reg?delta(reg.total_paid,pp_reg.total_paid):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления в периоде</div><div class="val-big">'+fmt(reg.total_paid_sum)+' ₽'+(pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Конверсия в сделку</div><div class="val-big">'+reg.conv+'%'+(pp_reg?delta(reg.conv,pp_reg.conv):'')+'</div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">Доля отказов</div><div class="val-big">'+reg.lose_pct+'%'+(pp_reg?delta(reg.lose_pct,pp_reg.lose_pct):'')+'</div><div class="lbl2">'+reg.lose+' из '+reg.total+' сд.</div></div>';
     regKpis += '<div class="kpi kpi-reg"><div class="lbl">Средний чек</div><div class="val-big">'+fmt(reg.avg_check)+' ₽'+(pp_reg?delta(reg.avg_check,pp_reg.avg_check):'')+'</div></div>';
-    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.'+(pp_reg?deltaInv(reg.avg_dur,pp_reg.avg_dur):'')+'</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+reg.avg_inv_dur+' дн.'+(pp_reg?deltaInv(reg.avg_inv_dur,pp_reg.avg_inv_dur):'')+'</div></div>';
+    regKpis += '<div class="kpi kpi-reg"><div class="lbl">Цикл сделки</div><div class="val-big">'+reg.avg_dur+' дн.'+(pp_reg?deltaInv(reg.avg_dur,pp_reg.avg_dur):'')+'</div></div>';
     if (pp_reg) {
       regKpis += '<div style="grid-column:1/-1;height:0"></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления (пред. период)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_paid_sum)+' ₽</div><span class="si">'+pp_reg.total_paid+' сд.</span></div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.total_sum)+' ₽</div><span class="si">'+fmt(pp_reg.total)+' сд.</span></div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Потенциал в SQL (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.sql_sum)+' ₽</div><span class="si">'+pp_reg.sql+' сд.</span></div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Счёт отправлен (пред.)</div><div class="row"><div class="val-big">'+fmt(pp_reg.real_inv_sum)+' ₽</div><span class="si">'+pp_reg.real_inv_cnt+' сд.</span></div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Конверсия в оплату (пред.)</div><div class="val-big">'+pp_reg.conv+'%</div><div class="lbl2">Конверсия в счёт</div><div class="val-big c-reg">'+pp_reg.inv_conv+'%</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло (пред.)</div><div class="val-big">'+fmt(pp_reg.total)+' шт.</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Регистраций пришло (пред.)</div><div class="val-big">'+fmt(pp_reg.total_sum)+' ₽</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления (пред. период)</div><div class="val-big">'+pp_reg.total_paid+' шт.</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Поступления (пред. период)</div><div class="val-big">'+fmt(pp_reg.total_paid_sum)+' ₽</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Конверсия в сделку (пред.)</div><div class="val-big">'+pp_reg.conv+'%</div></div>';
       regKpis += '<div class="kpi kpi-reg"><div class="lbl">Доля отказов (пред.)</div><div class="val-big">'+pp_reg.lose_pct+'%</div><div class="lbl2">'+pp_reg.lose+' из '+pp_reg.total+' сд.</div></div>';
       regKpis += '<div class="kpi kpi-reg"><div class="lbl">Средний чек (пред.)</div><div class="val-big">'+fmt(pp_reg.avg_check)+' ₽</div></div>';
-      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Цикл сделки (пред.)</div><div class="val-big">'+pp_reg.avg_dur+' дн.</div><div class="lbl2">Цикл в счет</div><div class="val-big c-reg">'+pp_reg.avg_inv_dur+' дн.</div></div>';
+      regKpis += '<div class="kpi kpi-reg"><div class="lbl">Цикл сделки (пред.)</div><div class="val-big">'+pp_reg.avg_dur+' дн.</div></div>';
     }
     var regEl = document.getElementById('newRegKpis'); if(regEl) regEl.innerHTML = regKpis;
 
@@ -473,16 +505,24 @@ async function renderPageMainNew(d) {
     var tSi = tS > 0 ? tInv / tS * 100 : 0;
     var tIo = tInv > 0 ? tO / tInv * 100 : 0;
     var tLo = tL > 0 ? tO / tL * 100 : 0;
-    var weekStr = '<table style="font-size:11px"><tr><th>'+(isMonths('table')?'Месяц':'Неделя')+'</th><th>Лиды</th><th>MQL</th><th>SQL</th><th>Счёт</th><th>Оплачено</th><th>Поступл.</th><th>Ср.чек</th><th>Цикл</th><th>Лиды\u2192MQL</th><th>MQL\u2192SQL</th><th>SQL\u2192Счёт</th><th>Счёт\u2192Оплата</th><th>Лид\u2192Оплата</th></tr>';
+    var colHeaders = [
+      {l:isMonths('table')?'Месяц':'Неделя'},
+      {l:'Лиды'},{l:'MQL'},{l:'SQL'},{l:'Счёт'},{l:'Сделки'},
+      {l:'Поступл.'},{l:'Ср.чек'},{l:'Цикл'},
+      {l:'Лиды\u2192MQL'},{l:'MQL\u2192SQL'},{l:'SQL\u2192Счёт'},{l:'Счёт\u2192Сделка'},{l:'Лид\u2192Сделка'}
+    ];
+    var weekStr = '<table class="table table-sm sortable" style="font-size:11px"><thead><tr>';
+    colHeaders.forEach(function(h,i){weekStr += '<th class="sort" data-col="'+i+'">'+h.l+'</th>';});
+    weekStr += '</tr></thead><tbody>';
     // ИТОГО первой строкой
-    weekStr += '<tr style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>\uD83D\uDCCA ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
+    weekStr += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>\uD83D\uDCCA ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
     // Недели
     for(var wi=tblBuckets.length-1; wi>=0; wi--){
       var w = tblBuckets[wi];
       weekStr += '<tr><td><b>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</b></td><td>'+w.leads+'</td><td>'+w.mql+'</td><td>'+w.sql+'</td><td><b>'+(w.invoice_cnt||0)+'</b></td><td><b>'+w.oplata+'</b></td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td><td>'+(w.leads>0?(w.oplata/w.leads*100).toFixed(1):'0.0')+'%</td></tr>';
     }
-    weekStr += '</table>';
-    el = document.getElementById('newWeekTable'); if(el) el.innerHTML = weekStr;
+    weekStr += '</tbody></table>';
+    el = document.getElementById('newWeekTable'); if(el) { el.innerHTML = weekStr; initTableSort('newWeekTable'); }
 
 
 
@@ -500,10 +540,10 @@ async function renderPageMainNew(d) {
     setTimeout(function(){
       if (window.Chart) {
         try {
-          if (document.getElementById('newChFunnel2')) new Chart(document.getElementById('newChFunnel2'), {type:'bar', data:{labels:funLabels,datasets:[{label:'Отказы неКвал',data:funBuckets.map(function(w){return w.stack2_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4,seg:'rej_nq'},{label:'Отказы',data:funBuckets.map(function(w){return w.stack2_rej||0;}),backgroundColor:'#E53935',borderRadius:4,seg:'rej'},{label:'Не квал',data:funBuckets.map(function(w){return w.stack2_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4,seg:'nq'},{label:'MQL',data:funBuckets.map(function(w){return w.stack2_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4,seg:'mql'},{label:'SQL',data:funBuckets.map(function(w){return w.stack2_sql||0;}),backgroundColor:'#1A237E',borderRadius:4,seg:'sql'},{label:'Счёт',data:funBuckets.map(function(w){return w.stack2_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4,seg:'inv'},{label:'Оплата',data:funBuckets.map(function(w){return w.stack2_pay||0;}),backgroundColor:'#43A047',borderRadius:4,seg:'pay'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].forEach(function(k){tot+=funBuckets[i][k]||0;});return tot?tot+' сд.':'';}},tooltip:{callbacks:{label:function(ctx){var l=ctx.dataset.label||'';var v=ctx.raw||0;var w=funBuckets[ctx.dataIndex]||{};var s=ctx.dataset.seg||'';var sumKey=s?'stack2_'+s+'_sum':'';var sumVal=sumKey?(w[sumKey]||0):0;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].map(function(k){tot+=w[k]||0;});var pct=tot>0?(v/tot*100).toFixed(1):0;var txt=l+': '+v+' сд. ('+pct+'%)';if(s==='sql'||s==='inv'||s==='pay'){txt+=' · '+sumVal.toLocaleString('ru-RU')+' ₽';}return txt;}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}},plugins:[{id:'legendSpacer',beforeLayout(chart){var leg=chart.legend;if(leg&&!leg.__spacer30){var of=leg.fit.bind(leg);leg.fit=function(){of();this.height+=30;};leg.__spacer30=true;}}}] });
+          if (document.getElementById('newChFunnel2')) new Chart(document.getElementById('newChFunnel2'), {type:'bar', data:{labels:funLabels,datasets:[{label:'Отказы неКвал',data:funBuckets.map(function(w){return w.stack2_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4,seg:'rej_nq'},{label:'Отказы',data:funBuckets.map(function(w){return w.stack2_rej||0;}),backgroundColor:'#E53935',borderRadius:4,seg:'rej'},{label:'Не квал',data:funBuckets.map(function(w){return w.stack2_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4,seg:'nq'},{label:'MQL',data:funBuckets.map(function(w){return w.stack2_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4,seg:'mql'},{label:'SQL',data:funBuckets.map(function(w){return w.stack2_sql||0;}),backgroundColor:'#1A237E',borderRadius:4,seg:'sql'},{label:'Счёт',data:funBuckets.map(function(w){return w.stack2_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4,seg:'inv'},{label:'Сделка',data:funBuckets.map(function(w){return w.stack2_pay||0;}),backgroundColor:'#43A047',borderRadius:4,seg:'pay'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].forEach(function(k){tot+=funBuckets[i][k]||0;});return tot?tot+' сд.':'';}},tooltip:{callbacks:{label:function(ctx){var l=ctx.dataset.label||'';var v=ctx.raw||0;var w=funBuckets[ctx.dataIndex]||{};var s=ctx.dataset.seg||'';var sumKey=s?'stack2_'+s+'_sum':'';var sumVal=sumKey?(w[sumKey]||0):0;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].map(function(k){tot+=w[k]||0;});var pct=tot>0?(v/tot*100).toFixed(1):0;var txt=l+': '+v+' сд. ('+pct+'%)';if(s==='sql'||s==='inv'||s==='pay'){txt+=' · '+sumVal.toLocaleString('ru-RU')+' ₽';}return txt;}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}},plugins:[{id:'legendSpacer',beforeLayout(chart){var leg=chart.legend;if(leg&&!leg.__spacer30){var of=leg.fit.bind(leg);leg.fit=function(){of();this.height+=30;};leg.__spacer30=true;}}}] });
         } catch(e){}
         try {
-          if (document.getElementById('newChConv')) new Chart(document.getElementById('newChConv'), {type:'line', data:{labels:labels,datasets:[{label:'Лиды\u2192MQL %',data:weeks.map(function(w){return w.conv_lead_mql||0;}),borderColor:'#B0BEC5',tension:0.3,fill:false},{label:'MQL\u2192SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL\u2192Счёт %',data:weeks.map(function(w){return w.conv_sql_invoice||0;}),borderColor:'#43A047',tension:0.3,fill:false},{label:'Счёт\u2192Оплата %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
+          if (document.getElementById('newChConv')) new Chart(document.getElementById('newChConv'), {type:'line', data:{labels:labels,datasets:[{label:'Лиды\u2192MQL %',data:weeks.map(function(w){return w.conv_lead_mql||0;}),borderColor:'#B0BEC5',tension:0.3,fill:false},{label:'MQL\u2192SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL\u2192Счёт %',data:weeks.map(function(w){return w.conv_sql_invoice||0;}),borderColor:'#43A047',tension:0.3,fill:false},{label:'Счёт\u2192Сделка %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
         } catch(e){}
         try {
           if (document.getElementById('newChPos')) new Chart(document.getElementById('newChPos'), {type:'bar', data:{labels:posLabels,datasets:[{label:'ООМ',data:posBuckets.map(function(w){return w.oom_postupleniya||0;}),backgroundColor:'#00bcd4',borderRadius:4},{label:'КОМ',data:posBuckets.map(function(w){return w.kom_postupleniya||0;}),backgroundColor:'#9C27B0',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{display:false},tooltip:{callbacks:{label:function(ctx){var i=ctx.dataIndex;var v=ctx.raw||0;var oom=posBuckets[i].oom_postupleniya||0;var kom=posBuckets[i].kom_postupleniya||0;var tot=oom+kom;if(ctx.datasetIndex===0) return ctx.dataset.label+': '+v.toLocaleString('ru-RU')+' ₽ из '+tot.toLocaleString('ru-RU')+' ₽';if(ctx.datasetIndex===1) return ctx.dataset.label+': '+v.toLocaleString('ru-RU')+' ₽ из '+tot.toLocaleString('ru-RU')+' ₽';return ctx.dataset.label+': '+v.toLocaleString('ru-RU')+' ₽';}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
