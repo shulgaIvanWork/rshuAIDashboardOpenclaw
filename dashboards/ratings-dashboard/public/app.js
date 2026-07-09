@@ -290,7 +290,20 @@ function buildFilteredData(orig, filteredWeeks) {
     conv_mql_sql:srcTotMql?Math.round(srcTotSql/srcTotMql*100*10)/10:0,
     conv_sql_deals:srcTotSql?Math.round(srcTotDeals/srcTotSql*100*10)/10:0,
     conv_lead_deals:0};
-  out.src_rating = [srcTotal].concat(srcList.slice(0,20));
+  var srcRest = srcList.slice(20);
+  var srcRestRow = null;
+  if (srcRest.length) {
+    var rSum = srcRest.reduce(function(s,x){return s+x.postupleniya;},0);
+    var rDeals = srcRest.reduce(function(s,x){return s+x.deals;},0);
+    var rMql = srcRest.reduce(function(s,x){return s+x.mql;},0);
+    var rSql = srcRest.reduce(function(s,x){return s+x.sql;},0);
+    srcRestRow = {name:'📦 Остальные ('+srcRest.length+' источников)',
+      postupleniya:rSum, deals:rDeals, mql:rMql, sql:rSql, leads:0,
+      avg_check:rDeals?Math.round(rSum/rDeals):0, avg_won_days:0,
+      conv_mql_sql:rMql?Math.round(rSql/rMql*100*10)/10:0,
+      conv_sql_deals:rSql?Math.round(rDeals/rSql*100*10)/10:0, conv_lead_deals:0};
+  }
+  out.src_rating = [srcTotal].concat(srcList.slice(0,20)).concat(srcRestRow?[srcRestRow]:[]);
 
   // Построить mba_rating
   out.mba_rating = Object.entries(mbaAgg).map(function(e) {
@@ -314,11 +327,20 @@ function buildFilteredData(orig, filteredWeeks) {
       if (v.last && (!compAgg[cid].last || v.last > compAgg[cid].last)) compAgg[cid].last = v.last;
     });
   });
-  out.top_companies = Object.entries(compAgg).filter(function(e){return e[1].sum>0;}).map(function(e) {
+  var compList = Object.entries(compAgg).filter(function(e){return e[1].sum>0;}).map(function(e) {
     var cid = e[0], v = e[1];
     return {id:cid, name:(companyNames[cid]||'—').slice(0,100), sum:v.sum, cnt:v.cnt,
       last_date:v.last||'—', avg_check:v.cnt?Math.round(v.sum/v.cnt):0};
-  }).sort(function(a,b){return b.sum-a.sum;}).slice(0,20);
+  }).sort(function(a,b){return b.sum-a.sum;});
+  var compTop = compList.slice(0,20);
+  var compRest = compList.slice(20);
+  if (compRest.length) {
+    var cRSum = compRest.reduce(function(s,x){return s+x.sum;},0);
+    var cRCnt = compRest.reduce(function(s,x){return s+x.cnt;},0);
+    compTop = compTop.concat([{id:'_rest', name:'📦 Остальные ('+compRest.length+' компаний)',
+      sum:cRSum, cnt:cRCnt, last_date:'—', avg_check:cRCnt?Math.round(cRSum/cRCnt):0}]);
+  }
+  out.top_companies = compTop;
 
   return out;
 }
@@ -699,32 +721,58 @@ async function renderPageMainNew(d) {
 
     // Fill tables
     var prods = d.top_products||[];
-    var prodTotalDeals = prods.reduce(function(s,p){return s+(p.deals||p.cnt||0);},0);
-    var prodTotalSum = prods.reduce(function(s,p){return s+(p.sum||0);},0);
-    var prodTotalOchn = prods.reduce(function(s,p){return s+(p.fmt_ochn_cnt||0);},0);
-    var prodTotalOm = prods.reduce(function(s,p){return s+(p.fmt_om_cnt||0);},0);
-    var prodTotalSdo = prods.reduce(function(s,p){return s+(p.fmt_sdo_cnt||0);},0);
-    var prodTotalOchnSum = prods.reduce(function(s,p){return s+(p.fmt_ochn_sum||0);},0);
-    var prodTotalOmSum = prods.reduce(function(s,p){return s+(p.fmt_om_sum||0);},0);
-    var prodTotalSdoSum = prods.reduce(function(s,p){return s+(p.fmt_sdo_sum||0);},0);
     function fmtFmt(cnt, sum) { return cnt+' / '+fmt(sum)+' р'; }
-    var prodStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">Сделки</th><th class="sort" data-col="3">Поступления, ₽</th><th class="sort" data-col="4">Ср.чек, ₽</th><th class="sort" data-col="5">Цикл сделки, дн.</th><th class="sort" data-col="6">Доля</th><th class="sort" data-col="7">Очно</th><th class="sort" data-col="8">Онлайн</th><th class="sort" data-col="9">Дистанционно</th></tr><tr style="background:#fff8e1;font-weight:700"><td></td><td><b>📊 ИТОГО</b></td><td><b>'+prodTotalDeals+'</b></td><td><b>'+fmt(prodTotalSum)+'</b> ₽</td><td>'+fmt(prodTotalDeals?Math.round(prodTotalSum/prodTotalDeals):0)+'</td><td>—</td><td><b>100%</b></td><td>'+fmtFmt(prodTotalOchn, prodTotalOchnSum)+'</td><td>'+fmtFmt(prodTotalOm, prodTotalOmSum)+'</td><td>'+fmtFmt(prodTotalSdo, prodTotalSdoSum)+'</td></tr>';
+    // «📦 Остальные» — агрегат хвоста; топ-20 считаем без него, «все продукты» — вместе с ним
+    function isRest(p){ return (p.name||'').includes('Остальные'); }
+    function totalsOf(list) {
+      return {
+        deals: list.reduce(function(s,p){return s+(p.deals||p.cnt||0);},0),
+        sum:   list.reduce(function(s,p){return s+(p.sum||0);},0),
+        ochn:  list.reduce(function(s,p){return s+(p.fmt_ochn_cnt||0);},0),
+        ochnS: list.reduce(function(s,p){return s+(p.fmt_ochn_sum||0);},0),
+        om:    list.reduce(function(s,p){return s+(p.fmt_om_cnt||0);},0),
+        omS:   list.reduce(function(s,p){return s+(p.fmt_om_sum||0);},0),
+        sdo:   list.reduce(function(s,p){return s+(p.fmt_sdo_cnt||0);},0),
+        sdoS:  list.reduce(function(s,p){return s+(p.fmt_sdo_sum||0);},0),
+        share: list.reduce(function(s,p){return s+(p.share||0);},0),
+      };
+    }
+    var t20  = totalsOf(prods.filter(function(p){ return p.name && !isRest(p); }));
+    var tAll = totalsOf(prods.filter(function(p){ return p.name; }));
+    function totalRow(label, t, shareTxt) {
+      return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>—</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
+    }
+    var prodStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">Сделки</th><th class="sort" data-col="3">Поступления, ₽</th><th class="sort" data-col="4">Ср.чек, ₽</th><th class="sort" data-col="5">Цикл сделки, дн.</th><th class="sort" data-col="6">Доля</th><th class="sort" data-col="7">Очно</th><th class="sort" data-col="8">Онлайн</th><th class="sort" data-col="9">Дистанционно</th></tr>';
+    prodStr += totalRow('📊 ИТОГО (топ-20)', t20, t20.share.toFixed(1)+'%');
     prods.slice(0,21).forEach(function(p,i){
       if(!p.name) return;
-      var isRem = (p.name||'').includes('Остальные');
+      var isRem = isRest(p);
       var pc=p.cnt||p.deals||0;
       prodStr += '<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td><b>'+pc+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'дн</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
     });
+    prodStr += totalRow('📊 ИТОГО (все продукты)', tAll, '100%');
     prodStr += '</table>';
     var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
 
     var src = d.src_rating||[];
+    var srcAll = src[0] || {};          // ИТОГО по всем источникам (уже посчитан на бэке)
+    var srcRows = src.slice(1);         // топ-20 источников + строка «Остальные»
+    function isSrcRest(s){ return (''+(s.name||'')).includes('Остальные'); }
+    var st20 = srcRows.filter(function(s){ return s.name && !isSrcRest(s); })
+      .reduce(function(a,s){ a.sum+=s.postupleniya||0; a.mql+=s.mql||0; a.sql+=s.sql||0; a.deals+=s.deals||0; return a; }, {sum:0,mql:0,sql:0,deals:0});
+    function srcTotalRow(label, t) {
+      var avgCheck = t.deals?Math.round(t.sum/t.deals):0;
+      var cMs = t.mql?(t.sql/t.mql*100):0, cSd = t.sql?(t.deals/t.sql*100):0;
+      return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+t.mql+'</td><td>'+t.sql+'</td><td>'+t.deals+'</td><td>'+cMs.toFixed(1)+'%</td><td>'+cSd.toFixed(1)+'%</td><td>'+fmt(avgCheck)+'</td><td>—</td></tr>';
+    }
     var srcStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Источник</th><th class="sort" data-col="2">Поступления, ₽</th><th class="sort" data-col="3">MQL</th><th class="sort" data-col="4">SQL</th><th class="sort" data-col="5">Сделки</th><th class="sort" data-col="6">MQL→SQL</th><th class="sort" data-col="7">SQL→Сд.</th><th class="sort" data-col="8">Ср.чек, ₽</th><th class="sort" data-col="9">Цикл сделки, дн.</th></tr>';
-    src.forEach(function(s,i){
+    srcStr += srcTotalRow('📊 ИТОГО (топ-20)', st20);
+    srcRows.forEach(function(s,i){
       if(!s.name) return;
-      var isTotal = i === 0;
-      srcStr += '<tr'+(isTotal?' style="background:#fff8e1;font-weight:700"':'')+'><td>'+(isTotal?'':i)+'</td><td>'+escapeHtml(s.name)+'</td><td><b>'+fmt(s.postupleniya)+'</b> ₽</td><td>'+(s.mql||0)+'</td><td>'+(s.sql||0)+'</td><td>'+(s.deals||0)+'</td><td>'+(s.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(s.conv_sql_deals||0).toFixed(1)+'%</td><td>'+fmt(s.avg_check)+'</td><td>'+(s.avg_won_days||0).toFixed(1)+'дн</td></tr>';
+      var isRem = isSrcRest(s);
+      srcStr += '<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td>'+escapeHtml(s.name)+'</td><td><b>'+fmt(s.postupleniya)+'</b> ₽</td><td>'+(s.mql||0)+'</td><td>'+(s.sql||0)+'</td><td>'+(s.deals||0)+'</td><td>'+(s.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(s.conv_sql_deals||0).toFixed(1)+'%</td><td>'+fmt(s.avg_check)+'</td><td>'+(s.avg_won_days||0).toFixed(1)+'дн</td></tr>';
     });
+    srcStr += srcTotalRow('📊 ИТОГО (все источники)', {sum:srcAll.postupleniya||0, mql:srcAll.mql||0, sql:srcAll.sql||0, deals:srcAll.deals||0});
     srcStr += '</table>';
     el = document.getElementById('newSrcTable'); if(el) el.innerHTML = srcStr;
 
@@ -733,8 +781,18 @@ async function renderPageMainNew(d) {
 
 
     var comps = d.top_companies || [];
+    function isCompRest(c){ return (''+(c.name||'')).includes('Остальные'); }
+    function compTotals(list){ return {sum:list.reduce(function(s,c){return s+(c.sum||0);},0), cnt:list.reduce(function(s,c){return s+(c.cnt||0);},0)}; }
+    var ct20  = compTotals(comps.filter(function(c){ return c.name && !isCompRest(c); }));
+    var ctAll = compTotals(comps.filter(function(c){ return c.name; }));
+    function compTotalRow(label, t){ return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+t.cnt+'</td><td>'+fmt(t.cnt?Math.round(t.sum/t.cnt):0)+' ₽</td><td>—</td></tr>'; }
     var compStr = '<table style="font-size:11px"><tr><th>#</th><th>Компания</th><th>Поступления</th><th>Сделок</th><th>Ср.чек</th><th>Последняя оплата</th></tr>';
-    comps.forEach(function(c, i){compStr+='<tr><td>'+(i+1)+'</td><td><b>'+escapeHtml(c.name)+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+c.last_date+'</td></tr>';});
+    compStr += compTotalRow('📊 ИТОГО (топ-20)', ct20);
+    comps.forEach(function(c, i){
+      var isRem = isCompRest(c);
+      compStr+='<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td><b>'+escapeHtml(c.name)+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+c.last_date+'</td></tr>';
+    });
+    compStr += compTotalRow('📊 ИТОГО (все компании)', ctAll);
     compStr += '</table>';
     el = document.getElementById('newCompaniesTable'); if(el) el.innerHTML = compStr;
 
