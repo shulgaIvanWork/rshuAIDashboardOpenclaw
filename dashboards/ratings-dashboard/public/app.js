@@ -230,15 +230,13 @@ function buildFilteredData(orig, filteredWeeks) {
     // by_mba
     Object.entries(w.by_mba || {}).forEach(function(e) {
       var type = e[0], v = e[1];
-      if (!mbaAgg[type]) mbaAgg[type] = {cnt:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
+      if (!mbaAgg[type]) mbaAgg[type] = {cnt:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
       mbaAgg[type].cnt += v.cnt||0; mbaAgg[type].sum += v.sum||0;
       mbaAgg[type].fmt_ochn_cnt += v.fmt_ochn_cnt||0; mbaAgg[type].fmt_ochn_sum += v.fmt_ochn_sum||0;
+      mbaAgg[type].fmt_om_cnt += v.fmt_om_cnt||0; mbaAgg[type].fmt_om_sum += v.fmt_om_sum||0;
       mbaAgg[type].fmt_sdo_cnt += v.fmt_sdo_cnt||0; mbaAgg[type].fmt_sdo_sum += v.fmt_sdo_sum||0;
     });
   });
-
-  // Добавить sql из оригинального top_products (sql считается по DATE_CREATE, не по оплате)
-  (orig.top_products || []).forEach(function(p) { if (prodAgg[p.name]) prodAgg[p.name].sql = p.sql; });
 
   // Построить top_products
   var totalSum = Object.values(prodAgg).reduce(function(s,v){return s+v.sum;},0) || 1;
@@ -246,7 +244,7 @@ function buildFilteredData(orig, filteredWeeks) {
     var name = e[0], v = e[1];
     var avgCheck = v.deals ? Math.round(v.sum/v.deals) : 0;
     var avgDur = Math.round(avg(v.durs)*10)/10;
-    return {name:name, sql:v.sql||0, deals:v.deals, sum:v.sum, avg_check:avgCheck,
+    return {name:name, deals:v.deals, sum:v.sum, avg_check:avgCheck,
       avg_won_days:avgDur, share:Math.round(v.sum/totalSum*100*10)/10,
       fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
       fmt_sdo_cnt:v.fmt_sdo_cnt, fmt_sdo_sum:v.fmt_sdo_sum};
@@ -256,8 +254,7 @@ function buildFilteredData(orig, filteredWeeks) {
   var restSum = rest.reduce(function(s,p){return s+p.sum;},0);
   var restDeals = rest.reduce(function(s,p){return s+p.deals;},0);
   if (rest.length) {
-    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', sql:rest.reduce(function(s,p){return s+p.sql;},0),
-      deals:restDeals, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:0,
+    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', deals:restDeals, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:0,
       share:Math.round(restSum/totalSum*100*10)/10,
       fmt_ochn_cnt:rest.reduce(function(s,p){return s+p.fmt_ochn_cnt;},0),
       fmt_ochn_sum:rest.reduce(function(s,p){return s+p.fmt_ochn_sum;},0),
@@ -300,6 +297,7 @@ function buildFilteredData(orig, filteredWeeks) {
     var type = e[0], v = e[1];
     return {type:type, cnt:v.cnt, sum:v.sum, deals:v.cnt, avg_check:v.cnt?Math.round(v.sum/v.cnt):0,
       fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
+      fmt_om_cnt:v.fmt_om_cnt, fmt_om_sum:v.fmt_om_sum,
       fmt_sdo_cnt:v.fmt_sdo_cnt, fmt_sdo_sum:v.fmt_sdo_sum};
   }).sort(function(a,b){return b.sum-a.sum;});
 
@@ -397,7 +395,7 @@ function renderPage(data) {
         <div class="kpi"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.qual_lead_ytd)}</b> · конв. ${data.qual_lead_ytd && data.leads_ytd ? (data.qual_lead_ytd/data.leads_ytd*100).toFixed(1) : 0}%</div></div>
         <div class="kpi"><div class="lbl">📈 Конверсия YTD</div><div class="val">${ytd.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
         <div class="kpi"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(ytd.avg_check)} ₽</div><div class="sub">медиана ${fmt(ytd.median_check)} ₽</div></div>
-        <div class="kpi"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${ytd.avg_close_days_won.toFixed(1)}</div><div class="sub">ср.взв. ${(ytd.avg_close_days_won_weighted || ytd.avg_close_days_won).toFixed(1)} · мед. ${ytd.median_close_days_won} дн.</div></div>
+        <div class="kpi"><div class="lbl">⏱ Цикл сделки, дн.</div><div class="val">${ytd.avg_close_days_won.toFixed(1)}</div><div class="sub">ср.взв. ${(ytd.avg_close_days_won_weighted || ytd.avg_close_days_won).toFixed(1)} · мед. ${ytd.median_close_days_won} дн.</div></div>
         <div class="kpi"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(cur.postupleniya)} ₽</div><div class="sub">${cur.won_relevant_cnt} сд.</div></div>
         <div class="kpi"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.leads_cur)}</div><div class="sub">${data.leads_prev > 0 ? ((data.leads_cur - data.leads_prev) > 0 ? '🟩' : (data.leads_cur - data.leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.leads_cur - data.leads_prev) / data.leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
       </div>
@@ -409,7 +407,7 @@ function renderPage(data) {
         <div class="kpi oom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.oom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.oom_qual_lead_ytd)}</b> · конв. ${data.oom_qual_lead_ytd && data.oom_leads_ytd ? (data.oom_qual_lead_ytd/data.oom_leads_ytd*100).toFixed(1) : 0}%</div></div>
         <div class="kpi oom"><div class="lbl">📈 Конверсия YTD</div><div class="val">${oom_ytd.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
         <div class="kpi oom"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(oom_ytd.avg_check)} ₽</div><div class="sub">медиана ${fmt(oom_ytd.median_check)} ₽</div></div>
-        <div class="kpi oom"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${oom_ytd.avg_close_days_won.toFixed(1)}</div><div class="sub">ср.взв. ${(oom_ytd.avg_close_days_won_weighted || oom_ytd.avg_close_days_won).toFixed(1)} · мед. ${oom_ytd.median_close_days_won} дн.</div></div>
+        <div class="kpi oom"><div class="lbl">⏱ Цикл сделки, дн.</div><div class="val">${oom_ytd.avg_close_days_won.toFixed(1)}</div><div class="sub">ср.взв. ${(oom_ytd.avg_close_days_won_weighted || oom_ytd.avg_close_days_won).toFixed(1)} · мед. ${oom_ytd.median_close_days_won} дн.</div></div>
         <div class="kpi oom"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(oom_cur.postupleniya)} ₽</div><div class="sub">${oom_cur.won_relevant_cnt} сд.</div></div>
         <div class="kpi oom"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.oom_leads_cur)}</div><div class="sub">${data.oom_leads_prev > 0 ? ((data.oom_leads_cur - data.oom_leads_prev) > 0 ? '🟩' : (data.oom_leads_cur - data.oom_leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.oom_leads_cur - data.oom_leads_prev) / data.oom_leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
       </div>
@@ -421,7 +419,7 @@ function renderPage(data) {
         <div class="kpi kom"><div class="lbl">📋 Лиды YTD</div><div class="val">${fmt(data.kom_leads_ytd)}</div><div class="sub" style="line-height:1.5">квал. лиды (MQL) <b>${fmt(data.kom_qual_lead_ytd)}</b></div></div>
         <div class="kpi kom"><div class="lbl">📈 Конверсия YTD</div><div class="val">${kom.conv_deal_pct.toFixed(1)}%</div><div class="sub">WON / (WON+LOSE)</div></div>
         <div class="kpi kom"><div class="lbl">💰 Средний чек YTD</div><div class="val">${fmt(kom.avg_check)} ₽</div><div class="sub">макс ${fmt(kom.max_check)} ₽</div></div>
-        <div class="kpi kom"><div class="lbl">⏱ Срок WON, дн.</div><div class="val">${kom.avg_close_days_won.toFixed(1)}</div><div class="sub">медиана ${kom.median_close_days_won} дн.</div></div>
+        <div class="kpi kom"><div class="lbl">⏱ Цикл сделки, дн.</div><div class="val">${kom.avg_close_days_won.toFixed(1)}</div><div class="sub">медиана ${kom.median_close_days_won} дн.</div></div>
         <div class="kpi kom"><div class="lbl">📈 W${cw}: поступления</div><div class="val">${fmt(kom_cur.postupleniya)} ₽</div><div class="sub">${kom_cur.won_relevant_cnt} сд.</div></div>
         <div class="kpi kom"><div class="lbl">🎯 W${cw}: лиды</div><div class="val">${fmt(data.kom_leads_cur)}</div><div class="sub">${data.kom_leads_prev > 0 ? ((data.kom_leads_cur - data.kom_leads_prev) > 0 ? '🟩' : (data.kom_leads_cur - data.kom_leads_prev) < 0 ? '🔻' : '') + ' ' + ((data.kom_leads_cur - data.kom_leads_prev) / data.kom_leads_prev * 100).toFixed(1) + '% к прошл.' : ''}</div></div>
       </div>
@@ -497,19 +495,16 @@ function renderPage(data) {
     <div class="card"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2>
       <div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div>
       <div class="scroll-x"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">📥 Всего</th><th class="sort" data-col="3">✅ Оплачено</th><th class="sort" data-col="4">💰 Поступления, ₽</th><th class="sort" data-col="5">💵 Ср.чек, ₽</th><th class="sort" data-col="6">⏱ Цикл,дн</th><th class="sort" data-col="7">📊 Конв.%</th><th class="sort" data-col="8">📈 Доля</th></tr></thead>
+        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">✅ Оплачено</th><th class="sort" data-col="3">💰 Поступления, ₽</th><th class="sort" data-col="4">💵 Ср.чек, ₽</th><th class="sort" data-col="5">⏱ Цикл,дн</th><th class="sort" data-col="6">📈 Доля</th></tr></thead>
         <tbody>${(data.top_products || []).map((p, i) => {
           const isRem = (p.name || '').includes('Остальные');
-          var conv = p.sql > 0 ? (p.deals / p.sql * 100) : 0;
           return `<tr${isRem ? " style='background:#f0f4ff;font-weight:700'" : ""}>
             <td>${isRem ? '' : i+1}</td>
             <td style='max-width:260px;white-space:normal'>${(p.name || '').substring(0, 100)}</td>
-            <td>${p.sql}</td>
             <td><b>${p.deals}</b></td>
             <td><b>${fmt(p.sum)}</b> ₽</td>
             <td>${fmt(p.avg_check)}</td>
             <td>${p.avg_won_days.toFixed(1)}</td>
-            <td>${conv.toFixed(1)}%</td>
             <td><b>${p.share.toFixed(1)}%</b></td>
           </tr>`;
         }).join('')}</tbody>
@@ -706,23 +701,25 @@ async function renderPageMainNew(d) {
     var prods = d.top_products||[];
     var prodTotalDeals = prods.reduce(function(s,p){return s+(p.deals||p.cnt||0);},0);
     var prodTotalSum = prods.reduce(function(s,p){return s+(p.sum||0);},0);
-    var prodTotalSql = prods.reduce(function(s,p){return s+(p.sql||0);},0);
     var prodTotalOchn = prods.reduce(function(s,p){return s+(p.fmt_ochn_cnt||0);},0);
+    var prodTotalOm = prods.reduce(function(s,p){return s+(p.fmt_om_cnt||0);},0);
     var prodTotalSdo = prods.reduce(function(s,p){return s+(p.fmt_sdo_cnt||0);},0);
     var prodTotalOchnSum = prods.reduce(function(s,p){return s+(p.fmt_ochn_sum||0);},0);
+    var prodTotalOmSum = prods.reduce(function(s,p){return s+(p.fmt_om_sum||0);},0);
     var prodTotalSdoSum = prods.reduce(function(s,p){return s+(p.fmt_sdo_sum||0);},0);
-    var prodStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">SQL</th><th class="sort" data-col="3">Сделки</th><th class="sort" data-col="4">Поступления, ₽</th><th class="sort" data-col="5">Ср.чек, ₽</th><th class="sort" data-col="6">Срок WON</th><th class="sort" data-col="7">Доля</th><th class="sort" data-col="8"></span>Очно</th><th class="sort" data-col="9"></span>Дистанционно</th></tr><tr style="background:#fff8e1;font-weight:700"><td></td><td><b>📊 ИТОГО</b></td><td>'+prodTotalSql+'</td><td><b>'+prodTotalDeals+'</b></td><td><b>'+fmt(prodTotalSum)+'</b> ₽</td><td>'+fmt(prodTotalDeals?Math.round(prodTotalSum/prodTotalDeals):0)+'</td><td>—</td><td><b>100%</b></td><td>'+prodTotalOchn+' ('+fmt(prodTotalOchnSum)+' ₽)</td><td>'+prodTotalSdo+' ('+fmt(prodTotalSdoSum)+' ₽)</td></tr>';
+    function fmtFmt(cnt, sum) { return cnt+' / '+fmt(sum)+' р'; }
+    var prodStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">Сделки</th><th class="sort" data-col="3">Поступления, ₽</th><th class="sort" data-col="4">Ср.чек, ₽</th><th class="sort" data-col="5">Цикл сделки, дн.</th><th class="sort" data-col="6">Доля</th><th class="sort" data-col="7">Очно</th><th class="sort" data-col="8">Онлайн</th><th class="sort" data-col="9">Дистанционно</th></tr><tr style="background:#fff8e1;font-weight:700"><td></td><td><b>📊 ИТОГО</b></td><td><b>'+prodTotalDeals+'</b></td><td><b>'+fmt(prodTotalSum)+'</b> ₽</td><td>'+fmt(prodTotalDeals?Math.round(prodTotalSum/prodTotalDeals):0)+'</td><td>—</td><td><b>100%</b></td><td>'+fmtFmt(prodTotalOchn, prodTotalOchnSum)+'</td><td>'+fmtFmt(prodTotalOm, prodTotalOmSum)+'</td><td>'+fmtFmt(prodTotalSdo, prodTotalSdoSum)+'</td></tr>';
     prods.slice(0,21).forEach(function(p,i){
       if(!p.name) return;
       var isRem = (p.name||'').includes('Остальные');
       var pc=p.cnt||p.deals||0;
-      prodStr += '<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td>'+(p.sql||0)+'</td><td><b>'+pc+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'дн</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+(p.fmt_ochn_cnt||0)+' ('+fmt(p.fmt_ochn_sum||0)+' ₽)</td><td>'+(p.fmt_sdo_cnt||0)+' ('+fmt(p.fmt_sdo_sum||0)+' ₽)</td></tr>';
+      prodStr += '<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td><b>'+pc+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'дн</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
     });
     prodStr += '</table>';
     var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
 
     var src = d.src_rating||[];
-    var srcStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Источник</th><th class="sort" data-col="2">Поступления, ₽</th><th class="sort" data-col="3">MQL</th><th class="sort" data-col="4">SQL</th><th class="sort" data-col="5">Сделки</th><th class="sort" data-col="6">MQL→SQL</th><th class="sort" data-col="7">SQL→Сд.</th><th class="sort" data-col="8">Ср.чек, ₽</th><th class="sort" data-col="9">Срок WON</th></tr>';
+    var srcStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Источник</th><th class="sort" data-col="2">Поступления, ₽</th><th class="sort" data-col="3">MQL</th><th class="sort" data-col="4">SQL</th><th class="sort" data-col="5">Сделки</th><th class="sort" data-col="6">MQL→SQL</th><th class="sort" data-col="7">SQL→Сд.</th><th class="sort" data-col="8">Ср.чек, ₽</th><th class="sort" data-col="9">Цикл сделки, дн.</th></tr>';
     src.forEach(function(s,i){
       if(!s.name) return;
       var isTotal = i === 0;
@@ -747,10 +744,12 @@ async function renderPageMainNew(d) {
     var mbaDeals = mbaData.reduce(function(s,m){return s+(m.cnt||0);},0);
     var mbaAvg = mbaDeals ? Math.round(mbaTotal / mbaDeals) : 0;
     var mbaOchn = mbaData.reduce(function(s,m){return s+(m.fmt_ochn_cnt||0);},0);
+    var mbaOm = mbaData.reduce(function(s,m){return s+(m.fmt_om_cnt||0);},0);
     var mbaSdo = mbaData.reduce(function(s,m){return s+(m.fmt_sdo_cnt||0);},0);
     var mbaOchnSum = mbaData.reduce(function(s,m){return s+(m.fmt_ochn_sum||0);},0);
+    var mbaOmSum = mbaData.reduce(function(s,m){return s+(m.fmt_om_sum||0);},0);
     var mbaSdoSum = mbaData.reduce(function(s,m){return s+(m.fmt_sdo_sum||0);},0);
-    var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th><th></span>Очно</th><th></span>Дистанционно</th></tr><tr style="background:#fff8e1;font-weight:700"><td><b>📊 ИТОГО</b></td><td><b>'+fmt(mbaTotal)+' ₽</b></td><td>'+mbaDeals+'</td><td>'+fmt(mbaAvg)+' ₽</td><td>100%</td><td>'+mbaOchn+' ('+fmt(mbaOchnSum)+' ₽)</td><td>'+mbaSdo+' ('+fmt(mbaSdoSum)+' ₽)</td></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' ₽</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' ₽</td><td>'+(mbaTotal>0?(m.sum/mbaTotal*100).toFixed(1):'0.0')+'%</td><td>'+ (m.fmt_ochn_cnt||0) +' ('+fmt(m.fmt_ochn_sum||0)+' ₽)</td><td>'+ (m.fmt_sdo_cnt||0) +' ('+fmt(m.fmt_sdo_sum||0)+' ₽)</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
+    var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th><th>Очно</th><th>Онлайн</th><th>Дистанционно</th></tr><tr style="background:#fff8e1;font-weight:700"><td><b>📊 ИТОГО</b></td><td><b>'+fmt(mbaTotal)+' ₽</b></td><td>'+mbaDeals+'</td><td>'+fmt(mbaAvg)+' ₽</td><td>100%</td><td>'+fmtFmt(mbaOchn,mbaOchnSum)+'</td><td>'+fmtFmt(mbaOm,mbaOmSum)+'</td><td>'+fmtFmt(mbaSdo,mbaSdoSum)+'</td></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' ₽</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' ₽</td><td>'+(mbaTotal>0?(m.sum/mbaTotal*100).toFixed(1):'0.0')+'%</td><td>'+fmtFmt(m.fmt_ochn_cnt||0,m.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(m.fmt_om_cnt||0,m.fmt_om_sum||0)+'</td><td>'+fmtFmt(m.fmt_sdo_cnt||0,m.fmt_sdo_sum||0)+'</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
     el = document.getElementById('newMbaTable'); if(el) el.innerHTML = mbaStr;
 
   } catch(e) {

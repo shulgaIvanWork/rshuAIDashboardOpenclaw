@@ -843,32 +843,35 @@ export async function analyze(onProgress) {
   for (const r of rows) {
     if (r.FORMAT==='КОМ') continue;
     const key=r.PRODUCT.slice(0,90);
-    if (!prodData[key]) prodData[key]={sql:0,deals:0,sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
-    if (r.DC&&r.DC.getFullYear()===YEAR&&r.OPP>=MIN_OPP) prodData[key].sql++;
+    if (!prodData[key]) prodData[key]={deals:0,sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
     if (payYtd(r)) {
       prodData[key].deals++; prodData[key].sum+=r.OPP;
       if (r.FORMAT==='Очный') { prodData[key].fmt_ochn_cnt++; prodData[key].fmt_ochn_sum+=r.OPP; }
+      else if (r.FORMAT==='Онлайн') { prodData[key].fmt_om_cnt++; prodData[key].fmt_om_sum+=r.OPP; }
       else { prodData[key].fmt_sdo_cnt++; prodData[key].fmt_sdo_sum+=r.OPP; }
       if (r.DC&&r.CL){const d=daysBetween(r.DC,r.CL);if(d>=0)prodData[key].durs.push(d);}
     }
   }
   const prodList=Object.entries(prodData).map(([name,d])=>{
     const avgC=d.deals?d.sum/d.deals:0, avgD=avg(d.durs);
-    return{name,sql:d.sql,deals:d.deals,sum:d.sum,avg_check:Math.round(avgC),avg_won_days:Math.round(avgD*10)/10,share:0,_durs:d.durs,fmt_ochn_cnt:d.fmt_ochn_cnt,fmt_ochn_sum:d.fmt_ochn_sum,fmt_sdo_cnt:d.fmt_sdo_cnt,fmt_sdo_sum:d.fmt_sdo_sum};
+    return{name,deals:d.deals,sum:d.sum,avg_check:Math.round(avgC),avg_won_days:Math.round(avgD*10)/10,share:0,_durs:d.durs,fmt_ochn_cnt:d.fmt_ochn_cnt,fmt_ochn_sum:d.fmt_ochn_sum,fmt_om_cnt:d.fmt_om_cnt,fmt_om_sum:d.fmt_om_sum,fmt_sdo_cnt:d.fmt_sdo_cnt,fmt_sdo_sum:d.fmt_sdo_sum};
   }).sort((a,b)=>b.sum-a.sum);
   const totalNonKom=prodList.reduce((s,p)=>s+p.sum,0);
   const TOP_N=20;
   const selected=prodList.slice(0,TOP_N).map(p=>{ const {_durs,...rest}=p; rest.share=totalNonKom?Math.round(p.sum/totalNonKom*100*10)/10:0; return rest; });
   const remaining=prodList.slice(TOP_N);
   const remSum=remaining.reduce((s,p)=>s+p.sum,0), remDeals=remaining.reduce((s,p)=>s+p.deals,0);
-  const remSql=remaining.reduce((s,p)=>s+p.sql,0), remDurs=remaining.flatMap(p=>p._durs);
+  const remDurs=remaining.flatMap(p=>p._durs);
   const remOchnCnt=remaining.reduce((s,p)=>s+p.fmt_ochn_cnt,0), remOchnSum=remaining.reduce((s,p)=>s+p.fmt_ochn_sum,0);
+  const remOmCnt=remaining.reduce((s,p)=>s+p.fmt_om_cnt,0), remOmSum=remaining.reduce((s,p)=>s+p.fmt_om_sum,0);
   const remSdoCnt=remaining.reduce((s,p)=>s+p.fmt_sdo_cnt,0), remSdoSum=remaining.reduce((s,p)=>s+p.fmt_sdo_sum,0);
   const topProducts=[...selected,{
-    name:`📦 Остальные (${remaining.length} продуктов)`,sql:remSql,deals:remDeals,sum:remSum,
+    name:`📦 Остальные (${remaining.length} продуктов)`,deals:remDeals,sum:remSum,
     avg_check:remDeals?Math.round(remSum/remDeals):0,avg_won_days:Math.round(avg(remDurs)*10)/10,
     share:totalNonKom?Math.round(remSum/totalNonKom*100*10)/10:0,
-    fmt_ochn_cnt:remOchnCnt,fmt_ochn_sum:remOchnSum,fmt_sdo_cnt:remSdoCnt,fmt_sdo_sum:remSdoSum,
+    fmt_ochn_cnt:remOchnCnt,fmt_ochn_sum:remOchnSum,
+    fmt_om_cnt:remOmCnt,fmt_om_sum:remOmSum,
+    fmt_sdo_cnt:remSdoCnt,fmt_sdo_sum:remSdoSum,
   }];
 
   // ── Менеджеры ─────────────────────────────────────────────────────────────
@@ -925,12 +928,13 @@ export async function analyze(onProgress) {
     const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE);
     if (!isMba) continue;
     const mt=detectMbaType(r.TITLE); if(!mt) continue;
-    if(!mbaMap[mt]) mbaMap[mt]={cnt:0,sum:0,deals:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
+    if(!mbaMap[mt]) mbaMap[mt]={cnt:0,sum:0,deals:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
     mbaMap[mt].cnt++; mbaMap[mt].sum+=r.OPP; mbaMap[mt].deals++;
     if (r.FORMAT==='Очный') { mbaMap[mt].fmt_ochn_cnt++; mbaMap[mt].fmt_ochn_sum+=r.OPP; }
+    else if (r.FORMAT==='Онлайн') { mbaMap[mt].fmt_om_cnt++; mbaMap[mt].fmt_om_sum+=r.OPP; }
     else { mbaMap[mt].fmt_sdo_cnt++; mbaMap[mt].fmt_sdo_sum+=r.OPP; }
   }
-  const mbaRatingList=Object.entries(mbaMap).map(([type,v])=>({type,cnt:v.cnt,sum:v.sum,deals:v.deals,avg_check:v.cnt?Math.round(v.sum/v.cnt):0,fmt_ochn_cnt:v.fmt_ochn_cnt,fmt_ochn_sum:v.fmt_ochn_sum,fmt_sdo_cnt:v.fmt_sdo_cnt,fmt_sdo_sum:v.fmt_sdo_sum})).sort((a,b)=>b.sum-a.sum);
+  const mbaRatingList=Object.entries(mbaMap).map(([type,v])=>({type,cnt:v.cnt,sum:v.sum,deals:v.deals,avg_check:v.cnt?Math.round(v.sum/v.cnt):0,fmt_ochn_cnt:v.fmt_ochn_cnt,fmt_ochn_sum:v.fmt_ochn_sum,fmt_om_cnt:v.fmt_om_cnt,fmt_om_sum:v.fmt_om_sum,fmt_sdo_cnt:v.fmt_sdo_cnt,fmt_sdo_sum:v.fmt_sdo_sum})).sort((a,b)=>b.sum-a.sum);
 
   // ── Созданные по категориям ───────────────────────────────────────────────
   const createdByCat={};
