@@ -104,6 +104,51 @@ app.get('/api/artifacts', async (req, res) => {
   }
 });
 
+// ── ISO-недели: диапазон дат по номеру недели отчётного года ─────────────────
+// Позволяет выбирать любую неделю (прошлую или будущую), не завися от agg.weeks,
+// где есть только недели с начала года по текущую.
+function fromISOCalendar(year, week, dow) {
+  const jan4 = new Date(year, 0, 4);
+  const jan4dow = jan4.getDay() || 7;
+  const d = new Date(jan4);
+  d.setDate(jan4.getDate() - jan4dow + 1 + (week - 1) * 7 + dow - 1);
+  return d;
+}
+
+function isoWeekOf(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dow = d.getDay() || 7;
+  const thu = new Date(d); thu.setDate(d.getDate() + 4 - dow);
+  const yr = thu.getFullYear();
+  const week = Math.floor((thu - new Date(yr, 0, 1)) / (7 * 86400000)) + 1;
+  return [yr, week];
+}
+
+// 28 декабря всегда попадает в последнюю ISO-неделю года (52 или 53)
+function isoWeeksInYear(year) {
+  return isoWeekOf(new Date(year, 11, 28))[1];
+}
+
+function currentWeekNum() {
+  const [yr, w] = isoWeekOf(new Date());
+  if (yr === YEAR) return w;
+  return yr > YEAR ? isoWeeksInYear(YEAR) : 1;
+}
+
+const fmt2 = n => String(n).padStart(2, '0');
+
+function weekRange(week) {
+  const start = fromISOCalendar(YEAR, week, 1);
+  const end = fromISOCalendar(YEAR, week, 7);
+  end.setHours(23, 59, 59);
+  return { start, end };
+}
+
+function weekDatesLabel(week) {
+  const { start, end } = weekRange(week);
+  return `${fmt2(start.getDate())}.${fmt2(start.getMonth() + 1)}—${fmt2(end.getDate())}.${fmt2(end.getMonth() + 1)}`;
+}
+
 // Strip dates, cities, contract numbers from deal title to get program name
 function normalizeTitle(title) {
   return (title || '')
@@ -117,10 +162,8 @@ function normalizeTitle(title) {
     || title;
 }
 
-// Build participants list for a given week index
-async function buildParticipants(weekIndex) {
-  const agg = await getAgg();
-
+// Build participants list for a given ISO week number of YEAR
+async function buildParticipants(weekNum) {
   let modulesData = {};
   try {
     modulesData = JSON.parse(await fs.readFile(path.join(PARTS_CACHE, 'modules.json'), 'utf-8'));
@@ -172,28 +215,8 @@ async function buildParticipants(weekIndex) {
     return 'Онлайн';
   }
 
-  const weeks = agg.weeks || [];
-  const targetWeek = weeks[weekIndex];
-  if (!targetWeek) return { participants: [], weekLabel: '—' };
-
-  const wkLabel = targetWeek.label_short + ' (' + targetWeek.label_dates + ')';
-
-  function parseDateRange(datesStr) {
-    const parts = datesStr.split('—');
-    if (parts.length !== 2) return null;
-    const [d1, d2] = parts.map(s => s.trim());
-    const [dd1, mm1] = d1.split('.');
-    const [dd2, mm2] = d2.split('.');
-    const y = YEAR;
-    const m1 = parseInt(mm1), d1n = parseInt(dd1);
-    const m2 = parseInt(mm2), d2n = parseInt(dd2);
-    const start = new Date(y, m1 - 1, d1n);
-    const end = new Date(y, m2 - 1, d2n, 23, 59, 59);
-    return { start, end };
-  }
-
-  const range = parseDateRange(targetWeek.label_dates);
-  if (!range) return { participants: [], weekLabel: wkLabel };
+  const wkLabel = `W${fmt2(weekNum)} (${weekDatesLabel(weekNum)})`;
+  const range = weekRange(weekNum);
 
   function toDate(s) {
     if (!s) return null;
@@ -442,14 +465,27 @@ async function buildParticipants(weekIndex) {
     .sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ name, count }));
 
-  return { participants, total: participants.length, weekLabel: wkLabel, directionCounts };
+  return { participants, total: participants.length, week: weekNum, weekLabel: wkLabel, directionCounts };
 }
 
+// Список всех ISO-недель отчётного года для селектора + номер текущей
+app.get('/api/weeks', (req, res) => {
+  const total = isoWeeksInYear(YEAR);
+  const current = currentWeekNum();
+  const weeks = [];
+  for (let w = 1; w <= total; w++) {
+    weeks.push({ week: w, dates: weekDatesLabel(w) });
+  }
+  res.json({ weeks, current });
+});
+
+// ?week=N — номер ISO-недели; без параметра — текущая неделя
 app.get('/api/participants', async (req, res) => {
   try {
-    const agg = await getAgg();
-    const weeks = agg.weeks || [];
-    const result = await buildParticipants(weeks.length - 2);
+    const total = isoWeeksInYear(YEAR);
+    let week = parseInt(req.query.week, 10);
+    if (!week || week < 1 || week > total) week = currentWeekNum();
+    const result = await buildParticipants(week);
     res.json(result);
   } catch (e) {
     console.error('/api/participants error:', e.message);
@@ -459,9 +495,7 @@ app.get('/api/participants', async (req, res) => {
 
 app.get('/api/participants/current', async (req, res) => {
   try {
-    const agg = await getAgg();
-    const weeks = agg.weeks || [];
-    const result = await buildParticipants(weeks.length - 1);
+    const result = await buildParticipants(currentWeekNum());
     res.json(result);
   } catch (e) {
     console.error('/api/participants/current error:', e.message);
@@ -471,11 +505,10 @@ app.get('/api/participants/current', async (req, res) => {
 
 app.get('/api/export', async (req, res) => {
   try {
-    const agg = await getAgg();
-    const weeks = agg.weeks || [];
+    const cur = currentWeekNum();
     const [prevResult, curResult] = await Promise.all([
-      buildParticipants(weeks.length - 2),
-      buildParticipants(weeks.length - 1),
+      buildParticipants(Math.max(1, cur - 1)),
+      buildParticipants(cur),
     ]);
     const { buildParticipantsWorkbook } = await import('./lib/export-excel.js');
     const buffer = await buildParticipantsWorkbook(prevResult, curResult);

@@ -337,7 +337,7 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Источники: Внутренняя база vs Маркетинговые сделки</h2><div class="chartbox-sm"><canvas id="newChSrcSplit"></canvas></div><div id="newSrcSplitTable"></div></div>';
     html += '</div>';
     // Регистрация — над воронкой
-    html += '<div class="kpis kpis-8" id="newRegKpis" style="margin-top:16px"></div>';
+    html += '<div class="kpis kpis-6" id="newRegKpis" style="margin-top:16px"></div>';
     // Стеки воронок - на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:8px"><h2>Воронка '+(isMonths('funnel')?'по месяцам':'по неделям')+' <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии '+(isMonths('funnel')?'в том же месяце':'на той же неделе')+')</span>'+perToggle('funnel')+'</h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     // Конверсии
@@ -505,11 +505,23 @@ async function renderPageMainNew(d) {
         + (pp_reg?'<div class="pp-val">'+ppVal+'</div>':'')
         + '</div>';
     }
+    // Сдвоенная карточка: «шт.» и «₽» одной метрики в одном блоке
+    function regCardPair(lbl1, val1, delta1, ppVal1, lbl2, val2, delta2, ppVal2) {
+      return '<div class="kpi kpi-reg"><div class="lbl">'+lbl1+'</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+val1+'</div>'+(delta1||'')+'</div>'
+        + (pp_reg?'<div class="pp-val">'+ppVal1+'</div>':'')
+        + '<div class="lbl2">'+lbl2+'</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+val2+'</div>'+(delta2||'')+'</div>'
+        + (pp_reg?'<div class="pp-val">'+ppVal2+'</div>':'')
+        + '</div>';
+    }
     var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>'
-      + regCard('Регистраций пришло, шт.', fmt(reg.total), pp_reg?delta(reg.total,pp_reg.total):'', pp_reg?fmt(pp_reg.total):'')
-      + regCard('Регистраций пришло, ₽', fmt(reg.total_sum), pp_reg?delta(reg.total_sum,pp_reg.total_sum):'', pp_reg?fmt(pp_reg.total_sum):'')
-      + regCard('Поступления, шт.', fmt(reg.total_paid), pp_reg?delta(reg.total_paid,pp_reg.total_paid):'', pp_reg?fmt(pp_reg.total_paid):'')
-      + regCard('Поступления, ₽', fmt(reg.total_paid_sum), pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'', pp_reg?fmt(pp_reg.total_paid_sum):'')
+      + regCardPair(
+          'Регистраций пришло, шт.', fmt(reg.total), pp_reg?delta(reg.total,pp_reg.total):'', pp_reg?fmt(pp_reg.total):'',
+          'Регистраций пришло, ₽', fmt(reg.total_sum), pp_reg?delta(reg.total_sum,pp_reg.total_sum):'', pp_reg?fmt(pp_reg.total_sum):'')
+      + regCardPair(
+          'Поступления, шт.', fmt(reg.total_paid), pp_reg?delta(reg.total_paid,pp_reg.total_paid):'', pp_reg?fmt(pp_reg.total_paid):'',
+          'Поступления, ₽', fmt(reg.total_paid_sum), pp_reg?delta(reg.total_paid_sum,pp_reg.total_paid_sum):'', pp_reg?fmt(pp_reg.total_paid_sum):'')
       + regCard('Конверсия в сделку', reg.conv+'%', pp_reg?delta(reg.conv,pp_reg.conv):'', pp_reg?pp_reg.conv+'%':'')
       + regCard('Доля отказов', reg.lose_pct+'%', pp_reg?delta(reg.lose_pct,pp_reg.lose_pct):'', pp_reg?pp_reg.lose_pct+'%':'')
       + regCard('Средний чек, ₽', fmt(reg.avg_check), pp_reg?delta(reg.avg_check,pp_reg.avg_check):'', pp_reg?fmt(pp_reg.avg_check):'')

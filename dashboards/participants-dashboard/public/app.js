@@ -27,31 +27,35 @@ function shortCompany(name) {
     .replace(/\(акционерное общество\)/gi, '(АО)')
     .replace(/\(общество с ограниченной ответственностью\)/gi, '(ООО)');
 }
-let currentTab = 'participants';
-
 var exportBtn = document.getElementById('exportBtn');
 if (exportBtn) exportBtn.href = (window.BASE_PATH || '') + '/api/export';
 
-// ── Tab switching ─────────────────────────────────────────────────────────────
+// ── Селектор недели ───────────────────────────────────────────────────────────
 
-document.getElementById('tabBar').addEventListener('click', function(e) {
-  const tab = e.target.closest('.tab');
-  if (!tab) return;
-  const tabName = tab.dataset.tab;
-  if (tabName === currentTab) return;
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  tab.classList.add('active');
-  document.getElementById('participantsArea').classList.toggle('d-none', tabName !== 'participants');
-  document.getElementById('participantsCurArea').classList.toggle('d-none', tabName !== 'participantsCur');
-  currentTab = tabName;
-  if (tabName === 'participants') loadParticipants();
-  if (tabName === 'participantsCur') loadParticipantsCurrent();
-});
+async function initWeekSelect() {
+  const res = await api('/api/weeks');
+  const sel = document.getElementById('weekSelect');
+  sel.innerHTML = res.weeks.map(function(w) {
+    var suffix = '';
+    if (w.week === res.current) suffix = ' — текущая';
+    else if (w.week === res.current - 1) suffix = ' — предыдущая';
+    else if (w.week === res.current + 1) suffix = ' — следующая';
+    return '<option value="' + w.week + '">' + w.dates + suffix + '</option>';
+  }).join('');
+  sel.value = res.current;
+  sel.addEventListener('change', function() {
+    loadParticipants(parseInt(sel.value, 10));
+  });
+  return res.current;
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function loadAll() {
   try {
+    const week = await initWeekSelect();
+    loadParticipants(week);
+
     const d = await api('/api/data/new');
     if (!d || !d.ytd) return;
     dataCache = d;
@@ -61,10 +65,6 @@ async function loadAll() {
       var dt = new Date(d._loadedAt);
       dateEl.textContent = '(Данные на: ' + dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ')';
     }
-
-    // Грузим оба таба сразу — иначе заголовок неактивной вкладки остаётся статичным текстом
-    loadParticipants();
-    loadParticipantsCurrent();
   } catch (e) {
     console.error('loadAll error:', e);
   }
@@ -142,56 +142,57 @@ function buildParticipantsTable(res, tableId) {
   return html + '</tbody></table>';
 }
 
-function renderDirectionCounts(directionCounts) {
-  if (!directionCounts || !directionCounts.length) return '';
-  return directionCounts.map(function(d) {
-    return '<span class="badge text-bg-light text-dark border me-1 mb-1">' + escapeHtml(d.name) + ': <strong>' + d.count + '</strong></span>';
-  }).join('');
-}
+// ── Селектор направления ──────────────────────────────────────────────────────
 
-function formatWeekTitle(weekLabel, which) {
-  var m = weekLabel.match(/W(\d+) \((.*?)\)/);
-  var label = which === 'prev' ? 'предыдущая неделя' : 'текущая неделя';
-  return m ? label + ' (' + m[2] + ')' : weekLabel;
-}
+var lastRes = null; // результат последней загруженной недели (для фильтрации без запроса)
 
-// ── Load prev week ────────────────────────────────────────────────────────────
-
-async function loadParticipants() {
-  const wrap = document.getElementById('participantsTableWrap');
-  wrap.innerHTML = '<div class="text-center text-secondary py-5"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка участников…</div></div>';
-  try {
-    const res = await api('/api/participants');
-    if (!res.participants) {
-      wrap.innerHTML = '<div class="alert alert-danger">❌ ' + (res.error || 'Нет данных') + '</div>';
-      return;
-    }
-    document.getElementById('participantsTitle').textContent =
-      '👥 ' + formatWeekTitle(res.weekLabel, 'prev') + ' · всего ' + res.total;
-    document.getElementById('participantsDirections').innerHTML = renderDirectionCounts(res.directionCounts);
-    wrap.innerHTML = buildParticipantsTable(res, 'participantsTable');
-    setTimeout(() => initTableSort('participantsTable'), 100);
-  } catch (e) {
-    wrap.innerHTML = '<div class="alert alert-danger">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
+function fillDirSelect(res) {
+  var sel = document.getElementById('dirSelect');
+  var prev = sel.value;
+  var opts = '<option value="">Все (' + res.total + ')</option>';
+  (res.directionCounts || []).forEach(function(d) {
+    opts += '<option value="' + escapeHtml(d.name) + '">' + escapeHtml(d.name) + ' (' + d.count + ')</option>';
+  });
+  sel.innerHTML = opts;
+  // Сохраняем выбранное направление при смене недели, если оно есть и на новой
+  if (prev && Array.prototype.some.call(sel.options, function(o) { return o.value === prev; })) {
+    sel.value = prev;
   }
 }
 
-// ── Load current week ─────────────────────────────────────────────────────────
+function renderTable() {
+  if (!lastRes) return;
+  var dir = document.getElementById('dirSelect').value;
+  var res = dir
+    ? Object.assign({}, lastRes, { participants: lastRes.participants.filter(function(p) { return (p.direction || '—') === dir; }) })
+    : lastRes;
+  document.getElementById('participantsTitle').textContent = dir
+    ? dir + ': ' + res.participants.length + ' из ' + lastRes.total
+    : 'всего ' + lastRes.total;
+  document.getElementById('participantsTableWrap').innerHTML = buildParticipantsTable(res, 'participantsTable');
+  setTimeout(() => initTableSort('participantsTable'), 100);
+}
 
-async function loadParticipantsCurrent() {
-  const wrap = document.getElementById('participantsCurTableWrap');
+document.getElementById('dirSelect').addEventListener('change', renderTable);
+
+// ── Load selected week ────────────────────────────────────────────────────────
+
+async function loadParticipants(week) {
+  const wrap = document.getElementById('participantsTableWrap');
   wrap.innerHTML = '<div class="text-center text-secondary py-5"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка участников…</div></div>';
+  document.getElementById('participantsTitle').textContent = '';
   try {
-    const res = await api('/api/participants/current');
+    const res = await api('/api/participants?week=' + week);
     if (!res.participants) {
       wrap.innerHTML = '<div class="alert alert-danger">❌ ' + (res.error || 'Нет данных') + '</div>';
       return;
     }
-    document.getElementById('participantsCurTitle').textContent =
-      '👥 ' + formatWeekTitle(res.weekLabel, 'cur') + ' · всего ' + res.total;
-    document.getElementById('participantsCurDirections').innerHTML = renderDirectionCounts(res.directionCounts);
-    wrap.innerHTML = buildParticipantsTable(res, 'participantsCurTable');
-    setTimeout(() => initTableSort('participantsCurTable'), 100);
+    // Если пользователь уже переключился на другую неделю — не перерисовываем
+    var sel = document.getElementById('weekSelect');
+    if (sel.value && parseInt(sel.value, 10) !== res.week) return;
+    lastRes = res;
+    fillDirSelect(res);
+    renderTable();
   } catch (e) {
     wrap.innerHTML = '<div class="alert alert-danger">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
   }
