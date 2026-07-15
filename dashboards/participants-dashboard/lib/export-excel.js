@@ -60,16 +60,15 @@ function addSheet(workbook, sheetName, participants) {
 }
 
 /**
- * Строит книгу из двух наборов participants (прошлая и текущая неделя)
+ * Строит книгу с одним листом участников выбранной недели
  * и возвращает Buffer с .xlsx.
  */
-export async function buildParticipantsWorkbook(prevResult, curResult) {
+export async function buildParticipantsWorkbook(result) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'RSHU Dashboard';
   workbook.created = new Date();
 
-  addSheet(workbook, 'Прошлая неделя', prevResult.participants || []);
-  addSheet(workbook, 'Текущая неделя', curResult.participants || []);
+  addSheet(workbook, result.weekLabel || 'Неделя', result.participants || []);
 
   return workbook.xlsx.writeBuffer();
 }

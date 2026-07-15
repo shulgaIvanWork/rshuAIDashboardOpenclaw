@@ -22,7 +22,7 @@ body { padding: 0 !important; }
 
 /* Поля дат (RangeCalendar/только для отображения) — тот же вид, что раньше был
    у input[type=date] в shared.css */
-.rc-input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; width: 170px; cursor: pointer; background: #fff; }
+.rc-input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; width: 200px; cursor: pointer; background: #fff; }
 .rc-input:disabled { background: #f1f3f6; color: #94A3B8; cursor: default; }
 
 /* Период + Сравнение — в одну строку, подсказки под ними (переопределяет

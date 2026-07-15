@@ -336,8 +336,6 @@ async function renderPageMainNew(d) {
     html += '<div class="card"><h2>Тип клиента: B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
     html += '<div class="card"><h2>Источники: Внутренняя база vs Маркетинговые сделки</h2><div class="chartbox-sm"><canvas id="newChSrcSplit"></canvas></div><div id="newSrcSplitTable"></div></div>';
     html += '</div>';
-    // Регистрация — над воронкой
-    html += '<div class="kpis kpis-6" id="newRegKpis" style="margin-top:16px"></div>';
     // Стеки воронок - на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:8px"><h2>Воронка '+(isMonths('funnel')?'по месяцам':'по неделям')+' <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии '+(isMonths('funnel')?'в том же месяце':'на той же неделе')+')</span>'+perToggle('funnel')+'</h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
     // Конверсии
@@ -379,6 +377,8 @@ async function renderPageMainNew(d) {
     srcTbl += '</table>';
         // MBA — перенесён на ratings-dashboard
 
+    // Регистрация — над недельной таблицей
+    html += '<div class="kpis kpis-6" id="newRegKpis" style="margin-top:16px"></div>';
     html += '<div class="card"><h2>'+(isMonths('table')?'Таблица по месяцам':'Недельная таблица')+perToggle('table')+'</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
     // --- Ключевые выводы ---

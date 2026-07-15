@@ -28,7 +28,10 @@ function shortCompany(name) {
     .replace(/\(общество с ограниченной ответственностью\)/gi, '(ООО)');
 }
 var exportBtn = document.getElementById('exportBtn');
-if (exportBtn) exportBtn.href = (window.BASE_PATH || '') + '/api/export';
+
+function updateExportBtn(week) {
+  if (exportBtn) exportBtn.href = (window.BASE_PATH || '') + '/api/export?week=' + week;
+}
 
 // ── Селектор недели ───────────────────────────────────────────────────────────
 
@@ -43,8 +46,11 @@ async function initWeekSelect() {
     return '<option value="' + w.week + '">' + w.dates + suffix + '</option>';
   }).join('');
   sel.value = res.current;
+  updateExportBtn(res.current);
   sel.addEventListener('change', function() {
-    loadParticipants(parseInt(sel.value, 10));
+    var week = parseInt(sel.value, 10);
+    updateExportBtn(week);
+    loadParticipants(week);
   });
   return res.current;
 }
@@ -166,9 +172,6 @@ function renderTable() {
   var res = dir
     ? Object.assign({}, lastRes, { participants: lastRes.participants.filter(function(p) { return (p.direction || '—') === dir; }) })
     : lastRes;
-  document.getElementById('participantsTitle').textContent = dir
-    ? dir + ': ' + res.participants.length + ' из ' + lastRes.total
-    : 'всего ' + lastRes.total;
   document.getElementById('participantsTableWrap').innerHTML = buildParticipantsTable(res, 'participantsTable');
   setTimeout(() => initTableSort('participantsTable'), 100);
 }
@@ -180,7 +183,6 @@ document.getElementById('dirSelect').addEventListener('change', renderTable);
 async function loadParticipants(week) {
   const wrap = document.getElementById('participantsTableWrap');
   wrap.innerHTML = '<div class="text-center text-secondary py-5"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка участников…</div></div>';
-  document.getElementById('participantsTitle').textContent = '';
   try {
     const res = await api('/api/participants?week=' + week);
     if (!res.participants) {

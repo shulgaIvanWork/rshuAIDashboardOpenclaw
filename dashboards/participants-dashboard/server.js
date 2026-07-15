@@ -505,14 +505,13 @@ app.get('/api/participants/current', async (req, res) => {
 
 app.get('/api/export', async (req, res) => {
   try {
-    const cur = currentWeekNum();
-    const [prevResult, curResult] = await Promise.all([
-      buildParticipants(Math.max(1, cur - 1)),
-      buildParticipants(cur),
-    ]);
+    const total = isoWeeksInYear(YEAR);
+    let week = parseInt(req.query.week, 10);
+    if (!week || week < 1 || week > total) week = currentWeekNum();
+    const result = await buildParticipants(week);
     const { buildParticipantsWorkbook } = await import('./lib/export-excel.js');
-    const buffer = await buildParticipantsWorkbook(prevResult, curResult);
-    const fileName = `participants_${new Date().toISOString().substring(0, 10)}.xlsx`;
+    const buffer = await buildParticipantsWorkbook(result);
+    const fileName = `participants_W${String(week).padStart(2, '0')}_${new Date().toISOString().substring(0, 10)}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(Buffer.from(buffer));
