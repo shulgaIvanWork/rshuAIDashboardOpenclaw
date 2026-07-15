@@ -116,6 +116,7 @@ app.use('/ratings-dashboard',         requireAuth, lazyApp('ratings-dashboard', 
 app.use('/participants-dashboard',    requireAuth, lazyApp('participants-dashboard',    () => import('../dashboards/participants-dashboard/server.js')));
 app.use('/test-dashboard',            requireAuth, lazyApp('test-dashboard',            () => import('../dashboards/test-dashboard/server.js')));
 app.use('/manager-report-dev',        requireAuth, lazyApp('manager-report-dev',        () => import('../dashboards/manager-report-dev/server.js')));
+app.use('/plan-fact-dashboard',       requireAuth, lazyApp('plan-fact-dashboard',       () => import('../dashboards/plan-fact-dashboard/server.js')));
 
 // --------------- Dashboards page ---------------
 app.get('/dashboards', requireAuth, (req, res) => {
@@ -297,7 +298,8 @@ function getAvailableDashboards(user) {
     'kom-dashboard': { url: '/kom-dashboard/' },
     'participants-dashboard': { url: '/participants-dashboard/' },
     'test-dashboard': { url: '/test-dashboard/' },
-    'manager-report-dev': { url: '/manager-report-dev/' }
+    'manager-report-dev': { url: '/manager-report-dev/' },
+    'plan-fact-dashboard': { url: '/plan-fact-dashboard/' }
   };
 
   try {
