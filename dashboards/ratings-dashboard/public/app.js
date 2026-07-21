@@ -255,8 +255,10 @@ function buildFilteredData(orig, filteredWeeks) {
   var rest = prodList.slice(20);
   var restSum = rest.reduce(function(s,p){return s+p.sum;},0);
   var restDeals = rest.reduce(function(s,p){return s+p.deals;},0);
+  var restCycleNum = rest.reduce(function(s,p){return s+((p.avg_won_days||0)*(p.deals||0));},0);
+  var restCycle = restDeals > 0 ? restCycleNum/restDeals : 0;
   if (rest.length) {
-    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', deals:restDeals, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:0,
+    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', deals:restDeals, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:restCycle,
       share:Math.round(restSum/totalSum*100*10)/10,
       fmt_ochn_cnt:rest.reduce(function(s,p){return s+p.fmt_ochn_cnt;},0),
       fmt_ochn_sum:rest.reduce(function(s,p){return s+p.fmt_ochn_sum;},0),
@@ -301,9 +303,11 @@ function buildFilteredData(orig, filteredWeeks) {
     var rDeals = srcRest.reduce(function(s,x){return s+x.deals;},0);
     var rMql = srcRest.reduce(function(s,x){return s+x.mql;},0);
     var rSql = srcRest.reduce(function(s,x){return s+x.sql;},0);
+    var rCycleNum = srcRest.reduce(function(s,x){return s+((x.avg_won_days||0)*(x.deals||0));},0);
+    var rCycle = rDeals > 0 ? rCycleNum/rDeals : 0;
     srcRestRow = {name:'📦 Остальные ('+srcRest.length+' источников)',
       postupleniya:rSum, deals:rDeals, mql:rMql, sql:rSql, leads:0,
-      avg_check:rDeals?Math.round(rSum/rDeals):0, avg_won_days:0,
+      avg_check:rDeals?Math.round(rSum/rDeals):0, avg_won_days:rCycle,
       conv_mql_sql:rMql?Math.round(rSql/rMql*100*10)/10:0,
       conv_sql_deals:rSql?Math.round(rDeals/rSql*100*10)/10:0, conv_lead_deals:0};
   }
