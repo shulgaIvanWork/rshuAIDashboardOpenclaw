@@ -34,9 +34,5 @@
   "plan-fact-dashboard": {
     "label": "План-факт выручки",
     "icon": "📋"
-  },
-  "sales-report": {
-    "label": "Отчёт отдела продаж",
-    "icon": "📊"
   }
 }
