@@ -580,9 +580,11 @@ function renderPage(data) {
     <!-- Top companies -->
     <div class="card"><h2>ТОП-20 компаний по поступлениям</h2>
       <div class="scroll-x" style="max-height:400px;overflow:auto"><table class="sortable">
-        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📅 Последняя покупка</th></tr></thead>
-        <tbody>${(data.top_companies || []).map((c, i) =>
-          `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${shortCompany(c.name || '—')}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${c.last_date || '—'}</td></tr>`
+        <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📊 Доля</th><th class="sort" data-col="6">📅 Последняя покупка</th></tr></thead>
+        <tbody>${(data.top_companies || []).map((c, i) => {
+          var allCompSum = (data.top_companies||[]).reduce(function(s,x){return s+(x.sum||0);},0) || 1;
+          return `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${shortCompany(c.name || '—')}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${(c.sum/allCompSum*100).toFixed(1)}%</td><td>${c.last_date || '—'}</td></tr>`;
+        })`,
         ).join('')}</tbody>
       </table></div>
     </div>
@@ -908,12 +910,15 @@ async function renderPageMainNew(d) {
     function compTotals(list){ return {sum:list.reduce(function(s,c){return s+(c.sum||0);},0), cnt:list.reduce(function(s,c){return s+(c.cnt||0);},0)}; }
     var ct20  = compTotals(comps.filter(function(c){ return c.name && !isCompRest(c); }));
     var ctAll = compTotals(comps.filter(function(c){ return c.name; }));
-    function compTotalRow(label, t){ return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+t.cnt+'</td><td>'+fmt(t.cnt?Math.round(t.sum/t.cnt):0)+' ₽</td><td>—</td></tr>'; }
-    var compStr = '<table style="font-size:11px"><tr><th>#</th><th>Компания</th><th>Поступления</th><th>Сделок</th><th>Ср.чек</th><th>Последняя оплата</th></tr>';
+    function compTotalRow(label, t, sharePct){ return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+t.cnt+'</td><td>'+fmt(t.cnt?Math.round(t.sum/t.cnt):0)+' ₽</td><td>100%</td><td>—</td></tr>'; }
+    var compStr = '<table style="font-size:11px"><tr><th>#</th><th>Компания</th><th>Поступления</th><th>Сделок</th><th>Ср.чек</th><th>Доля в&nbsp;поступлениях</th><th>Последняя оплата</th></tr>';
+    var ct20Sum = ct20.sum || 1;
+    var ctAllSum = ctAll.sum || 1;
     compStr += compTotalRow('📊 ИТОГО (топ-20)', ct20);
     comps.forEach(function(c, i){
       var isRem = isCompRest(c);
-      compStr+='<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td><b>'+escapeHtml(shortCompany(c.name))+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+c.last_date+'</td></tr>';
+      var share = isRem ? (c.sum / ctAllSum * 100).toFixed(1) : (c.sum / ct20Sum * 100).toFixed(1);
+      compStr+='<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td><b>'+escapeHtml(shortCompany(c.name))+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+share+'%</td><td>'+c.last_date+'</td></tr>';
     });
     compStr += compTotalRow('📊 ИТОГО (все компании)', ctAll);
     compStr += '</table>';
