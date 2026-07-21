@@ -910,12 +910,11 @@ async function renderPageMainNew(d) {
     var ctAll = compTotals(comps.filter(function(c){ return c.name; }));
     function compTotalRow(label, t, sharePct){ return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+t.cnt+'</td><td>'+fmt(t.cnt?Math.round(t.sum/t.cnt):0)+' ₽</td><td>100%</td><td>—</td></tr>'; }
     var compStr = '<table style="font-size:11px"><tr><th>#</th><th>Компания</th><th>Поступления</th><th>Сделок</th><th>Ср.чек</th><th>Доля в&nbsp;поступлениях</th><th>Последняя оплата</th></tr>';
-    var ct20Sum = ct20.sum || 1;
     var ctAllSum = ctAll.sum || 1;
     compStr += compTotalRow('📊 ИТОГО (топ-20)', ct20);
     comps.forEach(function(c, i){
       var isRem = isCompRest(c);
-      var share = isRem ? (c.sum / ctAllSum * 100).toFixed(1) : (c.sum / ct20Sum * 100).toFixed(1);
+      var share = (c.sum / ctAllSum * 100).toFixed(1);
       compStr+='<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td><b>'+escapeHtml(shortCompany(c.name))+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+share+'%</td><td>'+c.last_date+'</td></tr>';
     });
     compStr += compTotalRow('📊 ИТОГО (все компании)', ctAll);
