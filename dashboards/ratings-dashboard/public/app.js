@@ -214,9 +214,10 @@ function buildFilteredData(orig, filteredWeeks) {
     // by_prod
     Object.entries(w.by_prod || {}).forEach(function(e) {
       var name = e[0], v = e[1];
-      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
+      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
       prodAgg[name].deals += v.deals||0; prodAgg[name].sum += v.sum||0;
       prodAgg[name].fmt_ochn_cnt += v.fmt_ochn_cnt||0; prodAgg[name].fmt_ochn_sum += v.fmt_ochn_sum||0;
+      prodAgg[name].fmt_om_cnt += v.fmt_om_cnt||0; prodAgg[name].fmt_om_sum += v.fmt_om_sum||0;
       prodAgg[name].fmt_sdo_cnt += v.fmt_sdo_cnt||0; prodAgg[name].fmt_sdo_sum += v.fmt_sdo_sum||0;
       if (v.durs) prodAgg[name].durs = prodAgg[name].durs.concat(v.durs);
     });
@@ -247,6 +248,7 @@ function buildFilteredData(orig, filteredWeeks) {
     return {name:name, deals:v.deals, sum:v.sum, avg_check:avgCheck,
       avg_won_days:avgDur, share:Math.round(v.sum/totalSum*100*10)/10,
       fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
+      fmt_om_cnt:v.fmt_om_cnt, fmt_om_sum:v.fmt_om_sum,
       fmt_sdo_cnt:v.fmt_sdo_cnt, fmt_sdo_sum:v.fmt_sdo_sum};
   }).sort(function(a,b){return b.sum-a.sum;});
   var top20 = prodList.slice(0,20);
@@ -258,6 +260,8 @@ function buildFilteredData(orig, filteredWeeks) {
       share:Math.round(restSum/totalSum*100*10)/10,
       fmt_ochn_cnt:rest.reduce(function(s,p){return s+p.fmt_ochn_cnt;},0),
       fmt_ochn_sum:rest.reduce(function(s,p){return s+p.fmt_ochn_sum;},0),
+      fmt_om_cnt:rest.reduce(function(s,p){return s+p.fmt_om_cnt;},0),
+      fmt_om_sum:rest.reduce(function(s,p){return s+p.fmt_om_sum;},0),
       fmt_sdo_cnt:rest.reduce(function(s,p){return s+p.fmt_sdo_cnt;},0),
       fmt_sdo_sum:rest.reduce(function(s,p){return s+p.fmt_sdo_sum;},0)});
   }
