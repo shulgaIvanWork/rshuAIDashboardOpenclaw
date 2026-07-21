@@ -771,8 +771,8 @@ async function renderPageMainNew(d) {
     // Топ-20 продуктов
     html += '<div class="card" style="margin-top:8px"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
     // Источники
-    html += '<div class="card"><h2>Рейтинг источников поступлений (открытое обучение без КОМ)</h2><div style="overflow-x:auto"><div id="newSrcTable"></div></div></div>';
-    html += '<div class="card"><h2>Топ-20 компаний</h2><div id="newCompaniesTable"></div></div>';
+    html += '<div class="card"><h2>Рейтинг источников поступлений (открытое обучение без КОМ)</h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newSrcTable"></div></div></div>';
+    html += '<div class="card"><h2>Топ-20 компаний</h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newCompaniesTable"></div></div></div>';
 
     areaNew.innerHTML = html;
 
@@ -818,8 +818,7 @@ async function renderPageMainNew(d) {
     // ── Рейтинг источников (полная воронка, без КОМ) ─────────────────────
     var srcFunnel = d.src_funnel || [];
     var sub = d._loadedAt ? '· данные на ' + d._loadedAt.substring(0,10) : '';
-    var sfStr = '<div class="sub" style="margin:-8px 0 14px">Рейтинг источников поступлений (открытое обучение без КОМ) · ' + sub + '</div>';
-    sfStr += '<table class="table table-sm sortable" style="font-size:11px"><thead><tr>' +
+    var sfStr = '<table class="table table-sm sortable" style="font-size:11px"><thead><tr>' +
       '<th class="sort" data-col="0">Источник</th>' +
       '<th class="sort" data-col="1">Лиды</th>' +
       '<th class="sort" data-col="2">MQL</th>' +
@@ -928,7 +927,7 @@ async function renderPageMainNew(d) {
     function fmtFmt2(cnt,sum){ return cnt+' / '+fmt(sum)+' ₽'; }
     function compRow(bg, cells){ return '<tr'+(bg?' style="background:'+bg+';font-weight:700"':'')+'>'+cells+'</tr>'; }
     function compCell(v){ return '<td>'+v+'</td>'; }
-    var compStr = '<table style="font-size:11px"><tr><th>#</th><th style="white-space:normal">Компания</th><th>Поступления</th><th>Сделок</th><th>Сделки ОМ</th><th>Сделки КОМ</th><th>Ср.чек</th><th>Доля</th><th>Посл.&nbsp;оплата</th></tr>';
+    var compStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" style="white-space:normal" data-col="1">Компания</th><th class="sort" data-col="2">Поступления</th><th class="sort" data-col="3">Сделок</th><th class="sort" data-col="4">Сделки ОМ</th><th class="sort" data-col="5">Сделки КОМ</th><th class="sort" data-col="6">Ср.чек</th><th class="sort" data-col="7">Доля</th><th class="sort" data-col="8">Посл.&nbsp;оплата</th></tr>';
     var ctAllSum = ctAll.sum || 1;
     compStr += compRow('#fff8e1',
       '<td></td><td><b>📊 ИТОГО (топ-20)</b></td>'
