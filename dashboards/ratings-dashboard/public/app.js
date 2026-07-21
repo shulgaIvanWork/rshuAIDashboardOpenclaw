@@ -796,9 +796,10 @@ async function renderPageMainNew(d) {
 
     function sfRow(r, isTotalRow, idx) {
       if (!r) return '';
-      var isTotalOrRest = isTotalRow || (r.name||'').includes('Остальные') || (r.name||'').includes('ИТОГО');
-      var rowStyle = isTotalOrRest ? ' style="background:#eef1f8;font-weight:700"' : '';
-      var label = idx != null ? '<td>' + idx + '</td>' : '<td></td>';
+      var isRest = (r.name||'').includes('Остальные');
+      var isTotal = isTotalRow || (r.name||'').includes('ИТОГО');
+      var bg = isTotal ? '#fff8e1' : (isRest ? '#f0f4ff' : '');
+      var rowStyle = bg ? ' style="background:' + bg + ';font-weight:700"' : '';
       var leads = r.leads || 0;
       var mql = r.mql || 0;
       var sql = r.sql || 0;
@@ -812,13 +813,14 @@ async function renderPageMainNew(d) {
       var csi = sql > 0 ? (invoice / sql * 100).toFixed(1) + '%' : '—';
       var cio = invoice > 0 ? (deals / invoice * 100).toFixed(1) + '%' : '—';
       var clo = leads > 0 ? (deals / leads * 100).toFixed(1) + '%' : '—';
-      var typeLabel = '';
-      var typeColor = '';
-      if (!isTotalOrRest && r.type) {
-        if (r.type === 'internal') { typeLabel = 'ВНБ'; typeColor = '#1f2a44'; }
-        else { typeLabel = 'МТ'; typeColor = '#00bcd4'; }
+      var typeHtml = '';
+      if (!isTotal && !isRest && r.type) {
+        var tl = r.type === 'internal' ? 'ВНБ' : 'МТ';
+        var tc = r.type === 'internal' ? '#1f2a44' : '#00bcd4';
+        typeHtml = '<span style="display:inline-block;background:' + tc + ';color:#fff;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600">' + tl + '</span>';
+      } else if (isTotal) {
+        typeHtml = '<span style="font-size:10px;color:#475569">Внутренняя база / Маркет. трафик</span>';
       }
-      var typeHtml = typeLabel ? '<span style="display:inline-block;background:' + typeColor + ';color:#fff;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600">' + typeLabel + '</span>' : '';
       return '<tr' + rowStyle + '><td><b>' + escapeHtml(r.name) + '</b></td>' +
         '<td>' + leads + '</td>' +
         '<td>' + mql + '</td>' +
