@@ -359,23 +359,22 @@ function buildFilteredData(orig, filteredWeeks) {
   var companyNames = orig.company_names || {};
   // Дополнить из top_companies на случай если company_names отсутствует (старый кэш)
   (orig.top_companies || []).forEach(function(c) { if (!companyNames[c.id]) companyNames[c.id] = c.name; });
-  var origCompMap = {};
-  (orig.top_companies || []).forEach(function(c) { origCompMap[c.id] = c; });
   var compAgg = {};
   filteredWeeks.forEach(function(w) {
     Object.entries(w.by_company || {}).forEach(function(e) {
       var cid = e[0], v = e[1];
-      if (!compAgg[cid]) compAgg[cid] = {sum:0,cnt:0,last:null};
+      if (!compAgg[cid]) compAgg[cid] = {sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0};
       compAgg[cid].sum += v.sum||0; compAgg[cid].cnt += v.cnt||0;
+      compAgg[cid].om_cnt += v.om_cnt||0; compAgg[cid].om_sum += v.om_sum||0;
+      compAgg[cid].kom_cnt += v.kom_cnt||0; compAgg[cid].kom_sum += v.kom_sum||0;
       if (v.last && (!compAgg[cid].last || v.last > compAgg[cid].last)) compAgg[cid].last = v.last;
     });
   });
   var compList = Object.entries(compAgg).filter(function(e){return e[1].sum>0;}).map(function(e) {
     var cid = e[0], v = e[1];
-    var oc = origCompMap[cid] || {};
     return {id:cid, name:(companyNames[cid]||'—').slice(0,100), sum:v.sum, cnt:v.cnt,
-      om_cnt:oc.om_cnt||0, om_sum:oc.om_sum||0,
-      kom_cnt:oc.kom_cnt||0, kom_sum:oc.kom_sum||0,
+      om_cnt:v.om_cnt||0, om_sum:v.om_sum||0,
+      kom_cnt:v.kom_cnt||0, kom_sum:v.kom_sum||0,
       last_date:v.last||'—', avg_check:v.cnt?Math.round(v.sum/v.cnt):0};
   }).sort(function(a,b){return b.sum-a.sum;});
   var compTop = compList.slice(0,20);
