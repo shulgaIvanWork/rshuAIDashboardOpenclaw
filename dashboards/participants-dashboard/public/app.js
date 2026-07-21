@@ -76,28 +76,35 @@ async function loadAll() {
   }
 }
 
+// ── Формат даты ISO → ДД.ММ.ГГГГ ────────────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return '';
+  var parts = iso.split('-');
+  if (parts.length !== 3) return iso;
+  return parts[2] + '.' + parts[1] + '.' + parts[0];
+}
+
 // ── Participants table builder ─────────────────────────────────────────────────
 
 function buildParticipantsTable(res, tableId) {
   let html = '<table class="table table-sm table-hover align-middle text-center sortable" id="' + tableId + '"><thead><tr>' +
-    '<th class="sort text-nowrap sticky-top" data-col="0">Направление</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="1">Программа</th>' +
-
-    '<th class="sort text-nowrap sticky-top" data-col="2">Формат</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="3">ФИО</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="4">Регион</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="5">Компания</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="6">Тип</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="7">Сумма, ₽</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="8">Даты</th>' +
-    '<th class="sort sticky-top" data-col="9" style="white-space:normal;min-width:60px">Длит. дней</th>' +
-    '<th class="sort sticky-top" data-col="10" style="white-space:normal;min-width:60px">Цикл дней</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="11">Статус</th>' +
-    '<th class="sort sticky-top" data-col="12" style="white-space:normal;min-width:90px">Пред. обуч.</th>' +
-    '<th class="sort sticky-top" data-col="13" style="white-space:normal;min-width:90px">Посл. обуч. в комп.</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="14">Участник</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="15">Скидка, %</th>' +
-    '<th class="sort text-nowrap sticky-top" data-col="16">Статус счета</th>' +
+    '<th class="sort sticky-top" data-col="0">Направление</th>' +
+    '<th class="sort sticky-top" data-col="1">Программа</th>' +
+    '<th class="sort sticky-top" data-col="2">Формат</th>' +
+    '<th class="sort sticky-top" data-col="3">ФИО</th>' +
+    '<th class="sort sticky-top" data-col="4">Регион</th>' +
+    '<th class="sort sticky-top" data-col="5">Компания</th>' +
+    '<th class="sort sticky-top" data-col="6" style="min-width:65px">Тип<br>клиента</th>' +
+    '<th class="sort sticky-top" data-col="7" style="min-width:65px">Даты<br>модуля</th>' +
+    '<th class="sort sticky-top" data-col="8" style="min-width:60px">Длитель-<br>ность, дней</th>' +
+    '<th class="sort sticky-top" data-col="9" style="min-width:65px">Статус<br>сделки</th>' +
+    '<th class="sort sticky-top" data-col="10">Участник</th>' +
+    '<th class="sort sticky-top" data-col="11" style="min-width:70px">Статус<br>счета</th>' +
+    '<th class="sort sticky-top" data-col="12" style="min-width:65px">Сумма, ₽</th>' +
+    '<th class="sort sticky-top" data-col="13" style="min-width:55px">Скидка, %</th>' +
+    '<th class="sort sticky-top" data-col="14" style="min-width:65px">Цикл<br>сделки, дней</th>' +
+    '<th class="sort sticky-top" data-col="15" style="min-width:95px">Пред. обуч.<br>участника</th>' +
+    '<th class="sort sticky-top" data-col="16" style="min-width:95px">Пред. обуч.<br>компании</th>' +
     '</tr></thead><tbody>';
 
   for (let i = 0; i < res.participants.length; i++) {
@@ -106,7 +113,7 @@ function buildParticipantsTable(res, tableId) {
     const fmtBadge = p.format === 'Онлайн' ? 'text-bg-primary' : 'text-bg-success';
     const fmtLabel = p.format === 'Онлайн' ? 'Онлайн' : 'Очно';
     const regionLabel = p.region ? escapeHtml(p.region) : '—';
-    let stageBadge = 'text-bg-success';    // Счёт оплачен (по умолчанию)
+    let stageBadge = 'text-bg-success';
     if (p.stage === 'Счёт отправлен') stageBadge = 'text-bg-info';
     else if (p.stage === 'Постоплата') stageBadge = 'text-bg-primary';
     else if (p.stage === 'Частично оплачен') stageBadge = 'text-bg-warning';
@@ -124,25 +131,23 @@ function buildParticipantsTable(res, tableId) {
     const invStatusClass = invStatusColors[p.invoiceStatus] || 'text-primary';
 
     html += '<tr>' +
-      '<td><strong>' + escapeHtml(p.direction || '—') + '</strong></td>' +
-      '<td>' + escapeHtml(p.program) + '</td>' +
-
-      '<td><span class="badge ' + fmtBadge + '">' + fmtLabel + '</span></td>' +
-      '<td>' + escapeHtml(p.participant) + '</td>' +
-      '<td>' + regionLabel + '</td>' +
-      '<td>' + escapeHtml(shortCompany(p.company)) + '</td>' +
-      '<td><span class="badge ' + typeBadge + '">' + (p.clientType || '—') + '</span></td>' +
-      '<td>' + amount + '</td>' +
-      '<td class="small">' + (p.date || '—') + '<br>—<br>' + (p.dateEnd || '—') + '</td>' +
-      '<td>' + (p.moduleDuration != null ? p.moduleDuration : '—') + '</td>' +
-      '<td>' + (p.dealCycle != null ? p.dealCycle : '—') + '</td>' +
-      '<td><span class="badge ' + stageBadge + '">' + p.stage + '</span></td>' +
-
-      '<td>' + (p.hadPrevTraining ? '<span class="badge text-bg-warning">Да</span>' + (p.prevTrainingDate ? ' <span class="small">' + p.prevTrainingDate + '</span>' : '') : '<span class="">нет</span>') + '</td>' +
-      '<td>' + (p.lastCompanyTraining ? '<span class="small">' + p.lastCompanyTraining + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +
-      '<td>' + (p.participantFlag === 'Да' ? '<span class="badge text-bg-success">Да</span>' : p.participantFlag === 'Нет' ? '<span class="badge text-bg-danger">Нет</span>' : '<span class="text-secondary">—</span>') + '</td>' +
-      '<td>' + (p.invoiceDiscount != null ? Number(p.invoiceDiscount).toLocaleString('ru-RU') + '%' : '—') + '</td>' +
-      '<td>' + (p.invoiceStatus ? '<span class="' + invStatusClass + '">' + escapeHtml(p.invoiceStatus) + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +
+      '<td><strong>' + escapeHtml(p.direction || '—') + '</strong></td>' +          /* 0 Направление */
+      '<td>' + escapeHtml(p.program) + '</td>' +                                     /* 1 Программа */
+      '<td><span class="badge ' + fmtBadge + '">' + fmtLabel + '</span></td>' +    /* 2 Формат */
+      '<td>' + escapeHtml(p.participant) + '</td>' +                                 /* 3 ФИО */
+      '<td>' + regionLabel + '</td>' +                                               /* 4 Регион */
+      '<td>' + escapeHtml(shortCompany(p.company)) + '</td>' +                       /* 5 Компания */
+      '<td><span class="badge ' + typeBadge + '">' + (p.clientType || '—') + '</span></td>' +  /* 6 Тип клиента */
+      '<td class="small">' + (p.date || '—') + '<br>—<br>' + (p.dateEnd || '—') + '</td>' +    /* 7 Даты модуля */
+      '<td>' + (p.moduleDuration != null ? p.moduleDuration : '—') + '</td>' +       /* 8 Длительность, дней */
+      '<td><span class="badge ' + stageBadge + '">' + p.stage + '</span></td>' +  /* 9 Статус сделки */
+      '<td>' + (p.participantFlag === 'Да' ? '<span class="badge text-bg-success">Да</span>' : p.participantFlag === 'Нет' ? '<span class="badge text-bg-danger">Нет</span>' : '<span class="text-secondary">—</span>') + '</td>' +  /* 10 Участник */
+      '<td>' + (p.invoiceStatus ? '<span class="' + invStatusClass + '">' + escapeHtml(p.invoiceStatus) + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +  /* 11 Статус счета */
+      '<td>' + amount + '</td>' +                                                    /* 12 Сумма, ₽ */
+      '<td>' + (p.invoiceDiscount != null ? Number(p.invoiceDiscount).toLocaleString('ru-RU') + '%' : '—') + '</td>' +  /* 13 Скидка, % */
+      '<td>' + (p.dealCycle != null ? p.dealCycle : '—') + '</td>' +                /* 14 Цикл сделки, дней */
+      '<td>' + (p.hadPrevTraining ? '<span class="badge text-bg-warning">Да</span>' + (p.prevTrainingDate ? ' <span class="small">' + fmtDate(p.prevTrainingDate) + '</span>' : '') : '<span class="">нет</span>') + '</td>' +  /* 15 Пред. обуч. участника */
+      '<td>' + (p.lastCompanyTraining ? '<span class="small">' + fmtDate(p.lastCompanyTraining) + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +  /* 16 Пред. обуч. компании */
       '</tr>';
   }
   return html + '</tbody></table>';

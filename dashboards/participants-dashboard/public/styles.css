@@ -15,6 +15,15 @@
    только на самих ячейках) — заголовки в 2 строки иначе прижаты к верху */
 .table th, .table td { vertical-align: middle; }
 
+/* Шапка в 2 строки — компактно */
+#participantsTable thead th {
+  white-space: normal;
+  vertical-align: middle;
+  line-height: 1.15;
+  padding: 6px 4px;
+  font-size: 11px;
+}
+
 /* Сортировка таблиц (initTableSort из shared.js) — визуальные подсказки */
 th.sort { cursor: pointer; user-select: none; }
 th.sort::after { content: ' ⇅'; font-size: 10px; opacity: .4; font-weight: 400; }

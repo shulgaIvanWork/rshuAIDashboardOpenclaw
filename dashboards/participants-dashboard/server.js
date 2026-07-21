@@ -321,10 +321,22 @@ async function buildParticipants(weekNum) {
     const opp = parseFloat(d.OPPORTUNITY || 0);
     const manager = users[String(d.ASSIGNED_BY_ID || '')] || String(d.ASSIGNED_BY_ID || '—');
 
-    let region = contactInfo.region || contactsExt[contactId]?.region || contactsExt[contactId]?.locality || '';
-    if (!region && companiesExt[coId]?.region) {
-      region = companiesExt[coId].region;
+    // ═══ Регион: только из UF_CRM_1448611987 (Город проживания) ═══
+    // Поле содержит «Город, Область, Страна» — извлекаем только область.
+    // Если поле пустое — оставляем пустым, чтобы видеть, что менеджер не заполнил.
+    function extractRegion(field) {
+      if (!field || field.trim() === '') return '';
+      const parts = field.split(',').map(s => s.trim()).filter(Boolean);
+      if (parts.length >= 3) return parts[1];  // «Хабаровск, Хабаровский край, Россия» → «Хабаровский край»
+      if (parts.length === 2) {
+        const knownCountries = ['россия','рф','казахстан','беларусь','украина','иран','узбекистан','таджикистан','киргизия','армения','азербайджан','молдова','грузия','латвия','литва','эстония','польша','германия','франция','италия','испания','сша','китай','индия','израиль','турция','оаэ','объединенные арабские эмираты','египет','финляндия'];
+        if (knownCountries.includes(parts[1].toLowerCase().trim())) return parts[0];
+        return parts[1];
+      }
+      return parts[0];  // просто город
     }
+
+    let region = extractRegion(contactInfo.cityOfResidence) || '';
 
     const stageLabel = d.STAGE_ID === 'WON' || d.STAGE_ID === 'C0:WON' ? 'Счёт оплачен'
       : d.STAGE_ID === 'PROPOSAL' || d.STAGE_ID === 'C0:PROPOSAL' ? 'Счёт отправлен'

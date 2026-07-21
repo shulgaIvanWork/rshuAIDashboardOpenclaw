@@ -94,11 +94,12 @@ export async function fetchContacts(deals) {
 
   const contacts = await batchGet(
     ids,
-    id => `crm.contact.get?id=${id}&select[]=NAME&select[]=LAST_NAME&select[]=SECOND_NAME&select[]=POST&select[]=ADDRESS_CITY&select[]=ADDRESS_REGION`,
+    id => `crm.contact.get?id=${id}&select[]=NAME&select[]=LAST_NAME&select[]=SECOND_NAME&select[]=POST&select[]=ADDRESS_CITY&select[]=ADDRESS_REGION&select[]=UF_CRM_1448611987`,
     item => ({
       name: [item.LAST_NAME, item.NAME, item.SECOND_NAME].filter(Boolean).join(' ') || `Контакт #${item.ID}`,
       post: item.POST || '',
       region: item.ADDRESS_CITY || item.ADDRESS_REGION || '',
+      cityOfResidence: item.UF_CRM_1448611987 || '',  // «Город проживания» — полный адрес
     })
   );
 
