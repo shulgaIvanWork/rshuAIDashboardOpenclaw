@@ -393,8 +393,40 @@ function buildFilteredData(orig, filteredWeeks) {
   }
   out.top_companies = compTop;
 
-  // Источники: полная воронка (без КОМ, как управленческий) — передаём как есть из оригинала
-  out.src_funnel = orig.src_funnel || [];
+  // Источники: полная воронка (без КОМ) — пересчитываем из отфильтрованных недель
+  var origFunnelType = {};
+  (orig.src_funnel || []).forEach(function(f){ if(f.name&&f.type) origFunnelType[f.name]=f.type; });
+  function isSrcInternal(name){ var n=(name||'').toLowerCase(); return ['аккаунтинг','repeat','upsale','реанимаци','холодн','accounting'].some(function(kw){return n.includes(kw);}); }
+  var sfAgg={};
+  filteredWeeks.forEach(function(w){
+    Object.entries(w.by_src||{}).forEach(function(e){
+      var sn=e[0], v=e[1];
+      if(!sfAgg[sn]) sfAgg[sn]={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0,durs:[],type:''};
+      sfAgg[sn].leads+=(v.leads||0); sfAgg[sn].mql+=(v.mql||0); sfAgg[sn].sql+=(v.sql||0);
+      sfAgg[sn].invoice_cnt+=(v.invoice_cnt||0); sfAgg[sn].deals+=(v.deals||0); sfAgg[sn].postupleniya+=(v.sum||0);
+      if(v.durs) sfAgg[sn].durs=sfAgg[sn].durs.concat(v.durs);
+      if(!sfAgg[sn].type) sfAgg[sn].type = origFunnelType[sn] || (isSrcInternal(sn)?'internal':'marketing');
+    });
+  });
+  function avg(arr){return arr.length?arr.reduce(function(s,x){return s+x;},0)/arr.length:0;}
+  var sfList=Object.entries(sfAgg).filter(function(e){return e[1].postupleniya>0;}).map(function(e){
+    var sn=e[0], d=e[1];
+    return {name:sn, leads:d.leads, mql:d.mql, sql:d.sql, invoice_cnt:d.invoice_cnt,
+      deals:d.deals, postupleniya:d.postupleniya, type:d.type,
+      avg_check:d.deals?Math.round(d.postupleniya/d.deals):0,
+      avg_dur:avg(d.durs)};
+  }).sort(function(a,b){return b.postupleniya-a.postupleniya;});
+  var sfTop=sfList.slice(0,20), sfRestList=sfList.slice(20);
+  var sfAggFn=function(arr){var r={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0};arr.forEach(function(x){r.leads+=x.leads;r.mql+=x.mql;r.sql+=x.sql;r.invoice_cnt+=x.invoice_cnt;r.deals+=x.deals;r.postupleniya+=x.postupleniya;});r.avg_check=r.deals?Math.round(r.postupleniya/r.deals):0;var c=arr.reduce(function(s,x){return s+(x.avg_dur||0)*(x.deals||0);},0);var dc=arr.reduce(function(s,x){return s+(x.deals||0);},0);r.avg_dur=dc?c/dc:0;return r;};
+  function mkSfRow(name, data, extra){ var r=Object.assign({name:name, type:''},data); if(extra) Object.assign(r,extra); return r; }
+  var sfTopTotal=mkSfRow('📊 ИТОГО (топ-20)', sfAggFn(sfTop));
+  var sfAllTotal=mkSfRow('📊 ИТОГО (все без КОМ)', sfAggFn(sfList));
+  var sfRestRow=null;
+  if(sfRestList.length){
+    var rr=sfAggFn(sfRestList); rr.avg_dur=0;
+    sfRestRow=mkSfRow('📦 Остальные ('+sfRestList.length+' источников)', rr);
+  }
+  out.src_funnel=[sfTopTotal, ...sfTop, sfRestRow, sfAllTotal].filter(Boolean);
 
   return out;
 }
