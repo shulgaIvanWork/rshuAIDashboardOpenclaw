@@ -957,13 +957,16 @@ export async function analyze(onProgress) {
     let cid=String(r.COMPANY_ID||'0');
     if(cid==='0'&&cc[r.ID]) cid=String(cc[r.ID].COMPANY_ID||'0');
     if(!cid||cid==='0') continue;
-    if(!companyAgg[cid]) companyAgg[cid]={sum:0,cnt:0,last:null};
+    if(!companyAgg[cid]) companyAgg[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0};
     const pd=getPayDate(r);
     companyAgg[cid].sum+=r.OPP; companyAgg[cid].cnt++;
+    if(r.FORMAT==='Онлайн'){companyAgg[cid].om_cnt++;companyAgg[cid].om_sum+=r.OPP;}
+    if(r.IS_KOM){companyAgg[cid].kom_cnt++;companyAgg[cid].kom_sum+=r.OPP;}
     if(pd&&(!companyAgg[cid].last||pd>companyAgg[cid].last)) companyAgg[cid].last=pd;
   }
   const topCompanies=Object.entries(companyAgg).filter(([,d])=>d.sum>0).map(([cid,d])=>({
     id:cid, name:(companies[cid]||'—').slice(0,100), sum:d.sum, cnt:d.cnt,
+    om_cnt:d.om_cnt, om_sum:d.om_sum, kom_cnt:d.kom_cnt, kom_sum:d.kom_sum,
     last_date:d.last?`${fmt2(d.last.getDate())}.${fmt2(d.last.getMonth()+1)}.${d.last.getFullYear()}`:'—',
     avg_check:d.cnt?Math.round(d.sum/d.cnt):0,
   })).sort((a,b)=>b.sum-a.sum).slice(0,20);
