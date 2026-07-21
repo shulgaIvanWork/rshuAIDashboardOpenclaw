@@ -1,5 +1,29 @@
 // ========== Helper functions ==========
 function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+// Сокращение организационно-правовых форм: «ОБЩЕСТВО С ОГРАНИЧЕННОЙ …» → «ООО»
+var COMPANY_PREFIXES = [
+  ['ИНОСТРАННОЕ ПРЕДПРИЯТИЕ ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ', 'ИП ООО'],
+  ['ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ', 'ФГБОУ'],
+  ['ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ', 'ООО'],
+  ['МУНИЦИПАЛЬНОЕ УНИТАРНОЕ ПРЕДПРИЯТИЕ', 'МУП'],
+  ['ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО', 'ПАО'],
+  ['ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ', 'ИП'],
+  ['ЗАКРЫТОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО', 'ЗАО'],
+  ['АКЦИОНЕРНОЕ ОБЩЕСТВО', 'АО'],
+];
+function shortCompany(name) {
+  if (!name) return name;
+  var s = name.toUpperCase();
+  for (var i = 0; i < COMPANY_PREFIXES.length; i++) {
+    var full = COMPANY_PREFIXES[i][0], short = COMPANY_PREFIXES[i][1];
+    if (s.startsWith(full)) return short + name.substring(full.length);
+  }
+  return name
+    .replace(/\(публичное акционерное общество\)/gi, '(ПАО)')
+    .replace(/\(акционерное общество\)/gi, '(АО)')
+    .replace(/\(общество с ограниченной ответственностью\)/gi, '(ООО)');
+}
 function loadArtifacts(){
   fetch(window.BASE_PATH+'/api/artifacts').then(function(r){return r.json();}).then(function(d){
     var el=document.getElementById('newArtifactsBlock');
@@ -549,7 +573,7 @@ function renderPage(data) {
       <div class="scroll-x" style="max-height:400px;overflow:auto"><table class="sortable">
         <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📅 Последняя покупка</th></tr></thead>
         <tbody>${(data.top_companies || []).map((c, i) =>
-          `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${c.name || '—'}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${c.last_date || '—'}</td></tr>`
+          `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${shortCompany(c.name || '—')}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${c.last_date || '—'}</td></tr>`
         ).join('')}</tbody>
       </table></div>
     </div>
@@ -880,7 +904,7 @@ async function renderPageMainNew(d) {
     compStr += compTotalRow('📊 ИТОГО (топ-20)', ct20);
     comps.forEach(function(c, i){
       var isRem = isCompRest(c);
-      compStr+='<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td><b>'+escapeHtml(c.name)+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+c.last_date+'</td></tr>';
+      compStr+='<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td><b>'+escapeHtml(shortCompany(c.name))+'</b></td><td>'+fmt(c.sum)+' ₽</td><td>'+c.cnt+'</td><td>'+fmt(c.avg_check)+' ₽</td><td>'+c.last_date+'</td></tr>';
     });
     compStr += compTotalRow('📊 ИТОГО (все компании)', ctAll);
     compStr += '</table>';
