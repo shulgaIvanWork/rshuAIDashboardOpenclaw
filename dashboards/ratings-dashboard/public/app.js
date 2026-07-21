@@ -581,11 +581,12 @@ function renderPage(data) {
     <div class="card"><h2>ТОП-20 компаний по поступлениям</h2>
       <div class="scroll-x" style="max-height:400px;overflow:auto"><table class="sortable">
         <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Компания</th><th class="sort" data-col="2">💰 Поступления, ₽</th><th class="sort" data-col="3">✅ Сделок</th><th class="sort" data-col="4">💵 Ср.чек</th><th class="sort" data-col="5">📊 Доля</th><th class="sort" data-col="6">📅 Последняя покупка</th></tr></thead>
-        <tbody>${(data.top_companies || []).map((c, i) => {
+        <tbody>${(function(){
           var allCompSum = (data.top_companies||[]).reduce(function(s,x){return s+(x.sum||0);},0) || 1;
-          return `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${shortCompany(c.name || '—')}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${(c.sum/allCompSum*100).toFixed(1)}%</td><td>${c.last_date || '—'}</td></tr>`;
-        })`,
-        ).join('')}</tbody>
+          return (data.top_companies||[]).map(function(c, i){
+            return `<tr><td>${i+1}</td><td style="max-width:260px;white-space:normal">${shortCompany(c.name || '—')}</td><td><b>${fmt(c.sum)}</b> ₽</td><td>${c.cnt}</td><td>${fmt(c.avg_check || 0)}</td><td>${(c.sum/allCompSum*100).toFixed(1)}%</td><td>${c.last_date || '—'}</td></tr>`;
+          }).join('');
+        }())}</tbody>
       </table></div>
     </div>
 
@@ -792,9 +793,6 @@ async function renderPageMainNew(d) {
     }
     var t20  = totalsOf(prods.filter(function(p){ return p.name && !isRest(p); }));
     var tAll = totalsOf(prods.filter(function(p){ return p.name; }));
-    function totalRow(label, t, shareTxt) {
-      return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>—</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
-    }
     var prodStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">Сделки</th><th class="sort" data-col="3">Поступления, ₽</th><th class="sort" data-col="4">Ср.чек, ₽</th><th class="sort" data-col="5">Цикл сделки, дн.</th><th class="sort" data-col="6">Доля</th><th class="sort" data-col="7">Очно</th><th class="sort" data-col="8">Онлайн</th><th class="sort" data-col="9">Дистанционно</th></tr>';
     prodStr += totalRow('📊 ИТОГО (топ-20)', t20, t20.share.toFixed(1)+'%');
     prods.slice(0,21).forEach(function(p,i){
