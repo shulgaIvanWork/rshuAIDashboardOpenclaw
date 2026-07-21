@@ -811,6 +811,38 @@ export async function analyze(onProgress) {
   });
   const srcRating=[totalRow,...srcList.slice(0,20)];
 
+  // ── Источники: полная воронка (без КОМ, как управленческий дашборд) ──────
+  const srcFunnel={};
+  const getF=n=>{if(!srcFunnel[n])srcFunnel[n]={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0,durs:[],type:''};return srcFunnel[n];};
+  const srcType={};  // srcName → 'internal'|'marketing' (по первому встреченному SRC_ID)
+  for(const r of rows){
+    if(r.IS_KOM) continue;
+    if(!VALID_CATS.has(r.CAT_ID)) continue;
+    const sn=r.SRC;
+    // Определяем тип по первому встреченному SRC_ID
+    if(!srcType[sn]) srcType[sn]=isInternalSource(r.SRC_ID)?'internal':'marketing';
+    const sd=getF(sn); sd.type=srcType[sn];
+    if(isAllLead(r)) sd.leads++;
+    if(isQualLeadW(r)) sd.mql++;
+    if(isSqlByCreate(r)) sd.sql++;
+    if(r.INV_DT) sd.invoice_cnt++;
+    if(payYtd(r)){sd.deals++;sd.postupleniya+=r.OPP;if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)sd.durs.push(d);}}
+  }
+  function sfItem(name,d){return{name,...d,avg_check:d.deals?Math.round(d.postupleniya/d.deals):0,avg_dur:avg(d.durs)}};
+  const srcFunnelList=Object.entries(srcFunnel).map(([n,d])=>sfItem(n,d)).sort((a,b)=>b.postupleniya-a.postupleniya);
+  const sfTop=srcFunnelList.slice(0,20);
+  const sfRest=srcFunnelList.slice(20);
+  const sfAgg=(list,withDurs)=>{const r={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0};for(const x of list){r.leads+=x.leads;r.mql+=x.mql;r.sql+=x.sql;r.invoice_cnt+=x.invoice_cnt;r.deals+=x.deals;r.postupleniya+=x.postupleniya;}r.avg_check=r.deals?Math.round(r.postupleniya/r.deals):0;if(withDurs&&list.length){const c=list.reduce((s,x)=>s+(x.avg_dur||0)*(x.deals||0),0);r.avg_dur=list.reduce((s,x)=>s+(x.deals||0),0)?c/list.reduce((s,x)=>s+(x.deals||0),0):0;}else r.avg_dur=0;return r;};
+  const sfTopTotal={name:'📊 ИТОГО (топ-20)',...sfAgg(sfTop,true),type:''};
+  const sfAllTotal={name:'📊 ИТОГО (все без КОМ)',...sfAgg(srcFunnelList,true),type:''};
+  let sfRestRow=null;
+  if(sfRest.length){
+    const rAgg=sfAgg(sfRest,false);
+    rAgg.avg_dur=0;
+    sfRestRow={name:`📦 Остальные (${sfRest.length} источников)`,...rAgg,type:''};
+  }
+  const srcFunnelRating=[sfTopTotal,...sfTop,sfRestRow,sfAllTotal].filter(Boolean);
+
   // ── B2B/B2C ───────────────────────────────────────────────────────────────
   const bsplit=(subset,period)=>{ const g={}; for(const r of subset) if(isPaid(r)){if(!g[r.BTYPE])g[r.BTYPE]={cnt:0,sum:0};g[r.BTYPE].cnt++;g[r.BTYPE].sum+=r.OPP;} return{period,...g}; };
   const btypeYtd=bsplit(rows.filter(payYtd),'YTD');
@@ -994,6 +1026,7 @@ export async function analyze(onProgress) {
     months:Object.keys(monthly).map(Number).sort((a,b)=>a-b).map(m=>monthly[m]),
     prev_weeks:Object.keys(prevWeekly).map(Number).sort((a,b)=>a-b).map(w=>prevWeekly[w]),
     src_rating:srcRating,
+    src_funnel:srcFunnelRating,
     src_split_ytd:srcSplitYtd, src_split_prev:srcSplitPrev, src_split_cur:srcSplitCur,
     btype_ytd:btypeYtd, btype_prev:btypePrev, btype_cur:btypeCur,
     fmt_ytd:fmtYtd, fmt_prev:fmtPrev,

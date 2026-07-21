@@ -350,6 +350,9 @@ function buildFilteredData(orig, filteredWeeks) {
   }
   out.top_companies = compTop;
 
+  // Источники: полная воронка (без КОМ, как управленческий) — передаём как есть из оригинала
+  out.src_funnel = orig.src_funnel || [];
+
   return out;
 }
 
@@ -722,7 +725,7 @@ async function renderPageMainNew(d) {
     // Топ-20 продуктов
     html += '<div class="card" style="margin-top:8px"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
     // Источники
-    html += '<div class="card"><h2>Рейтинг источников поступлений</h2><div class="sub" style="margin:-8px 0 14px">Сводные данные с начала года · первая строка — итог · клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newSrcTable"></div></div></div>';
+    html += '<div class="card"><h2>Рейтинг источников поступлений (открытое обучение без КОМ)</h2><div style="overflow-x:auto"><div id="newSrcTable"></div></div></div>';
     html += '<div class="card"><h2>Топ-20 компаний</h2><div id="newCompaniesTable"></div></div>';
 
     areaNew.innerHTML = html;
@@ -769,28 +772,97 @@ async function renderPageMainNew(d) {
     prodStr += '</table>';
     var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
 
-    var src = d.src_rating||[];
-    var srcAll = src[0] || {};          // ИТОГО по всем источникам (уже посчитан на бэке)
-    var srcRows = src.slice(1);         // топ-20 источников + строка «Остальные»
-    function isSrcRest(s){ return (''+(s.name||'')).includes('Остальные'); }
-    var st20 = srcRows.filter(function(s){ return s.name && !isSrcRest(s); })
-      .reduce(function(a,s){ a.sum+=s.postupleniya||0; a.mql+=s.mql||0; a.sql+=s.sql||0; a.deals+=s.deals||0; a.cycleNum+=(s.avg_won_days||0)*(s.deals||0); return a; }, {sum:0,mql:0,sql:0,deals:0,cycleNum:0});
-    function srcTotalRow(label, t) {
-      var avgCheck = t.deals?Math.round(t.sum/t.deals):0;
-      var cMs = t.mql?(t.sql/t.mql*100):0, cSd = t.sql?(t.deals/t.sql*100):0;
-      var cycle = t.deals && t.cycleNum >= 0 ? (t.cycleNum / t.deals).toFixed(1) : '—';
-      return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+t.mql+'</td><td>'+t.sql+'</td><td>'+t.deals+'</td><td>'+cMs.toFixed(1)+'%</td><td>'+cSd.toFixed(1)+'%</td><td>'+fmt(avgCheck)+'</td><td>'+cycle+'дн</td></tr>';
+    // ── Рейтинг источников (полная воронка, без КОМ) ─────────────────────
+    var srcFunnel = d.src_funnel || [];
+    var sub = d._loadedAt ? '· данные на ' + d._loadedAt.substring(0,10) : '';
+    var sfStr = '<div class="sub" style="margin:-8px 0 14px">Рейтинг источников поступлений (открытое обучение без КОМ) · ' + sub + '</div>';
+    sfStr += '<table class="table table-sm sortable" style="font-size:11px"><thead><tr>' +
+      '<th class="sort" data-col="0">Источник</th>' +
+      '<th class="sort" data-col="1">Лиды</th>' +
+      '<th class="sort" data-col="2">MQL</th>' +
+      '<th class="sort" data-col="3">SQL</th>' +
+      '<th class="sort" data-col="4">Счёт</th>' +
+      '<th class="sort" data-col="5">Сделки</th>' +
+      '<th class="sort" data-col="6">Поступл.</th>' +
+      '<th class="sort" data-col="7">Ср.чек</th>' +
+      '<th class="sort" data-col="8">Цикл</th>' +
+      '<th class="sort" data-col="9">Лиды→MQL</th>' +
+      '<th class="sort" data-col="10">MQL→SQL</th>' +
+      '<th class="sort" data-col="11">SQL→Счёт</th>' +
+      '<th class="sort" data-col="12">Счёт→Сделка</th>' +
+      '<th class="sort" data-col="13">Лид→Сделка</th>' +
+      '<th class="sort" data-col="14">Тип трафика</th>' +
+      '</tr></thead><tbody>';
+
+    function sfRow(r, isTotalRow, idx) {
+      if (!r) return '';
+      var isTotalOrRest = isTotalRow || (r.name||'').includes('Остальные') || (r.name||'').includes('ИТОГО');
+      var rowStyle = isTotalOrRest ? ' style="background:#eef1f8;font-weight:700"' : '';
+      var label = idx != null ? '<td>' + idx + '</td>' : '<td></td>';
+      var leads = r.leads || 0;
+      var mql = r.mql || 0;
+      var sql = r.sql || 0;
+      var invoice = r.invoice_cnt || 0;
+      var deals = r.deals || 0;
+      var post = r.postupleniya || 0;
+      var avgChk = r.avg_check || 0;
+      var avgDur = (r.avg_dur || 0).toFixed(1);
+      var clm = leads > 0 ? (mql / leads * 100).toFixed(1) + '%' : '—';
+      var cms = mql > 0 ? (sql / mql * 100).toFixed(1) + '%' : '—';
+      var csi = sql > 0 ? (invoice / sql * 100).toFixed(1) + '%' : '—';
+      var cio = invoice > 0 ? (deals / invoice * 100).toFixed(1) + '%' : '—';
+      var clo = leads > 0 ? (deals / leads * 100).toFixed(1) + '%' : '—';
+      var typeLabel = '';
+      var typeColor = '';
+      if (!isTotalOrRest && r.type) {
+        if (r.type === 'internal') { typeLabel = 'ВНБ'; typeColor = '#1f2a44'; }
+        else { typeLabel = 'МТ'; typeColor = '#00bcd4'; }
+      }
+      var typeHtml = typeLabel ? '<span style="display:inline-block;background:' + typeColor + ';color:#fff;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600">' + typeLabel + '</span>' : '';
+      return '<tr' + rowStyle + '><td><b>' + escapeHtml(r.name) + '</b></td>' +
+        '<td>' + leads + '</td>' +
+        '<td>' + mql + '</td>' +
+        '<td>' + sql + '</td>' +
+        '<td>' + invoice + '</td>' +
+        '<td>' + deals + '</td>' +
+        '<td>' + fmt(post) + '</td>' +
+        '<td>' + fmt(avgChk) + '</td>' +
+        '<td>' + avgDur + '</td>' +
+        '<td>' + clm + '</td>' +
+        '<td>' + cms + '</td>' +
+        '<td>' + csi + '</td>' +
+        '<td>' + cio + '</td>' +
+        '<td>' + clo + '</td>' +
+        '<td>' + typeHtml + '</td></tr>';
     }
-    var srcStr = '<table class="sortable" style="font-size:11px"><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Источник</th><th class="sort" data-col="2">Поступления, ₽</th><th class="sort" data-col="3">MQL</th><th class="sort" data-col="4">SQL</th><th class="sort" data-col="5">Сделки</th><th class="sort" data-col="6">MQL→SQL</th><th class="sort" data-col="7">SQL→Сд.</th><th class="sort" data-col="8">Ср.чек, ₽</th><th class="sort" data-col="9">Цикл сделки, дн.</th></tr>';
-    srcStr += srcTotalRow('📊 ИТОГО (топ-20)', st20);
-    srcRows.forEach(function(s,i){
-      if(!s.name) return;
-      var isRem = isSrcRest(s);
-      srcStr += '<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td>'+escapeHtml(s.name)+'</td><td><b>'+fmt(s.postupleniya)+'</b> ₽</td><td>'+(s.mql||0)+'</td><td>'+(s.sql||0)+'</td><td>'+(s.deals||0)+'</td><td>'+(s.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(s.conv_sql_deals||0).toFixed(1)+'%</td><td>'+fmt(s.avg_check)+'</td><td>'+(s.avg_won_days||0).toFixed(1)+'дн</td></tr>';
-    });
-    srcStr += srcTotalRow('📊 ИТОГО (все источники)', {sum:srcAll.postupleniya||0, mql:srcAll.mql||0, sql:srcAll.sql||0, deals:srcAll.deals||0, cycleNum: (srcAll.avg_won_days||0) * (srcAll.deals||0)});
-    srcStr += '</table>';
-    el = document.getElementById('newSrcTable'); if(el) el.innerHTML = srcStr;
+
+    // ИТОГО (топ-20) — всегда первая строка
+    if (srcFunnel.length > 0) sfStr += sfRow(srcFunnel[0], true);
+    // Топ-20 источников (строки 1..20 из ответа — элементы с 1 по 20)
+    for (var si = 1; si < srcFunnel.length - 1; si++) {
+      var s = srcFunnel[si];
+      if (!s || !s.name) continue;
+      if ((s.name||'').includes('Остальные') || (s.name||'').includes('ИТОГО')) continue;
+      sfStr += sfRow(s, false, si);
+    }
+    // Остальные (если есть)
+    var sfRest = null;
+    for (var si = 0; si < srcFunnel.length; si++) {
+      if (srcFunnel[si] && (srcFunnel[si].name||'').includes('Остальные')) {
+        sfRest = srcFunnel[si];
+        break;
+      }
+    }
+    if (sfRest) sfStr += sfRow(sfRest, true);
+    // ИТОГО все
+    for (var si = 0; si < srcFunnel.length; si++) {
+      if (srcFunnel[si] && (srcFunnel[si].name||'').includes('ИТОГО (все')) {
+        sfStr += sfRow(srcFunnel[si], true);
+        break;
+      }
+    }
+    sfStr += '</tbody></table>';
+    el = document.getElementById('newSrcTable'); if(el) el.innerHTML = sfStr;
 
     // Сортировка
     if (typeof initTableSort === 'function') initTableSort();
