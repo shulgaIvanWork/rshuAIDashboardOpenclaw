@@ -532,7 +532,7 @@ export async function analyze(onProgress) {
             if (r.DC&&r.PAY_DT) { const d=daysBetween(r.DC,r.PAY_DT); if(d>=0) wd.by_prod[pk].durs.push(d); }
           }
           // by_src
-          { const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(isQualLeadW(r)) wd.by_src[sn].mql++; if(isSqlByCreate(r)) wd.by_src[sn].sql++; if(r.INV_DT) wd.by_src[sn].invoice_cnt++; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
+          { const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(isQualLeadW(r)) wd.by_src[sn].mql++; if(isSqlByCreate(r)) wd.by_src[sn].sql++; if(r.INV_DT) wd.by_src[sn].invoice_cnt++; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
           // by_company
           { const cid=r.COMPANY_ID; if(cid&&cid!=='0'){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; if(r.FORMAT==='Онлайн'){wd.by_company[cid].om_cnt++;wd.by_company[cid].om_sum+=r.OPP;} if(r.IS_KOM){wd.by_company[cid].kom_cnt++;wd.by_company[cid].kom_sum+=r.OPP;} const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
           // by_mba
@@ -564,7 +564,7 @@ export async function analyze(onProgress) {
   for (const r of rows) {
     if (r.DC && r.DC.getFullYear()===YEAR && isAllLead(r)) {
       const [,wk]=isoCalendar(r.DC);
-      if (wk in weekly) { weekly[wk].leads++; if(r.IS_OOM) weekly[wk].oom_leads++; if(wk in weekly){const wd=weekly[wk];const sn=r.SRC;if(!wd.by_src[sn])wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0};wd.by_src[sn].leads++;} }
+      if (wk in weekly) { weekly[wk].leads++; if(r.IS_OOM) weekly[wk].oom_leads++; const sn=r.SRC; if(!weekly[wk].by_src[sn]) weekly[wk].by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; weekly[wk].by_src[sn].leads++; }
     }
   }
 
