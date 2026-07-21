@@ -146,7 +146,7 @@ function buildParticipantsTable(res, tableId) {
       '<td>' + amount + '</td>' +                                                    /* 12 Сумма, ₽ */
       '<td>' + (p.invoiceDiscount != null ? Number(p.invoiceDiscount).toLocaleString('ru-RU') + '%' : '—') + '</td>' +  /* 13 Скидка, % */
       '<td>' + (p.dealCycle != null ? p.dealCycle : '—') + '</td>' +                /* 14 Цикл сделки, дней */
-      '<td>' + (p.hadPrevTraining ? '<span class="badge text-bg-warning">Да</span>' + (p.prevTrainingDate ? ' <span class="small">' + fmtDate(p.prevTrainingDate) + '</span>' : '') : '<span class="">нет</span>') + '</td>' +  /* 15 Пред. обуч. участника */
+      '<td>' + (p.prevTrainingDate ? '<span class="small">' + fmtDate(p.prevTrainingDate) + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +  /* 15 Пред. обуч. участника */
       '<td>' + (p.lastCompanyTraining ? '<span class="small">' + fmtDate(p.lastCompanyTraining) + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +  /* 16 Пред. обуч. компании */
       '</tr>';
   }
