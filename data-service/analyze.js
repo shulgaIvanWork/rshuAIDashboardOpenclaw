@@ -812,6 +812,9 @@ export async function analyze(onProgress) {
   const srcRating=[totalRow,...srcList.slice(0,20)];
 
   // ── Источники: полная воронка (без КОМ, как управленческий дашборд) ──────
+  // Зеркалит логику управленческого дашборда:
+  //   - Лиды: по ДАТЕ СОЗДАНИЯ (DC) в этом году
+  //   - MQL/SQL/Счёт/Сделки/Поступления: по ДАТЕ ОПЛАТЫ (payYtd) в этом году
   const srcFunnel={};
   const getF=n=>{if(!srcFunnel[n])srcFunnel[n]={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0,durs:[],type:''};return srcFunnel[n];};
   const srcType={};  // srcName → 'internal'|'marketing' (по первому встреченному SRC_ID)
@@ -819,14 +822,25 @@ export async function analyze(onProgress) {
     if(r.IS_KOM) continue;
     if(!VALID_CATS.has(r.CAT_ID)) continue;
     const sn=r.SRC;
-    // Определяем тип по первому встреченному SRC_ID
     if(!srcType[sn]) srcType[sn]=isInternalSource(r.SRC_ID)?'internal':'marketing';
     const sd=getF(sn); sd.type=srcType[sn];
-    if(isAllLead(r)) sd.leads++;
-    if(isQualLeadW(r)) sd.mql++;
-    if(isSqlByCreate(r)) sd.sql++;
-    if(r.INV_DT) sd.invoice_cnt++;
-    if(payYtd(r)){sd.deals++;sd.postupleniya+=r.OPP;if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)sd.durs.push(d);}}
+    // MQL/SQL/Счёт/Сделки/Поступления — только оплаченные в этом году (как в управленческом)
+    if(payYtd(r)){
+      if(isQualLeadW(r)) sd.mql++;
+      if(isSqlByCreate(r)) sd.sql++;
+      if(r.INV_DT) sd.invoice_cnt++;
+      sd.deals++;sd.postupleniya+=r.OPP;
+      if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)sd.durs.push(d);}
+    }
+  }
+  // Лиды — отдельным проходом по дате создания (как в управленческом)
+  for(const r of rows){
+    if(r.IS_KOM) continue;
+    if(!VALID_CATS.has(r.CAT_ID)) continue;
+    if(!r.DC||r.DC.getFullYear()!==YEAR) continue;
+    const sn=r.SRC;
+    if(!srcType[sn]) srcType[sn]=isInternalSource(r.SRC_ID)?'internal':'marketing';
+    if(isAllLead(r)) getF(sn).leads++;
   }
   function sfItem(name,d){return{name,...d,avg_check:d.deals?Math.round(d.postupleniya/d.deals):0,avg_dur:avg(d.durs)}};
   const srcFunnelList=Object.entries(srcFunnel).map(([n,d])=>sfItem(n,d)).sort((a,b)=>b.postupleniya-a.postupleniya);
