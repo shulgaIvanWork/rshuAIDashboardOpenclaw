@@ -1,0 +1,9 @@
+{
+  "name": "ratings-dashboard",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "express": "^4.22.2",
+    "@rshu/data-service": "*"
+  }
+}

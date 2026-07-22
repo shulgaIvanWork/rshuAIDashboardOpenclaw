@@ -1,0 +1,14 @@
+{
+  "name": "kom-dashboard",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "КОМ Dashboard — порт 3003",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@rshu/data-service": "*",
+    "express": "^4.18.2"
+  }
+}

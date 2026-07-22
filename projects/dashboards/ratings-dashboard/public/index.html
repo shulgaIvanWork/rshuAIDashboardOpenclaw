@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Рейтинги 2026</title>
+  <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Рейтинги 2026 <span id="updateDate" class="page-title-meta"></span></h1>
+  <div id="dateFilterBar" class="date-filter-bar">
+    <label>📅 Период:</label>
+    <input type="date" id="dateFrom">
+    <span class="date-sep">—</span>
+    <input type="date" id="dateTo">
+    <span id="filterInfo" class="filter-info"></span>
+  </div>
+  <div id="contentAreaNew">
+    <div class="loading-state" id="loadingStateNew"><div class="spinner"></div><div>Загрузка данных…</div></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "manager-report-dev",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@rshu/data-service": "*",
+    "express": "^4.22.2"
+  }
+}

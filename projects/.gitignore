@@ -32,17 +32,5 @@ __pycache__/
 .vscode/
 .idea/
 
-# OpenClaw internal
-.openclaw/
-
-# PM2
-pm2-logrotate/
-
-# Cache & temp
-*.tmp
-backup/
-cron/
-inbox/
-outbox/
 
 .claude
