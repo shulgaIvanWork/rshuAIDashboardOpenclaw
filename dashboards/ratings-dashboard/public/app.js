@@ -739,7 +739,7 @@ async function renderPageMainNew(d) {
       };
     }
     function totalRow(label, t, shareTxt) {
-      return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>'+(t.avgCycle||0).toFixed(1)+'дн</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
+      return '<tr style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>'+(t.avgCycle||0).toFixed(1)+'</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
     }
     var t20  = totalsOf(prods.filter(function(p){ return p.name && !isRest(p); }));
     var tAll = totalsOf(prods.filter(function(p){ return p.name; }));
@@ -749,7 +749,7 @@ async function renderPageMainNew(d) {
       if(!p.name) return;
       var isRem = isRest(p);
       var pc=p.cnt||p.deals||0;
-      prodStr += '<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td><b>'+pc+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'дн</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
+      prodStr += '<tr'+(isRem?' style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':(i+1))+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td><b>'+pc+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
     });
     prodStr += totalRow('📊 ИТОГО (все продукты)', tAll, '100%');
     prodStr += '</table>';

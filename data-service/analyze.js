@@ -889,7 +889,7 @@ export async function analyze(onProgress) {
   const prodData={};
   for (const r of rows) {
     if (r.IS_KOM) continue;                          // всё корпоративное, не только FORMAT==='КОМ'
-    if (/^\s*ILP/i.test(r.TITLE||'')) continue;      // конструктор (префикс ILP) — по просьбе Насти Ш.
+    if (/\bILP\b/i.test(r.TITLE||'')) continue;      // конструктор (ILP где угодно в названии) — по просьбе Насти Ш.
     const key=r.PRODUCT.slice(0,90);
     if (!prodData[key]) prodData[key]={deals:0,sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
     if (payYtd(r)) {
