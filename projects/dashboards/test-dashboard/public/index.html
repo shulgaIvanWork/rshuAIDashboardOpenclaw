@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 Тестовый дашборд — Сквозная аналитика</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Итоги мая 2026 — Сквозная аналитика <span id="updateDate" class="page-title-meta"></span></h1>
+    <p>Яндекс Метрика + Roistat + Bitrix24</p>
+  </div>
+  <div class="container">
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="forecast">💡 Прогноз (разработка)</button>
+      <button class="tab" data-tab="funnel">① Воронка продаж</button>
+      <button class="tab" data-tab="calls">② Коллтрекинг</button>
+      <button class="tab" data-tab="channels">③ Рекламные каналы</button>
+      <button class="tab" data-tab="conversion">④ Конверсия</button>
+      <button class="tab" data-tab="motivation">⑤ Мотивация ДРОП</button>
+      <button class="tab" data-tab="products">⑥ Рейтинг продуктов</button>
+      <button class="tab" data-tab="avg-check">💰 Средний чек</button>
+    </div>
+
+    <!-- ============ TAB 0: Прогноз ============ -->
+    <div class="tab-content active" id="tab-forecast">
+      <div id="forecast-content"><div class="loading-state"><div class="spinner"></div><div>Загрузка прогноза...</div></div></div>
+    </div>
+
+    <!-- ============ TAB 1: Воронка ============ -->
+    <div class="tab-content" id="tab-funnel">
+      <div class="cards" id="funnel-cards"></div>
+      <div class="card">
+        <h3>Воронка продаж (Sale, май 2026)</h3>
+        <div class="chart-container"><canvas id="funnelChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Детали воронки по источникам</h3>
+        <div id="funnel-table"><div class="loading">Загрузка</div></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB 2: Коллтрекинг ============ -->
+    <div class="tab-content" id="tab-calls">
+      <div class="cards" id="calls-cards"></div>
+      <div class="card">
+        <h3>Звонки и визиты по дням (май 2026)</h3>
+        <div class="chart-container"><canvas id="callsChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Звонки по дням</h3>
+        <div id="calls-table"><div class="loading">Загрузка</div></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB 3: Каналы ============ -->
+    <div class="tab-content" id="tab-channels">
+      <div class="cards" id="channels-cards"></div>
+      <div class="card">
+        <h3>Рекламные каналы: трафик → заявки</h3>
+        <div class="chart-container"><canvas id="channelsChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Таблица каналов</h3>
+        <div id="channels-table"><div class="loading">Загрузка</div></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB 4: Конверсия ============ -->
+    <div class="tab-content" id="tab-conversion">
+      <div class="cards" id="conversion-cards"></div>
+      <div class="card">
+        <h3>Конверсия по неделям: визиты → сделки WON</h3>
+        <div class="chart-container"><canvas id="conversionChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Конверсия по неделям</h3>
+        <div id="conversion-table"><div class="loading">Загрузка</div></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB 5: Мотивация ДРОП ============ -->
+    <div class="tab-content" id="tab-motivation">
+      <div class="cards" id="motivation-cards"></div>
+
+      <!-- Редактор планов -->
+      <div class="card" style="border-left:4px solid #093EB4">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;cursor:pointer" id="plansEditorToggle">
+          <h3 style="margin:0">⚙️ Планы и бонусы</h3>
+          <span id="plansEditorArrow" style="font-size:18px;color:#475569">▼</span>
+        </div>
+        <div id="plans-editor-body" style="display:none"><div class="loading">Загрузка...</div></div>
+      </div>
+
+      <div class="card">
+        <h3>План vs Факт по месяцам</h3>
+        <div class="chart-container"><canvas id="motivationMonthlyChart"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>Накопленная мотивация по сотрудникам</h3>
+        <div class="chart-container"><canvas id="motivationEmployeeChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="tab active" style="padding:6px 14px;font-size:12px" data-motiv-month="all">Все месяцы</button>
+        </div>
+        <h3>Детализация по сотрудникам</h3>
+        <div id="motivation-table"><div class="loading">Загрузка</div></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>📊 Анализ поступлений: Входящий vs Исходящий трафик</h3>
+        <p style="font-size:12px;color:#888;margin-bottom:12px">Исходящие: аккаунтинг, репитсейл, реанимация, холодная база, апсейл</p>
+        <div class="chart-container" style="height:250px"><canvas id="sourceChart"></canvas></div>
+        <div id="source-table" style="margin-top:12px"><div class="loading">Загрузка...</div></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <h3>📊 Анализ поступлений: КОМ vs Остальные форматы</h3>
+        <div class="chart-container" style="height:250px"><canvas id="formatChart"></canvas></div>
+        <div id="format-table" style="margin-top:12px"><div class="loading">Загрузка...</div></div>
+      </div>
+    </div>
+
+    <!-- ============ TAB 6: Рейтинг продуктов ============ -->
+    <div class="tab-content" id="tab-products">
+      <div class="cards" id="products-cards"></div>
+      <div class="card">
+        <h3>Рейтинг продуктов (по кол-ву)</h3>
+        <div id="products-table"><div class="loading">Загрузка</div></div>
+      </div>
+      <div class="card">
+        <h3>Рейтинг продуктов (по выручке)</h3>
+        <div id="products-table-rev"><div class="loading">Загрузка</div></div>
+      </div>
+      <div class="twocol">
+        <div class="card">
+          <h3>ILP программы</h3>
+          <div id="products-ilp"><div class="loading">Загрузка</div></div>
+        </div>
+        <div class="card">
+          <h3>Корпоративное обучение</h3>
+          <div id="products-corp"><div class="loading">Загрузка</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB 7: Средний чек по неделям ============ -->
+    <div class="tab-content" id="tab-avg-check">
+      <div class="card">
+        <h2>Средний чек по неделям (ООМ vs КОМ)</h2>
+        <div style="height:440px;position:relative"><canvas id="avgCheckChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

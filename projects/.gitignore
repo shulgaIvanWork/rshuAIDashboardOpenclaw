@@ -1,0 +1,36 @@
+# Environment
+.env
+
+# Dependencies — npm workspaces: корень + локальные воркспейсы
+node_modules/
+
+# Кэш данных из Bitrix (генерируется data-service при запуске)
+data-service/cache/
+
+# Runtime-кэш дашбордов
+dashboards/*/cache/
+dashboards/*/output/
+
+# Runtime (сессии пользователей)
+clover-web/data/sessions/*
+
+# Чувствительные данные (пароли, база пользователей)
+clover-web/data/users.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Python (старые скрипты)
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+
+.claude

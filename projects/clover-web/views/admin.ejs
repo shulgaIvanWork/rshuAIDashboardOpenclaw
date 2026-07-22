@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>РШУ дашборды — админка</title>
+  <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    /* Модалка и тост — локально: их show/hide реализован на classList,
+       без bootstrap.bundle.js штатные Modal/Toast не поднять. */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 500px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
+    .app-toast { position: fixed; bottom: 24px; right: 24px; background: #093EB4; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 2000; opacity: 0; transition: opacity .3s; }
+    .app-toast.show { opacity: 1; }
+  </style>
+</head>
+<body class="app-chrome">
+  <nav class="app-navbar navbar navbar-expand px-4">
+    <span class="navbar-brand text-white fw-bold mb-0">📊 РШУ</span>
+    <span class="text-white-50 small me-auto"><%= user.name %></span>
+    <div class="navbar-nav flex-row gap-2">
+      <a href="/dashboards" class="nav-link">📊 Дашборды</a>
+      <a href="/admin" class="nav-link active">👥 Пользователи</a>
+      <a href="/logout" class="nav-link logout-link">🚪 Выйти</a>
+    </div>
+  </nav>
+
+  <main class="container py-4" style="max-width:1200px">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="h4 mb-0">👥 Управление пользователями</h1>
+      <button class="btn btn-primary" onclick="openCreate()">➕ Создать</button>
+    </div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Логин</th>
+              <th>Имя</th>
+              <th>Роль</th>
+              <th>Доступ к дашбордам</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function(u) { %>
+            <tr data-id="<%= u.id %>">
+              <td><code><%= u.id %></code></td>
+              <td><%= u.name %></td>
+              <td><span class="badge <%= u.role === 'admin' ? 'text-bg-primary badge-admin' : 'text-bg-info badge-guest' %>"><%= u.role === 'admin' ? 'Админ' : 'Гость' %></span></td>
+              <td>
+                <% if (u.role === 'admin') { %>
+                  <span class="text-secondary small">все</span>
+                <% } else if (u.dashboards && u.dashboards.length > 0) { %>
+                  <% u.dashboards.forEach(function(d) { %>
+                    <span class="badge text-bg-success badge-dash me-1"><%= d %></span>
+                  <% }); %>
+                <% } else { %>
+                  <span class="text-secondary small">все</span>
+                <% } %>
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-outline-secondary" onclick="openEdit('<%= u.id %>')">✏️</button>
+                  <% if (u.role !== 'admin') { %>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="resetPassword('<%= u.id %>')">🔑</button>
+                  <button class="btn btn-sm btn-danger" onclick="deleteUser('<%= u.id %>')">🗑️</button>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: Create/Edit -->
+  <div class="modal-overlay" id="userModal">
+    <div class="modal-box">
+      <h2 class="h5 mb-3" id="modalTitle">Создать пользователя</h2>
+      <input type="hidden" id="editId">
+
+      <label for="modalId" class="form-label">Логин</label>
+      <input type="text" id="modalId" class="form-control mb-2" placeholder="client_name" pattern="[a-zA-Z0-9_-]+" required>
+
+      <label for="modalName" class="form-label">Имя</label>
+      <input type="text" id="modalName" class="form-control mb-2" placeholder="ООО Клиент">
+
+      <label for="modalRole" class="form-label">Роль</label>
+      <select id="modalRole" class="form-select mb-2" onchange="toggleDashboardsField()">
+        <option value="guest">Гость</option>
+        <option value="admin">Админ</option>
+      </select>
+
+      <div id="dashboardsField">
+        <label class="form-label">Доступ к дашбордам</label>
+        <div class="row row-cols-2 g-1" id="dashboardsCheckboxes">
+          <% dashboards.forEach(function(d) { %>
+            <div class="col">
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input dash-chk" id="chk_<%= d.name %>" value="<%= d.name %>">
+                <label class="form-check-label" for="chk_<%= d.name %>"><%= d.label %></label>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+        <div class="form-text">оставьте пустым — будут видны все дашборды</div>
+      </div>
+
+      <div id="passwordDisplay" class="alert alert-warning mt-3" style="display:none;">
+        <div class="small">🔑 Сгенерированный пароль (показывается один раз):</div>
+        <div class="fs-5 fw-bold font-monospace" id="generatedPassword"></div>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end mt-3">
+        <button class="btn btn-outline-secondary" onclick="closeModal()">Отмена</button>
+        <button class="btn btn-primary" id="modalSaveBtn" onclick="saveUser()">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="app-toast" id="toast"></div>
+
+  <script>
+    const allDashboards = <%- JSON.stringify(dashboards.map(d => ({ name: d.name, label: d.label }))) %>;
+
+    function openCreate() {
+      document.getElementById('modalTitle').textContent = '➕ Создать пользователя';
+      document.getElementById('editId').value = '';
+      document.getElementById('modalId').value = '';
+      document.getElementById('modalId').disabled = false;
+      document.getElementById('modalName').value = '';
+      document.getElementById('modalRole').value = 'guest';
+      document.getElementById('passwordDisplay').style.display = 'none';
+      document.getElementById('generatedPassword').textContent = '';
+      document.getElementById('modalSaveBtn').textContent = 'Создать';
+      toggleDashboardsField();
+      document.querySelectorAll('.dash-chk').forEach(c => c.checked = false);
+      document.getElementById('userModal').classList.add('active');
+    }
+
+    function openEdit(id) {
+      document.getElementById('modalTitle').textContent = '✏️ Редактировать пользователя';
+      document.getElementById('editId').value = id;
+      document.getElementById('modalId').value = id;
+      document.getElementById('modalId').disabled = true;
+      document.getElementById('passwordDisplay').style.display = 'none';
+      document.getElementById('generatedPassword').textContent = '';
+      document.getElementById('modalSaveBtn').textContent = 'Сохранить';
+
+      const row = document.querySelector(`tr[data-id="${id}"]`);
+      const name = row.querySelector('td:nth-child(2)').textContent;
+      const isAdmin = row.querySelector('.badge-admin') !== null;
+
+      document.getElementById('modalName').value = name;
+      document.getElementById('modalRole').value = isAdmin ? 'admin' : 'guest';
+      toggleDashboardsField();
+
+      // Check the appropriate dashboards
+      document.querySelectorAll('.dash-chk').forEach(c => c.checked = false);
+      if (!isAdmin) {
+        row.querySelectorAll('.badge-dash').forEach(function(b) {
+          const chk = document.querySelector(`.dash-chk[value="${b.textContent.trim()}"]`);
+          if (chk) chk.checked = true;
+        });
+      }
+
+      document.getElementById('userModal').classList.add('active');
+    }
+
+    function toggleDashboardsField() {
+      const role = document.getElementById('modalRole').value;
+      document.getElementById('dashboardsField').style.display = role === 'admin' ? 'none' : 'block';
+    }
+
+    function closeModal() {
+      document.getElementById('userModal').classList.remove('active');
+    }
+
+    async function saveUser() {
+      const id = document.getElementById('editId').value || document.getElementById('modalId').value;
+      const name = document.getElementById('modalName').value;
+      const role = document.getElementById('modalRole').value;
+      const isCreate = !document.getElementById('editId').value;
+
+      if (!id || !name) { showToast('Заполните логин и имя'); return; }
+      if (!/^[a-zA-Z0-9_-]+$/.test(id)) { showToast('Логин: только буквы, цифры, -, _'); return; }
+
+      let dashboards = [];
+      if (role === 'guest') {
+        document.querySelectorAll('.dash-chk:checked').forEach(c => dashboards.push(c.value));
+      }
+
+      if (isCreate) {
+        // Create
+        const res = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, name, role, dashboards })
+        });
+        const data = await res.json();
+        if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
+
+        if (data.generatedPassword) {
+          document.getElementById('generatedPassword').textContent = data.generatedPassword;
+          document.getElementById('passwordDisplay').style.display = 'block';
+          document.getElementById('modalSaveBtn').textContent = 'Закрыть';
+          document.getElementById('modalSaveBtn').onclick = closeModal;
+          return;
+        }
+      } else {
+        // Update
+        const res = await fetch('/api/admin/users/' + encodeURIComponent(id), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, role, dashboards })
+        });
+        const data = await res.json();
+        if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
+      }
+
+      closeModal();
+      showToast('✅ Сохранено');
+      setTimeout(() => location.reload(), 500);
+    }
+
+    async function resetPassword(id) {
+      if (!confirm('Сбросить пароль для "' + id + '"?')) return;
+
+      const newPassword = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 4);
+      const res = await fetch('/api/admin/users/' + encodeURIComponent(id), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword })
+      });
+      const data = await res.json();
+      if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
+
+      showToast('🔑 Новый пароль для ' + id + ': ' + newPassword, 15000);
+    }
+
+    async function deleteUser(id) {
+      if (!confirm('Удалить пользователя "' + id + '"? Это действие необратимо.')) return;
+
+      const res = await fetch('/api/admin/users/' + encodeURIComponent(id), { method: 'DELETE' });
+      const data = await res.json();
+      if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
+
+      showToast('✅ Пользователь удалён');
+      setTimeout(() => location.reload(), 500);
+    }
+
+    function showToast(msg, duration) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(t._timeout);
+      t._timeout = setTimeout(() => t.classList.remove('show'), duration || 3000);
+    }
+
+    // Close modal on overlay click
+    document.getElementById('userModal').addEventListener('click', function(e) {
+      if (e.target === this) closeModal();
+    });
+  </script>
+</body>
+</html>

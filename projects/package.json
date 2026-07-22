@@ -1,0 +1,13 @@
+{
+  "name": "rshu-ai-dashboard",
+  "private": true,
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "exceljs": "^4.4.0"
+  },
+  "workspaces": [
+    "data-service",
+    "clover-web",
+    "dashboards/*"
+  ]
+}

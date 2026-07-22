@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 Дашборды — uprav.tech</title>
+  <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/shared.css">
+</head>
+<body class="app-chrome">
+  <nav class="app-navbar navbar navbar-expand px-4">
+    <span class="navbar-brand text-white fw-bold mb-0">📊 РШУ</span>
+    <span class="text-white-50 small me-auto"><%= user.name %><% if (user.role === 'guest') { %> <span class="opacity-50">(гость)</span><% } %></span>
+    <div class="navbar-nav flex-row gap-2">
+      <a href="/dashboards" class="nav-link active">📊 Дашборды</a>
+      <% if (user.role === 'admin') { %><a href="/admin" class="nav-link">👥 Пользователи</a><% } %>
+      <a href="/logout" class="nav-link logout-link">🚪 Выйти</a>
+    </div>
+  </nav>
+
+  <main class="container py-4" style="max-width:800px">
+    <h1 class="h4 mb-4">📊 Дашборды</h1>
+    <% dashboards.forEach(function(d) { %>
+      <a href="<%= d.url %>" target="_blank" class="card p-3 mb-2 text-decoration-none text-body d-flex flex-row align-items-center gap-3">
+        <span style="font-size:24px;line-height:1"><%= d.icon %></span>
+        <span class="fw-semibold"><%= d.description %></span>
+      </a>
+    <% }) %>
+    <% if (dashboards.length === 0) { %>
+      <p class="text-secondary text-center py-5">Нет доступных дашбордов</p>
+    <% } %>
+  </main>
+</body>
+</html>

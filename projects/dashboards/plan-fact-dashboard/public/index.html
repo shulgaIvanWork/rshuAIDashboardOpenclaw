@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>План-факт выручки</title>
+  <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container-fluid p-4">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <h1 class="h3 mb-0">План-факт выручки <span id="updateDate" class="fs-6 fw-normal text-secondary"></span></h1>
+  </div>
+
+  <ul class="nav nav-tabs mb-3" id="tabBar">
+    <li class="nav-item"><button class="nav-link active tab" data-tab="weekly">📅 По неделям</button></li>
+    <li class="nav-item"><button class="nav-link tab" data-tab="post">💰 Пост/Выр/Уч</button></li>
+    <li class="nav-item"><button class="nav-link tab" data-tab="om">📈 Выручка ОМ</button></li>
+    <li class="nav-item"><button class="nav-link tab" data-tab="sdo">🎬 Выручка СДО</button></li>
+  </ul>
+
+  <div id="tabContent" class="table-responsive">
+    <div class="text-center text-secondary py-5">
+      <div class="spinner-border text-primary mb-2" role="status"></div>
+      <div>Расчёт данных из Bitrix24…</div>
+    </div>
+  </div>
+</div>
+
+<script src="/shared.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

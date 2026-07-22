@@ -11,25 +11,30 @@
 - Полный доступ, VPS
 - Дашборды в /root/.openclaw/workspace/projects/
 
-## Web Interface (Клевер) — единый сервис
+## Web Interface (Клевер) — npm workspaces монолит
 
 - **URL:** https://uprav.tech/
 - **Порт:** 3000 (единственный, всё через него)
 - **Логины:** ivan, olga, anastasia
 - **Пароли:** {логин}123 (ivan123, olga123, anastasia123)
-- **Стек:** Express.js, EJS, openclaw agent CLI
-- **Лог:** /tmp/clover-web.log
+- **Стек:** Express.js, npm workspaces
+- **Лог:** tail -f /root/.pm2/logs/clover-web-out.log
+- **Ошибки:** tail -f /root/.pm2/logs/clover-web-error.log
 - **Процесс:** PM2, имя `clover-web`
+- **Корень:** `projects/clover-web/server.js`
+- **Данные:** `projects/data-service/`
 
-**Важно:** Весь проект — единая система на одном порту 3000.
-Все дашборды — под-приложения внутри clover-web, монтируются через `app.use('/name', requireAuth, subApp)` в `server.js`.
-Отдельные порты/PM2 процессы не нужны.
+**Важно:** Весь проект — npm workspaces монолит на одном порту 3000.
+- Дашборды загружаются лениво (lazyApp) при первом обращении
+- Данные централизованы через `data-service/`
+- `cd data-service && npm run fetch` — обновление данных
+- `pm2 restart clover-web` — перезапуск после правок
 
 ## OpenClaw Web
 
 - **URL:** https://openclaw.uprav.tech/
 - **Порт:** 18789 (loopback, через nginx)
-- **Токен:** c48f4f…7a2b
+- **Токен:** bd63edb75f52b23bae4a82bdbf4b8bc9f266be3af400e8b8
 - **Процесс:** systemd user (openclaw-gateway.service)
 
 ## Коллеги
@@ -47,34 +52,46 @@
 | `/kom-dashboard` | `dashboards/kom-dashboard/` | КОМ дашборд |
 | `/ratings-dashboard` | `dashboards/ratings-dashboard/` | Рейтинги |
 | `/participants-dashboard` | `dashboards/participants-dashboard/` | Участники |
-| `/test-dashboard` | `dashboards/test-dashboard/` | Тестовый |
+| `/test-dashboard` | `dashboards/test-dashboard/` | Тестовый (прогноз мотивации) |
+| `/manager-report-dev` | `dashboards/manager-report-dev/` | Отчёт для менеджеров |
 
-## Источники данных (приоритет использования)
+## Проект
 
-### 🔵 1. Bitrix24 REST API (основной)
-- **Webhook:** `https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/`
-- **Что даёт:** сделки, лиды, компании, контакты, справочники, UF_DATE_PAY_1C
-- **Использовать первым** для большинства запросов
-- **Лимиты:** batch API до 50 команд
+### Структура (npm workspaces)
+- **data-service/** — единый слой выгрузки и аналитики B24
+  - `npm run fetch` — 5 шагов: REST + Export + справочники + контакты/компании + модули
+  - `analyze.js` (956 строк) — вся аналитика, включает `prev_weeks` (прошлый год для сравнения)
+  - `agg-cache.js` — общий кэш для дашбордов (TTL 60с)
+  - `fetch-modules.js` — даты модулей для participants-dashboard
+  - `cache/` — результаты (deals.json, dicts.json, contacts.json, companies.json, fetched_at.json)
+- **clover-web/** — Express.js сервер на порту 3000
+  - `pm2 restart clover-web` — перезапуск
+- **dashboards/** — 8 под-приложений
 
-### 🟢 2. Bitrix24 CRM Export (для глубоких запросов)
-- **Когда использовать:** если REST API не покрывает — нужны продукты/модули сделок, обогащённые данные с контактами, компаниями, направлениями
+### Обновление данных
+```bash
+cd /root/.openclaw/workspace/projects/data-service && npm run fetch
+```
+Данные обновляются централизованно, дашборды читают через `@rshu/data-service/agg-cache.js`.
+
+## Источники данных
+
+### 🔵 1. Bitrix24 REST API (через data-service)
+- **Webhook:** `https://24.uprav.ru/rest/516/k1cdomfp4vd1kiql/` (в `.env`)
+- Лимиты: batch API до 50 команд
+- Используется `lib/bitrix-rest.js`
+
+### 🟢 2. Bitrix24 CRM Export (через data-service)
 - **Эндпоинт:** `https://24.uprav.ru/web_services/crm/export.php`
 - **Secret key:** `14b0fc053c141e47a5974b3859f5753f`
-- **Метод:** POST, Content-Type: `application/x-www-form-urlencoded`
-- **Параметры:** `secret`, `action` (getDeals|getFormats|getDirections|getUserFieldsCrm), `data` (массив)
-- **WITH_PRODUCTS=Y** — только для товаров/модулей (limit ≤ 5)
-- **Документация:** `projects/dashboards/rshu-management-dashboard/docs/CRM_Export_API_для_ИИ_агентов.md`
-- **Ограничения:** limit ≤ 50, offset ≤ 5000, SELECT — без `*` и `UF_*`
-- **Статус:** ✅ подключён
+- **Ограничения:** limit ≤ 50, offset ≤ 5000
+- Используется `lib/bitrix-export.js`
+- SELECT с UF_полями зашит в коде
 
 ### 🟡 3. Яндекс Метрика API
 - **Токен OAuth:** `y0__wgBELrbs5oCGKr3QiDt4u3iF6ydZv9PW4NDN8I-iaAaFC-A6UfL`
 - **ClientID:** `78b1e8c8046f4b08837f3d007ac983b4`
 - **Client secret:** `055582f270bc4443984e42e6020d68f0`
-- **API отчетов:** `/stat/v1/data/` — статистика
-- **API управления:** CRUD счётчиков, целей
-- **Лимиты:** 30 запр/с с IP, 5000 запр/сутки, 200 запр/5мин для отчётов
 - **Статус:** не подключён
 
 
