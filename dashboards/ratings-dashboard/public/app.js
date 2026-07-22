@@ -539,7 +539,7 @@ function renderPage(data) {
     </div>
 
     <!-- Top products (80% revenue) -->
-    <div class="card"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2>
+    <div class="card"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · по доле в поступлениях</span></h2>
       <div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div>
       <div class="scroll-x"><table class="sortable">
         <thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">✅ Оплачено</th><th class="sort" data-col="3">💰 Поступления, ₽</th><th class="sort" data-col="4">💵 Ср.чек, ₽</th><th class="sort" data-col="5">⏱ Цикл,дн</th><th class="sort" data-col="6">📈 Доля</th></tr></thead>
@@ -709,7 +709,7 @@ async function renderPageMainNew(d) {
     html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
 
     // Топ-20 продуктов
-    html += '<div class="card" style="margin-top:8px"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ · по доле в поступлениях</span></h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
+    html += '<div class="card" style="margin-top:8px"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · по доле в поступлениях</span></h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
     // Источники
     html += '<div class="card"><h2>Рейтинг источников поступлений (открытое обучение без КОМ)</h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newSrcTable"></div></div></div>';
     html += '<div class="card"><h2>Топ-20 компаний</h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newCompaniesTable"></div></div></div>';
@@ -875,13 +875,13 @@ async function renderPageMainNew(d) {
       '<td></td><td><b>📊 ИТОГО (топ-20)</b></td>'
       +compCell(fmt(ct20.sum)+' ₽')+compCell(ct20.cnt)
       +compCell(fmtFmt2(ct20.omCnt,ct20.omSum))+compCell(fmtFmt2(ct20.komCnt,ct20.komSum))
-      +compCell(fmt(ct20.cnt?Math.round(ct20.sum/ct20.cnt):0)+' ₽')+compCell('100%')+compCell('—'), true);
+      +compCell(fmt(ct20.cnt?Math.round(ct20.sum/ct20.cnt):0)+' ₽')+compCell((ct20.sum/ctAllSum*100).toFixed(1)+'%')+compCell('—'), true);
     comps.forEach(function(c, i){
       var isRem = isCompRest(c);
       var bg = isRem ? '#f0f4ff' : '';
       var share = (c.sum / ctAllSum * 100).toFixed(1);
       compStr += compRow(bg,
-        '<td>'+(isRem?'':(i+1))+'</td><td style="white-space:normal;max-width:300px"><b>'+escapeHtml(c.name)+'</b></td>'
+        '<td>'+(isRem?'':(i+1))+'</td><td style="white-space:normal;max-width:300px"><b>'+escapeHtml(shortCompany(c.name))+'</b></td>'
         +compCell(fmt(c.sum)+' ₽')+compCell(c.cnt)
         +compCell(fmtFmt2(c.om_cnt||0,c.om_sum||0))+compCell(fmtFmt2(c.kom_cnt||0,c.kom_sum||0))
         +compCell(fmt(c.avg_check)+' ₽')+compCell(share+'%')+compCell(c.last_date), isRem);
