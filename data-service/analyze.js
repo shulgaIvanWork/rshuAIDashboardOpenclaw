@@ -534,7 +534,7 @@ export async function analyze(onProgress) {
           // by_src
           { const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(isQualLeadW(r)) wd.by_src[sn].mql++; if(isSqlByCreate(r)) wd.by_src[sn].sql++; if(r.INV_DT) wd.by_src[sn].invoice_cnt++; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
           // by_company
-          { const cid=r.COMPANY_ID; if(cid&&cid!=='0'){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; if(r.FORMAT==='Онлайн'){wd.by_company[cid].om_cnt++;wd.by_company[cid].om_sum+=r.OPP;} if(r.IS_KOM){wd.by_company[cid].kom_cnt++;wd.by_company[cid].kom_sum+=r.OPP;} const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
+          { const cid=r.COMPANY_ID; if(cid&&cid!=='0'){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; if(!r.IS_KOM){wd.by_company[cid].om_cnt++;wd.by_company[cid].om_sum+=r.OPP;} else {wd.by_company[cid].kom_cnt++;wd.by_company[cid].kom_sum+=r.OPP;} const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
           // by_mba
           { const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else if(r.FORMAT==='Онлайн'){wd.by_mba[mt].fmt_om_cnt++;wd.by_mba[mt].fmt_om_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}}}}
         }
@@ -960,8 +960,9 @@ export async function analyze(onProgress) {
     if(!companyAgg[cid]) companyAgg[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0};
     const pd=getPayDate(r);
     companyAgg[cid].sum+=r.OPP; companyAgg[cid].cnt++;
-    if(r.FORMAT==='Онлайн'){companyAgg[cid].om_cnt++;companyAgg[cid].om_sum+=r.OPP;}
-    if(r.IS_KOM){companyAgg[cid].kom_cnt++;companyAgg[cid].kom_sum+=r.OPP;}
+    // ОМ = открытое обучение (все форматы, кроме КОМ) — как на управленческом
+    if(!r.IS_KOM){companyAgg[cid].om_cnt++;companyAgg[cid].om_sum+=r.OPP;}
+    else {companyAgg[cid].kom_cnt++;companyAgg[cid].kom_sum+=r.OPP;}
     if(pd&&(!companyAgg[cid].last||pd>companyAgg[cid].last)) companyAgg[cid].last=pd;
   }
   const topCompanies=Object.entries(companyAgg).filter(([,d])=>d.sum>0).map(([cid,d])=>({
