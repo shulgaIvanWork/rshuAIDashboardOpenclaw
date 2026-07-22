@@ -1,38 +1,7 @@
-// ========== Helper functions ==========
-function escapeHtml(t){return String(t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+// escapeHtml(), api(), fmt(), fmtPct(), initTableSort(), shortCompany(),
+// window.BASE_PATH — всё в /shared.js (подключается перед app.js).
+// Здесь оставлены только специфичные для рейтингов хелперы (safeFetch и т.п.).
 
-// Сокращение организационно-правовых форм: «ОБЩЕСТВО С ОГРАНИЧЕННОЙ …» → «ООО»
-var COMPANY_PREFIXES = [
-  // Самое длинное — первым (startsWith проверит по порядку)
-  ['ИНОСТРАННОЕ ПРЕДПРИЯТИЕ ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ', 'ИП ООО'],
-  ['ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ ВЫСШЕГО ОБРАЗОВАНИЯ', 'ФГБОУ ВО'],
-  ['ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ', 'ФГБОУ'],
-  ['ЧАСТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ ДОПОЛНИТЕЛЬНОГО ПРОФЕССИОНАЛЬНОГО ОБРАЗОВАНИЯ', 'ЧОУ ДПО'],
-  ['ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ПРОФЕССИОНАЛЬНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ', 'ГБПОУ'],
-  ['ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ', 'ГБОУ'],
-  ['ОБЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ', 'ООО'],
-  ['МУНИЦИПАЛЬНОЕ УНИТАРНОЕ ПРЕДПРИЯТИЕ', 'МУП'],
-  ['ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО', 'ПАО'],
-  ['АВТОНОМНАЯ НЕКОММЕРЧЕСКАЯ ОРГАНИЗАЦИЯ', 'АНО'],
-  ['НЕКОММЕРЧЕСКАЯ ОРГАНИЗАЦИЯ', 'НО'],
-  ['НЕКОММЕРЧЕСКОЕ ПАРТНЕРСТВО', 'НП'],
-  ['ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ', 'ОУ'],
-  ['ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ', 'ИП'],
-  ['ЗАКРЫТОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО', 'ЗАО'],
-  ['АКЦИОНЕРНОЕ ОБЩЕСТВО', 'АО'],
-];
-function shortCompany(name) {
-  if (!name) return name;
-  var s = name.toUpperCase();
-  for (var i = 0; i < COMPANY_PREFIXES.length; i++) {
-    var full = COMPANY_PREFIXES[i][0], short = COMPANY_PREFIXES[i][1];
-    if (s.startsWith(full)) return short + name.substring(full.length);
-  }
-  return name
-    .replace(/\(публичное акционерное общество\)/gi, '(ПАО)')
-    .replace(/\(акционерное общество\)/gi, '(АО)')
-    .replace(/\(общество с ограниченной ответственностью\)/gi, '(ООО)');
-}
 function loadArtifacts(){
   fetch(window.BASE_PATH+'/api/artifacts').then(function(r){return r.json();}).then(function(d){
     var el=document.getElementById('newArtifactsBlock');
@@ -54,11 +23,6 @@ function loadArtifacts(){
   }).catch(function(){});
 }
 
-
-// Автоопределение пути — работает и самостоятельным сайтом, и как sub-app
-var _p = window.location.pathname;
-var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
-window.BASE_PATH = _m ? '/' + _m[1] : '';
 
 async function safeFetch(url, opts) {
   var resp = await fetch(url, opts);
@@ -95,21 +59,6 @@ function weeksInRange(weeks, dateFrom, dateTo) {
   return weeks.filter(function(w) {
     return w.week >= wnFrom && w.week <= wnTo;
   });
-}
-
-async function api(path) {
-  var url = (typeof window.BASE_PATH !== 'undefined' ? (window.BASE_PATH || '') : '') + path;
-  var controller = new AbortController();
-  var timeout = setTimeout(function() { controller.abort(); }, 30000); // 30s timeout
-  try {
-    const r = await fetch(url, { signal: controller.signal });
-    if (r.redirected || r.url.endsWith('/login')) { window.location.href = '/login'; throw new Error('redirect'); }
-    var text = await r.text();
-    if (text.startsWith('<!DOCTYPE')) { window.location.href = '/login'; throw new Error('redirect'); }
-    return JSON.parse(text);
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 async function loadAll() {
@@ -431,16 +380,6 @@ function buildFilteredData(orig, filteredWeeks) {
   return out;
 }
 
-function fmt(n) {
-  if (n === undefined || n === null || n === 0) return '0';
-  return Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-}
-
-function fmtPct(n) {
-  if (n === undefined || n === null) return '0.0';
-  return Number(n).toFixed(1);
-}
-
 function renderPage(data) {
   const area = document.getElementById('contentArea');
   const ytd = data.ytd;
@@ -731,43 +670,12 @@ function renderPage(data) {
 }
 
 // === Сортировка таблиц (как в Excel) ===
-function initTableSort() {
-  document.querySelectorAll('table.sortable').forEach(tbl => {
-    const ths = tbl.querySelectorAll('thead th.sort');
-    ths.forEach(th => {
-      th.addEventListener('click', () => {
-        const col = parseInt(th.dataset.col);
-        const tbody = tbl.querySelector('tbody');
-        if (!tbody) return;
-        const rows = Array.from(tbody.querySelectorAll('tr:not(.total-row)'));
-        const totalRows = Array.from(tbody.querySelectorAll('tr.total-row'));
-        const isAsc = th.classList.contains('asc');
-        ths.forEach(h => h.classList.remove('asc', 'desc'));
-        th.classList.add(isAsc ? 'desc' : 'asc');
-        rows.sort((a, b) => {
-          const va = (a.cells[col]?.innerText || '').trim();
-          const vb = (b.cells[col]?.innerText || '').trim();
-          // Попробуем распарсить как число
-          const na = parseFloat(va.replace(/[^\d\-.,]/g, '').replace(',', ''));
-          const nb = parseFloat(vb.replace(/[^\d\-.,]/g, '').replace(',', ''));
-          if (!isNaN(na) && !isNaN(nb)) {
-            return isAsc ? na - nb : nb - na;
-          }
-          return isAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-        });
-        [...totalRows, ...rows].forEach(r => tbody.appendChild(r));
-      });
-    });
-  });
-}
-
 async function renderPageNewLogic() {
   const area = document.getElementById("contentAreaNew");
   area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка новой логики…</div></div>';
   try {
     const data = await api("/api/data/new");
     if (!data.ytd) { area.innerHTML = '<div class="error-state">❌ Нет данных</div>'; return; }
-    function fmt(n) { return (n===undefined||n===null||n===0)?'0':Number(n).toLocaleString('ru-RU',{maximumFractionDigits:0}); }
     function kpi(l,v,s,c) { return '<div class=kpi'+(c?' '+c:'')+'><div class=lbl>'+l+'</div><div class=val>'+v+'</div><div class=sub>'+s+'</div></div>'; }
     var w=data.weeks||[], lst=w[w.length-1]||{}, prv=w[w.length-2]||{}, cw=data.cur_week||0;
     function rw(t,ytd,cur,kom) {
