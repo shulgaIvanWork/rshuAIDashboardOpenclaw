@@ -550,11 +550,6 @@ app.get(/(.*)/,  (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Инструкция в PDF — редактировать: public/guide.html
-app.get('/guide', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'guide.html'));
-});
-
 export default app;
 
 const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url);
