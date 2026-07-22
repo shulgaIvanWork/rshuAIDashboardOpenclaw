@@ -487,12 +487,13 @@ export async function analyze(onProgress) {
       if (wk in weekly) weekly[wk].kom_lost_cnt++;
     }
 
-    // invoice_cnt
+    // invoice_cnt — по ДАТЕ СЧЁТА
     if (r.UF_CRM_1753272713011) {
       const inv=parseDt(r.UF_CRM_1753272713011);
       if (inv && inv.getFullYear()===YEAR) {
         const [,wk]=isoCalendar(inv);
-        if (wk in weekly) weekly[wk].invoice_cnt++;
+        if (wk in weekly) { const wd=weekly[wk]; wd.invoice_cnt++;
+          if(!r.IS_KOM){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].invoice_cnt++; } }
       }
     }
 
@@ -532,7 +533,10 @@ export async function analyze(onProgress) {
             if (r.DC&&r.PAY_DT) { const d=daysBetween(r.DC,r.PAY_DT); if(d>=0) wd.by_prod[pk].durs.push(d); }
           }
           // by_src
-          { const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(isQualLeadW(r)) wd.by_src[sn].mql++; if(isSqlByCreate(r)) wd.by_src[sn].sql++; if(r.INV_DT) wd.by_src[sn].invoice_cnt++; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
+          // by_src: сделки/поступления — по дате оплаты (реальные деньги).
+          // MQL/SQL — по дате создания, счёт — по дате счёта (см. секции ниже),
+          // чтобы воронка источников была как в управленческом (без >100%).
+          if(!r.IS_KOM){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
           // by_company
           { const cid=r.COMPANY_ID; if(cid&&cid!=='0'){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; if(!r.IS_KOM){wd.by_company[cid].om_cnt++;wd.by_company[cid].om_sum+=r.OPP;} else {wd.by_company[cid].kom_cnt++;wd.by_company[cid].kom_sum+=r.OPP;} const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
           // by_mba
@@ -544,13 +548,15 @@ export async function analyze(onProgress) {
     // MQL по DATE_CREATE
     if (r.DC && r.DC.getFullYear()===YEAR && isQualLeadW(r)) {
       const [,wk]=isoCalendar(r.DC);
-      if (wk in weekly) { weekly[wk].mql++; if(r.IS_OOM) weekly[wk].oom_mql++; }
+      if (wk in weekly) { const wd=weekly[wk]; wd.mql++; if(r.IS_OOM) wd.oom_mql++;
+        if(!r.IS_KOM){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].mql++; } }
     }
 
     // SQL по DATE_CREATE
     if (isSqlByCreate(r) && r.DC && r.DC.getFullYear()===YEAR) {
       const [,wk]=isoCalendar(r.DC);
-      if (wk in weekly) weekly[wk].sql++;
+      if (wk in weekly) { const wd=weekly[wk]; wd.sql++;
+        if(!r.IS_KOM){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].sql++; } }
     }
 
     // Pre Sale duration
@@ -564,7 +570,8 @@ export async function analyze(onProgress) {
   for (const r of rows) {
     if (r.DC && r.DC.getFullYear()===YEAR && isAllLead(r)) {
       const [,wk]=isoCalendar(r.DC);
-      if (wk in weekly) { weekly[wk].leads++; if(r.IS_OOM) weekly[wk].oom_leads++; const sn=r.SRC; if(!weekly[wk].by_src[sn]) weekly[wk].by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; weekly[wk].by_src[sn].leads++; }
+      if (wk in weekly) { weekly[wk].leads++; if(r.IS_OOM) weekly[wk].oom_leads++;
+        if(!r.IS_KOM){ const sn=r.SRC; if(!weekly[wk].by_src[sn]) weekly[wk].by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; weekly[wk].by_src[sn].leads++; } }
     }
   }
 
