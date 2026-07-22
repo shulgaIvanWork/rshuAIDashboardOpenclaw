@@ -114,7 +114,6 @@ app.use('/drop-dashboard',            requireAuth, lazyApp('drop-dashboard',    
 app.use('/rshu-management-dashboard', requireAuth, lazyApp('rshu-management-dashboard', () => import('../dashboards/rshu-management-dashboard/server.js')));
 app.use('/ratings-dashboard',         requireAuth, lazyApp('ratings-dashboard',         () => import('../dashboards/ratings-dashboard/server.js')));
 app.use('/participants-dashboard',    requireAuth, lazyApp('participants-dashboard',    () => import('../dashboards/participants-dashboard/server.js')));
-app.use('/sales-report',               requireAuth, lazyApp('sales-report',               () => import('../dashboards/sales-report-dashboard/server.js')));
 app.use('/test-dashboard',            requireAuth, lazyApp('test-dashboard',            () => import('../dashboards/test-dashboard/server.js')));
 app.use('/manager-report-dev',        requireAuth, lazyApp('manager-report-dev',        () => import('../dashboards/manager-report-dev/server.js')));
 app.use('/plan-fact-dashboard',       requireAuth, lazyApp('plan-fact-dashboard',       () => import('../dashboards/plan-fact-dashboard/server.js')));

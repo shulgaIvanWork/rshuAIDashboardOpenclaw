@@ -32,15 +32,29 @@ __pycache__/
 .vscode/
 .idea/
 
-# OpenClaw internal
+# OpenClaw / автономный агент — служебные файлы, не относятся к проекту
 .openclaw/
+.dreams/
+memory/
+sessions/
+backups/
+backup/
+projects/
+heartbeat-state.json
+openclaw-workspace-state.json
+*.migrated
+AGENTS.md
+SOUL.md
+IDENTITY.md
+TOOLS.md
+HEARTBEAT.md
+USER.md
 
 # PM2
 pm2-logrotate/
 
 # Cache & temp
 *.tmp
-backup/
 cron/
 inbox/
 outbox/
