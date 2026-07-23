@@ -83,7 +83,8 @@ async function loadAll() {
     document.getElementById('dateTo').value = todayStr;
     dateFromCache = document.getElementById('dateFrom').value;
     dateToCache = document.getElementById('dateTo').value;
-    
+    if (rcPeriod) rcPeriod.setRange(dateFromDefault, todayStr);
+
     renderFilteredData();
 
     var dateEl = document.getElementById('updateDate');
@@ -784,16 +785,23 @@ function drawCharts(data) {
   });
 }
 
-// --- Date filter ---
-document.addEventListener('DOMContentLoaded', function() {
-    // Enter на datepicker тоже применяет
-  document.getElementById('dateFrom').addEventListener('change', function() {
-    if (document.getElementById('dateTo').value) renderFilteredData();
-  });
-  document.getElementById('dateTo').addEventListener('change', function() {
-    if (document.getElementById('dateFrom').value) renderFilteredData();
-  });
-});
+// --- Кастомный календарь выбора периода (как в управленческом, /vendor/range-calendar/) ---
+// #periodDisplay — видимое поле с попапом; #dateFrom/#dateTo — скрытые ISO-значения,
+// которые читает весь фильтр (renderFilteredData).
+var rcPeriod = null;
+(function() {
+  var disp = document.getElementById('periodDisplay');
+  if (disp && typeof RangeCalendar !== 'undefined') {
+    rcPeriod = RangeCalendar.attach(disp, {
+      mode: 'range',
+      onApply: function(startISO, endISO) {
+        document.getElementById('dateFrom').value = startISO;
+        document.getElementById('dateTo').value = endISO;
+        renderFilteredData();
+      }
+    });
+  }
+})();
 
 
 // Защищённый запуск: ошибка не должна блокировать UI
