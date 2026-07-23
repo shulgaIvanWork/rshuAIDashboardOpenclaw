@@ -78,6 +78,21 @@ function requireAdmin(req, res, next) {
   res.redirect('/dashboards');
 }
 
+// Проверка доступа к конкретному дашборду: админ — ко всем; гость — только к тем,
+// что явно перечислены в его списке (пустой список = нет доступа). Закрывает дыру,
+// когда гость открывал любой дашборд по прямой ссылке в обход списка.
+function requireDashboardAccess(name) {
+  return (req, res, next) => {
+    const user = req.session.userId ? getUserById(req.session.userId) : null;
+    if (!user) return res.redirect('/login');
+    req.user = user;
+    if (user.role === 'admin') return next();
+    const allowed = Array.isArray(user.dashboards) ? user.dashboards : [];
+    if (allowed.includes(name)) return next();
+    return res.redirect('/dashboards');
+  };
+}
+
 // --------------- Root redirect ---------------
 app.get('/', (req, res) => {
   if (req.session.userId) return res.redirect('/dashboards');
@@ -94,7 +109,7 @@ app.post('/login', (req, res) => {
   const { username, password } = req.body;
   const users = loadUsers();
   const user = users.find(u => u.id === username);
-  if (!user || !bcrypt.compareSync(password, user.password)) {
+  if (!user || !verifyPassword(password, user.password)) {
     return res.render('login.ejs', { error: 'Неверный логин или пароль' });
   }
   req.session.userId = user.id;
@@ -108,15 +123,15 @@ app.get('/logout', (req, res) => {
 });
 
 // --------------- Mount dashboards (with auth, lazy-loaded) ---------------
-app.use('/rshu-dashboard',            requireAuth, lazyApp('rshu-dashboard',            () => import('../dashboards/rshu-dashboard/server.js')));
-app.use('/kom-dashboard',             requireAuth, lazyApp('kom-dashboard',             () => import('../dashboards/kom-dashboard/server.js')));
-app.use('/drop-dashboard',            requireAuth, lazyApp('drop-dashboard',            () => import('../dashboards/drop-dashboard/server.js')));
-app.use('/rshu-management-dashboard', requireAuth, lazyApp('rshu-management-dashboard', () => import('../dashboards/rshu-management-dashboard/server.js')));
-app.use('/ratings-dashboard',         requireAuth, lazyApp('ratings-dashboard',         () => import('../dashboards/ratings-dashboard/server.js')));
-app.use('/participants-dashboard',    requireAuth, lazyApp('participants-dashboard',    () => import('../dashboards/participants-dashboard/server.js')));
-app.use('/test-dashboard',            requireAuth, lazyApp('test-dashboard',            () => import('../dashboards/test-dashboard/server.js')));
-app.use('/manager-report-dev',        requireAuth, lazyApp('manager-report-dev',        () => import('../dashboards/manager-report-dev/server.js')));
-app.use('/plan-fact-dashboard',       requireAuth, lazyApp('plan-fact-dashboard',       () => import('../dashboards/plan-fact-dashboard/server.js')));
+app.use('/rshu-dashboard',            requireDashboardAccess('rshu-dashboard'),            lazyApp('rshu-dashboard',            () => import('../dashboards/rshu-dashboard/server.js')));
+app.use('/kom-dashboard',             requireDashboardAccess('kom-dashboard'),             lazyApp('kom-dashboard',             () => import('../dashboards/kom-dashboard/server.js')));
+app.use('/drop-dashboard',            requireDashboardAccess('drop-dashboard'),            lazyApp('drop-dashboard',            () => import('../dashboards/drop-dashboard/server.js')));
+app.use('/rshu-management-dashboard', requireDashboardAccess('rshu-management-dashboard'), lazyApp('rshu-management-dashboard', () => import('../dashboards/rshu-management-dashboard/server.js')));
+app.use('/ratings-dashboard',         requireDashboardAccess('ratings-dashboard'),         lazyApp('ratings-dashboard',         () => import('../dashboards/ratings-dashboard/server.js')));
+app.use('/participants-dashboard',    requireDashboardAccess('participants-dashboard'),    lazyApp('participants-dashboard',    () => import('../dashboards/participants-dashboard/server.js')));
+app.use('/test-dashboard',            requireDashboardAccess('test-dashboard'),            lazyApp('test-dashboard',            () => import('../dashboards/test-dashboard/server.js')));
+app.use('/manager-report-dev',        requireDashboardAccess('manager-report-dev'),        lazyApp('manager-report-dev',        () => import('../dashboards/manager-report-dev/server.js')));
+app.use('/plan-fact-dashboard',       requireDashboardAccess('plan-fact-dashboard'),       lazyApp('plan-fact-dashboard',       () => import('../dashboards/plan-fact-dashboard/server.js')));
 
 // --------------- Dashboards page ---------------
 app.get('/dashboards', requireAuth, (req, res) => {
@@ -141,21 +156,22 @@ app.get('/admin', requireAdmin, (req, res) => {
   const allDashboards = Object.entries(getAllDashboardsMeta()).map(([name, m]) => ({ name, label: m.label || name }));
   res.render('admin.ejs', {
     user: { id: req.user.id, name: req.user.name },
-    users: users.map(u => ({ id: u.id, name: u.name, role: u.role, dashboards: u.dashboards, avatar: u.avatar })),
+    // password: открытый текст для показа админу; null — старый хеш (не показать)
+    users: users.map(u => ({ id: u.id, name: u.name, role: u.role, dashboards: u.dashboards, avatar: u.avatar, password: passwordForDisplay(u.password) })),
     dashboards: allDashboards,
     dashboardsMeta
   });
 });
 
-// API: список пользователей
+// API: список пользователей (админ видит пароли)
 app.get('/api/admin/users', requireAdmin, (req, res) => {
   const users = loadUsers();
-  res.json(users.map(u => ({ id: u.id, name: u.name, role: u.role, dashboards: u.dashboards, avatar: u.avatar })));
+  res.json(users.map(u => ({ id: u.id, name: u.name, role: u.role, dashboards: u.dashboards, avatar: u.avatar, password: passwordForDisplay(u.password) })));
 });
 
 // API: создать пользователя
-app.post('/api/admin/users', requireAdmin, async (req, res) => {
-  const { id, name, role, dashboards } = req.body;
+app.post('/api/admin/users', requireAdmin, (req, res) => {
+  const { id, name, role, dashboards, password } = req.body;
   if (!id || !name) return res.status(400).json({ error: 'id и name обязательны' });
   if (id.length < 2) return res.status(400).json({ error: 'id должен быть минимум 2 символа' });
   if (!/^[a-zA-Z0-9_-]+$/.test(id)) return res.status(400).json({ error: 'id: только буквы, цифры, -, _' });
@@ -163,46 +179,57 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
   const users = loadUsers();
   if (users.find(u => u.id === id)) return res.status(409).json({ error: 'Пользователь с таким id уже существует' });
 
-  const rawPassword = generatePassword();
-  const password = await bcrypt.hash(rawPassword, 10);
+  // Пароль: заданный админом или сгенерированный. Хранится открытым текстом.
+  const rawPassword = (password && String(password).trim()) ? String(password).trim() : generatePassword();
+  const isGuest = role !== 'admin';
   const newUser = {
     id,
     name,
-    password,
-    role: role === 'admin' ? 'admin' : 'guest',
-    avatar: role === 'admin' ? '👨‍💻' : '👤',
-    dashboards: role !== 'admin' && dashboards ? dashboards : undefined
+    password: rawPassword,
+    role: isGuest ? 'guest' : 'admin',
+    avatar: isGuest ? '👤' : '👨‍💻',
+    dashboards: isGuest && Array.isArray(dashboards) && dashboards.length ? dashboards : undefined
   };
   users.push(newUser);
   saveUsers(users);
   console.log(`👤 Created user: ${id} (${newUser.role})`);
 
-  res.json({ ok: true, user: { ...newUser, password: undefined }, generatedPassword: rawPassword });
+  res.json({ ok: true, user: { ...newUser }, generatedPassword: rawPassword });
 });
 
 // API: обновить пользователя
-app.put('/api/admin/users/:id', requireAdmin, async (req, res) => {
+app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
   const { id } = req.params;
-  const { name, newPassword, role, dashboards } = req.body;
+  const { name, newPassword, resetPassword, role, dashboards } = req.body;
   const users = loadUsers();
   const idx = users.findIndex(u => u.id === id);
   if (idx === -1) return res.status(404).json({ error: 'Пользователь не найден' });
 
   if (name) users[idx].name = name;
-  if (newPassword) {
-    users[idx].password = await bcrypt.hash(newPassword, 10);
-    console.log(`🔑 Password updated for ${id}`);
+
+  // Пароль хранится открытым текстом. resetPassword — сгенерировать на сервере.
+  let generatedPassword;
+  if (resetPassword) {
+    generatedPassword = generatePassword();
+    users[idx].password = generatedPassword;
+    console.log(`🔑 Password reset for ${id}`);
+  } else if (newPassword && String(newPassword).trim()) {
+    users[idx].password = String(newPassword).trim();
+    console.log(`🔑 Password changed for ${id}`);
   }
+
   if (role) users[idx].role = role === 'admin' ? 'admin' : 'guest';
   if (dashboards !== undefined) {
-    users[idx].dashboards = role === 'admin' ? undefined : (dashboards.length > 0 ? dashboards : undefined);
+    users[idx].dashboards = users[idx].role === 'admin'
+      ? undefined
+      : (Array.isArray(dashboards) && dashboards.length ? dashboards : undefined);
   }
   // Админам не нужен персональный список
   if (users[idx].role === 'admin') delete users[idx].dashboards;
 
   saveUsers(users);
   console.log(`👤 Updated user: ${id}`);
-  res.json({ ok: true, user: { ...users[idx], password: undefined } });
+  res.json({ ok: true, user: { ...users[idx], password: passwordForDisplay(users[idx].password) }, generatedPassword });
 });
 
 // API: удалить пользователя
@@ -262,6 +289,17 @@ function generatePassword(length = 10) {
   return pwd;
 }
 
+// Пароли хранятся открытым текстом (внутренний инструмент, users.json в .gitignore) —
+// чтобы админы могли их видеть и менять. Старые аккаунты остались с bcrypt-хешем:
+// логин по ним работает через bcrypt, но «посмотреть» их нельзя, пока не сбросят.
+function isHashed(stored) { return typeof stored === 'string' && stored.startsWith('$2'); }
+function verifyPassword(plain, stored) {
+  if (stored == null) return false;
+  return isHashed(stored) ? bcrypt.compareSync(plain, stored) : plain === stored;
+}
+// Что показать админу: открытый пароль или null (для старых хешей — не показываем)
+function passwordForDisplay(stored) { return isHashed(stored) ? null : (stored || ''); }
+
 // ============== Dashboard meta & status ==============
 
 function readDashboardsMeta() {
@@ -310,10 +348,8 @@ function getAvailableDashboards(user) {
 
       const meta = getDashboardStatus(entry.name);
 
-      // Админы видят всё, гости — только из своего списка
-      if (!isAdmin && allowedDashboards.length > 0) {
-        if (!allowedDashboards.includes(entry.name)) continue;
-      }
+      // Админы видят всё; гости — только явно перечисленные (пустой список = ничего)
+      if (!isAdmin && !allowedDashboards.includes(entry.name)) continue;
 
       if (knownProjects[entry.name]) {
         const kp = knownProjects[entry.name];

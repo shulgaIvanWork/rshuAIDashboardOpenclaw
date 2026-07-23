@@ -41,6 +41,7 @@
               <th>Логин</th>
               <th>Имя</th>
               <th>Роль</th>
+              <th>Пароль</th>
               <th>Доступ к дашбордам</th>
               <th>Действия</th>
             </tr>
@@ -52,6 +53,15 @@
               <td><%= u.name %></td>
               <td><span class="badge <%= u.role === 'admin' ? 'text-bg-primary badge-admin' : 'text-bg-info badge-guest' %>"><%= u.role === 'admin' ? 'Админ' : 'Гость' %></span></td>
               <td>
+                <% if (u.password) { %>
+                  <span class="font-monospace pw-mask" data-pw="<%= u.password %>">••••••••</span>
+                  <button class="btn btn-sm btn-link p-0 ms-1 pw-toggle" title="Показать/скрыть">👁️</button>
+                  <button class="btn btn-sm btn-link p-0 ms-1 pw-copy" title="Скопировать">📋</button>
+                <% } else { %>
+                  <span class="text-secondary small">скрыт (старый) — сбросьте 🔑</span>
+                <% } %>
+              </td>
+              <td>
                 <% if (u.role === 'admin') { %>
                   <span class="text-secondary small">все</span>
                 <% } else if (u.dashboards && u.dashboards.length > 0) { %>
@@ -59,7 +69,7 @@
                     <span class="badge text-bg-success badge-dash me-1"><%= d %></span>
                   <% }); %>
                 <% } else { %>
-                  <span class="text-secondary small">все</span>
+                  <span class="badge text-bg-danger">нет доступа</span>
                 <% } %>
               </td>
               <td>
@@ -91,6 +101,13 @@
       <label for="modalName" class="form-label">Имя</label>
       <input type="text" id="modalName" class="form-control mb-2" placeholder="ООО Клиент">
 
+      <label for="modalPassword" class="form-label" id="modalPasswordLabel">Пароль</label>
+      <div class="input-group mb-1">
+        <input type="text" id="modalPassword" class="form-control font-monospace" placeholder="">
+        <button class="btn btn-outline-secondary" type="button" onclick="genPassword()">🎲 Сгенерировать</button>
+      </div>
+      <div class="form-text mb-2" id="modalPasswordHint">Пусто при создании — сгенерируется автоматически.</div>
+
       <label for="modalRole" class="form-label">Роль</label>
       <select id="modalRole" class="form-select mb-2" onchange="toggleDashboardsField()">
         <option value="guest">Гость</option>
@@ -109,7 +126,7 @@
             </div>
           <% }); %>
         </div>
-        <div class="form-text">оставьте пустым — будут видны все дашборды</div>
+        <div class="form-text">выберите хотя бы один — иначе у гостя <b>нет доступа</b> ни к чему</div>
       </div>
 
       <div id="passwordDisplay" class="alert alert-warning mt-3" style="display:none;">
@@ -129,6 +146,31 @@
 
   <script>
     const allDashboards = <%- JSON.stringify(dashboards.map(d => ({ name: d.name, label: d.label }))) %>;
+    const USERS = <%- JSON.stringify(users) %>;
+
+    function genPassword() {
+      const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      let p = '';
+      for (let i = 0; i < 10; i++) p += chars[Math.floor(Math.random() * chars.length)];
+      document.getElementById('modalPassword').value = p;
+    }
+
+    // Показать/скрыть и скопировать пароль в таблице
+    document.addEventListener('click', function(e) {
+      const tog = e.target.closest('.pw-toggle');
+      if (tog) {
+        const span = tog.closest('td').querySelector('.pw-mask');
+        const shown = span.dataset.shown === '1';
+        span.textContent = shown ? '••••••••' : span.dataset.pw;
+        span.dataset.shown = shown ? '0' : '1';
+        return;
+      }
+      const cp = e.target.closest('.pw-copy');
+      if (cp) {
+        const pw = cp.closest('td').querySelector('.pw-mask').dataset.pw;
+        navigator.clipboard.writeText(pw).then(() => showToast('📋 Пароль скопирован'));
+      }
+    });
 
     function openCreate() {
       document.getElementById('modalTitle').textContent = '➕ Создать пользователя';
@@ -136,16 +178,21 @@
       document.getElementById('modalId').value = '';
       document.getElementById('modalId').disabled = false;
       document.getElementById('modalName').value = '';
+      document.getElementById('modalPassword').value = '';
+      document.getElementById('modalPasswordHint').textContent = 'Пусто — сгенерируется автоматически.';
       document.getElementById('modalRole').value = 'guest';
       document.getElementById('passwordDisplay').style.display = 'none';
       document.getElementById('generatedPassword').textContent = '';
       document.getElementById('modalSaveBtn').textContent = 'Создать';
+      document.getElementById('modalSaveBtn').onclick = saveUser;
       toggleDashboardsField();
       document.querySelectorAll('.dash-chk').forEach(c => c.checked = false);
       document.getElementById('userModal').classList.add('active');
     }
 
     function openEdit(id) {
+      const u = USERS.find(x => x.id === id);
+      if (!u) return;
       document.getElementById('modalTitle').textContent = '✏️ Редактировать пользователя';
       document.getElementById('editId').value = id;
       document.getElementById('modalId').value = id;
@@ -153,23 +200,22 @@
       document.getElementById('passwordDisplay').style.display = 'none';
       document.getElementById('generatedPassword').textContent = '';
       document.getElementById('modalSaveBtn').textContent = 'Сохранить';
+      document.getElementById('modalSaveBtn').onclick = saveUser;
 
-      const row = document.querySelector(`tr[data-id="${id}"]`);
-      const name = row.querySelector('td:nth-child(2)').textContent;
-      const isAdmin = row.querySelector('.badge-admin') !== null;
-
-      document.getElementById('modalName').value = name;
-      document.getElementById('modalRole').value = isAdmin ? 'admin' : 'guest';
+      document.getElementById('modalName').value = u.name || '';
+      // Пароль: показываем текущий (если открытый); для старого хеша — пусто с подсказкой
+      document.getElementById('modalPassword').value = u.password || '';
+      document.getElementById('modalPasswordHint').textContent = u.password
+        ? 'Можно изменить. Пусто — оставить как есть.'
+        : 'Старый пароль скрыт (хеш). Введите новый или оставьте пусто.';
+      document.getElementById('modalRole').value = u.role === 'admin' ? 'admin' : 'guest';
       toggleDashboardsField();
 
-      // Check the appropriate dashboards
       document.querySelectorAll('.dash-chk').forEach(c => c.checked = false);
-      if (!isAdmin) {
-        row.querySelectorAll('.badge-dash').forEach(function(b) {
-          const chk = document.querySelector(`.dash-chk[value="${b.textContent.trim()}"]`);
-          if (chk) chk.checked = true;
-        });
-      }
+      (u.dashboards || []).forEach(function(name) {
+        const chk = document.querySelector(`.dash-chk[value="${name}"]`);
+        if (chk) chk.checked = true;
+      });
 
       document.getElementById('userModal').classList.add('active');
     }
@@ -192,6 +238,8 @@
       if (!id || !name) { showToast('Заполните логин и имя'); return; }
       if (!/^[a-zA-Z0-9_-]+$/.test(id)) { showToast('Логин: только буквы, цифры, -, _'); return; }
 
+      const password = document.getElementById('modalPassword').value.trim();
+
       let dashboards = [];
       if (role === 'guest') {
         document.querySelectorAll('.dash-chk:checked').forEach(c => dashboards.push(c.value));
@@ -202,7 +250,7 @@
         const res = await fetch('/api/admin/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, name, role, dashboards })
+          body: JSON.stringify({ id, name, role, dashboards, password })
         });
         const data = await res.json();
         if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
@@ -211,15 +259,15 @@
           document.getElementById('generatedPassword').textContent = data.generatedPassword;
           document.getElementById('passwordDisplay').style.display = 'block';
           document.getElementById('modalSaveBtn').textContent = 'Закрыть';
-          document.getElementById('modalSaveBtn').onclick = closeModal;
+          document.getElementById('modalSaveBtn').onclick = () => location.reload();
           return;
         }
       } else {
-        // Update
+        // Update (newPassword пусто = не менять)
         const res = await fetch('/api/admin/users/' + encodeURIComponent(id), {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, role, dashboards })
+          body: JSON.stringify({ name, role, dashboards, newPassword: password })
         });
         const data = await res.json();
         if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
@@ -231,18 +279,16 @@
     }
 
     async function resetPassword(id) {
-      if (!confirm('Сбросить пароль для "' + id + '"?')) return;
-
-      const newPassword = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 4);
+      if (!confirm('Сгенерировать новый пароль для "' + id + '"?')) return;
       const res = await fetch('/api/admin/users/' + encodeURIComponent(id), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword })
+        body: JSON.stringify({ resetPassword: true })
       });
       const data = await res.json();
       if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
-
-      showToast('🔑 Новый пароль для ' + id + ': ' + newPassword, 15000);
+      showToast('🔑 Новый пароль для ' + id + ': ' + data.generatedPassword, 15000);
+      setTimeout(() => location.reload(), 2500);
     }
 
     async function deleteUser(id) {
