@@ -338,6 +338,6 @@ router.get('/api/status', async (req, res) => {
 });
 
 router.use(express.static(path.join(__dirname, 'public')));
-router.get(/(.*)/, (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+router.get(/(.*)/, (req, res) => { if (path.extname(req.path)) return res.status(404).end(); res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 
 export default router;

@@ -543,6 +543,7 @@ app.get('/api/data/new', async (req, res) => {
 // ============== FRONTEND ==============
 
 app.get('/*', (req, res) => {
+  if (path.extname(req.path)) return res.status(404).end();
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 

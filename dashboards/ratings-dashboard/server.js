@@ -151,6 +151,8 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 app.get(/(.*)/,  (req, res) => {
+  // Пути с расширением (guide.pdf, отсутствующие ассеты) → 404, а не HTML-заглушка
+  if (path.extname(req.path)) return res.status(404).end();
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');

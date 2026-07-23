@@ -365,6 +365,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 app.get(/(.*)/, (req, res) => {
+  if (path.extname(req.path)) return res.status(404).end();
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
