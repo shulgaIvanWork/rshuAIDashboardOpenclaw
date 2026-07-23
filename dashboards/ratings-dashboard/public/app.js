@@ -464,7 +464,7 @@ async function renderPageMainNew(d) {
       '<th class="sort" data-col="12">Счёт→Сделка</th>' +
       '<th class="sort" data-col="13">Лид→Сделка</th>' +
       '<th class="sort" data-col="14">Тип трафика</th>' +
-      '</tr></thead><tbody>';
+      '</tr>';
 
     function sfRow(r, isTotalRow, idx) {
       if (!r) return '';
@@ -512,37 +512,31 @@ async function renderPageMainNew(d) {
         '<td>' + typeHtml + '</td></tr>';
     }
 
-    // ИТОГО (топ-20) — всегда первая строка
-    if (srcFunnel.length > 0) sfStr += sfRow(srcFunnel[0], true);
-    // Топ-20 источников (строки 1..20 из ответа — элементы с 1 по 20)
+    // thead: шапка + ИТОГО(топ-20) · tbody: источники (сортируются) · tfoot: Остальные + ИТОГО(все)
+    // — 3 итоговых статичны и не всплывают при сортировке.
+    // (На этот момент sfStr = '<table…><thead><tr>…заголовки…</tr>')
+    if (srcFunnel.length > 0) sfStr += sfRow(srcFunnel[0], true); // ИТОГО (топ-20) в thead
+    sfStr += '</thead><tbody>';
     for (var si = 1; si < srcFunnel.length - 1; si++) {
       var s = srcFunnel[si];
       if (!s || !s.name) continue;
       if ((s.name||'').includes('Остальные') || (s.name||'').includes('ИТОГО')) continue;
       sfStr += sfRow(s, false, si);
     }
-    // Остальные (если есть)
+    sfStr += '</tbody><tfoot>';
     var sfRest = null;
     for (var si = 0; si < srcFunnel.length; si++) {
-      if (srcFunnel[si] && (srcFunnel[si].name||'').includes('Остальные')) {
-        sfRest = srcFunnel[si];
-        break;
-      }
+      if (srcFunnel[si] && (srcFunnel[si].name||'').includes('Остальные')) { sfRest = srcFunnel[si]; break; }
     }
     if (sfRest) sfStr += sfRow(sfRest, true);
-    // ИТОГО все
     for (var si = 0; si < srcFunnel.length; si++) {
       if (srcFunnel[si] && (srcFunnel[si].name||'').includes('ИТОГО (все')) {
         sfStr += sfRow(srcFunnel[si], true);
         break;
       }
     }
-    sfStr += '</tbody></table>';
+    sfStr += '</tfoot></table>';
     el = document.getElementById('newSrcTable'); if(el) el.innerHTML = sfStr;
-
-    // Сортировка
-    if (typeof initTableSort === 'function') initTableSort();
-
 
     var comps = d.top_companies || [];
     function isCompRest(c){ return (''+(c.name||'')).includes('Остальные'); }
@@ -609,6 +603,9 @@ async function renderPageMainNew(d) {
     var mbaSdoSum = mbaData.reduce(function(s,m){return s+(m.fmt_sdo_sum||0);},0);
     var mbaStr = mbaData.length ? '<table style="font-size:11px"><tr><th>Тип</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th><th>Очно</th><th>Онлайн</th><th>Дистанционно</th></tr><tr style="background:#fff8e1;font-weight:700"><td><b>📊 ИТОГО</b></td><td><b>'+fmt(mbaTotal)+' ₽</b></td><td>'+mbaDeals+'</td><td>'+fmt(mbaAvg)+' ₽</td><td>100%</td><td>'+fmtFmt(mbaOchn,mbaOchnSum)+'</td><td>'+fmtFmt(mbaOm,mbaOmSum)+'</td><td>'+fmtFmt(mbaSdo,mbaSdoSum)+'</td></tr>'+mbaData.map(function(m){return '<tr><td><b>'+escapeHtml(m.type)+'</b></td><td>'+fmt(m.sum)+' ₽</td><td>'+m.cnt+'</td><td>'+fmt(m.avg_check)+' ₽</td><td>'+(mbaTotal>0?(m.sum/mbaTotal*100).toFixed(1):'0.0')+'%</td><td>'+fmtFmt(m.fmt_ochn_cnt||0,m.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(m.fmt_om_cnt||0,m.fmt_om_sum||0)+'</td><td>'+fmtFmt(m.fmt_sdo_cnt||0,m.fmt_sdo_sum||0)+'</td></tr>';}).join('')+'</table>' : '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по MBA</div>';
     el = document.getElementById('newMbaTable'); if(el) el.innerHTML = mbaStr;
+
+    // Сортировка — после отрисовки ВСЕХ таблиц (иначе компании/MBA не получают слушателей)
+    if (typeof initTableSort === 'function') initTableSort();
 
   } catch(e) {
     areaNew.innerHTML = '<div class="error-state">❌ <b>Ошибка загрузки</b><br>'+escapeHtml(e.message)+'</div>';

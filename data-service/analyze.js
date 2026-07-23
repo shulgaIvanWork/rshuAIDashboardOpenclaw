@@ -522,8 +522,8 @@ export async function analyze(onProgress) {
             const d=daysBetween(r.DC,r.PAY_DT);
             if (d>=0) { wd.durs.push(d); if(r.IS_KOM) wd.kom_durs.push(d); else wd.oom_durs.push(d); }
           }
-          // by_prod: только ООМ
-          if (!r.IS_KOM && r.FORMAT!=='КОМ') {
+          // by_prod: только ООМ, без конструктора (ILP) — таблица продуктов пересчитывается из by_prod
+          if (!r.IS_KOM && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')) {
             const pk=r.PRODUCT.slice(0,90);
             if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
             wd.by_prod[pk].deals++; wd.by_prod[pk].sum+=r.OPP;
