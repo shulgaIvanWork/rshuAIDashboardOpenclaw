@@ -246,12 +246,6 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --------------- Dashboard files (static) ---------------
-app.use('/dashboard-files', requireAuth, express.static(PROJECTS_DIR, {
-  index: false,
-  dotfiles: 'deny'
-}));
-
 // --------------- Views ---------------
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -359,28 +353,9 @@ function getAvailableDashboards(user) {
           icon: meta ? meta.icon : '📁',
           url: kp.url
         });
-        continue;
       }
-
-      const dirPath = path.join(PROJECTS_DIR, entry.name);
-      const files = fs.readdirSync(dirPath);
-      const htmlFiles = files.filter(f => f.endsWith('.html'));
-      if (htmlFiles.length > 0 || files.includes('package.json')) {
-        let desc = 'Проект';
-        ['README.md', 'README.txt'].forEach(r => {
-          const rp = path.join(dirPath, r);
-          if (fs.existsSync(rp)) {
-            const firstLine = fs.readFileSync(rp, 'utf-8').split('\n')[0].replace(/^#\s*/, '');
-            if (firstLine) desc = firstLine;
-          }
-        });
-        dashboards.push({
-          name: entry.name,
-          description: desc,
-          icon: htmlFiles.length > 0 ? '📊' : '📁',
-          url: '/dashboard-files/' + entry.name + '/'
-        });
-      }
+      // Папки вне knownProjects не показываем — новый дашборд нужно
+      // зарегистрировать в knownProjects и смонтировать выше.
     }
   } catch (e) { console.error('Error scanning dashboards:', e.message); }
   return dashboards;
