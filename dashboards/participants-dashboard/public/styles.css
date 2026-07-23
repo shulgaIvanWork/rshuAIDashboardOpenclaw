@@ -29,3 +29,7 @@ th.sort { cursor: pointer; user-select: none; }
 th.sort::after { content: ' ⇅'; font-size: 10px; opacity: .4; font-weight: 400; }
 th.sort.asc::after { content: ' ▲'; opacity: 1; }
 th.sort.desc::after { content: ' ▼'; opacity: 1; }
+
+/* Кнопка «Инструкция» — единый вид со всеми дашбордами (как в рейтингах) */
+.btn-guide { display:inline-block; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600; line-height:1.2; text-decoration:none; cursor:pointer; background:#eef1f8; color:#093EB4; border:1px solid #093EB4; }
+.btn-guide:hover { background:#093EB4; color:#fff; }
