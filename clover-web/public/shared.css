@@ -8,6 +8,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .wrap { max-width: 1500px; margin: 0 auto; }
 .sub { color: #475569; font-size: 13px; margin-bottom: 24px; }
 
+/* Кнопки для дашбордов без Bootstrap (ratings). В Bootstrap-дашбордах
+   используйте штатные .btn .btn-outline-secondary / .btn-success. */
+.btn-guide, .btn-excel { display: inline-block; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.2; text-decoration: none; border: 1px solid transparent; cursor: pointer; }
+.btn-guide { background: #eef1f8; color: #093EB4; border-color: #093EB4; }
+.btn-guide:hover { background: #093EB4; color: #fff; }
+.btn-excel { background: #1e7e34; color: #fff; }
+.btn-excel:hover { background: #19692c; }
+
 /* Card */
 .card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
 .card.kom { border-left: 4px solid #7A2E2E; }
