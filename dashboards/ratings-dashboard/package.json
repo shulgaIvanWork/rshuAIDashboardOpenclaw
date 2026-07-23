@@ -4,6 +4,7 @@
   "type": "module",
   "dependencies": {
     "express": "^4.22.2",
+    "exceljs": "^4.4.0",
     "@rshu/data-service": "*"
   }
 }

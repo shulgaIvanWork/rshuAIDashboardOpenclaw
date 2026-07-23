@@ -108,6 +108,38 @@ app.get('/api/artifacts', async (req, res) => {
   }
 });
 
+// Excel-экспорт: клиент присылает уже посчитанные таблицы за выбранный период
+// (единый источник агрегации — клиентский buildFilteredData), сервер формирует xlsx.
+app.post('/api/export', async (req, res) => {
+  try {
+    const { sheets, fileName } = req.body || {};
+    if (!Array.isArray(sheets) || !sheets.length) return res.status(400).json({ error: 'Нет данных для экспорта' });
+    const ExcelJS = (await import('exceljs')).default;
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'RSHU Dashboard';
+    wb.created = new Date();
+    for (const s of sheets) {
+      const ws = wb.addWorksheet(String(s.name || 'Лист').slice(0, 31));
+      if (Array.isArray(s.header)) {
+        ws.addRow(s.header);
+        ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF093EB4' } };
+        ws.views = [{ state: 'frozen', ySplit: 1 }];
+      }
+      (s.rows || []).forEach(r => ws.addRow(r));
+      ws.columns.forEach((c, i) => { c.width = i === 1 ? 34 : 16; });
+      if (Array.isArray(s.header)) ws.autoFilter = { from: 'A1', to: { row: 1, column: s.header.length } };
+    }
+    const buf = await wb.xlsx.writeBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${(fileName || 'ratings.xlsx').replace(/[^\w.\-]/g, '_')}"`);
+    res.send(Buffer.from(buf));
+  } catch (e) {
+    console.error('/api/export error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
     if (filePath.endsWith('.html')) {
