@@ -1,44 +1,58 @@
 /**
- * nps-dashboard — NPS (пока пустой каркас).
- * Данных/агрегаций ещё нет: только статика + catch-all.
- * Когда появятся данные — добавить /api/* (при необходимости getAgg из data-service).
+ * nps-dashboard/server.js — NPS: обратная связь по программам.
+ *
+ * API:
+ *   GET /api/data            → все NPS-агрегаты за указанный год
+ *   GET /api/data?year=2025  → за конкретный год
+ *
+ * Данные из отдельного файла post-sale-deals.json — не влияют на другие дашборды.
  */
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import { getNps, getCacheAt } from '@rshu/data-service/agg-cache.js';
+import { YEAR } from '@rshu/data-service/lib/deal-rules.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = parseInt(process.env.PORT || '3000', 10);
 
 const app = express();
 app.set('etag', false);
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
-app.get('/api/user', (req, res) => {
-  res.json({ role: (req.user && req.user.role) || 'guest' });
+// Статика
+app.use(express.static(path.join(__dirname, 'public')));
+
+// API: NPS данные за год
+app.get('/api/data', async (req, res) => {
+  try {
+    const year = parseInt(req.query.year, 10) || YEAR;
+    const data = await getNps(year);
+    res.json(Object.assign({}, data, {
+      _loadedAt: new Date(getCacheAt()).toISOString(),
+      _year: year,
+    }));
+  } catch (e) {
+    console.error('[nps] /api/data error:', e.message);
+    res.status(503).json({ error: e.message });
+  }
 });
 
-app.use(express.static(path.join(__dirname, 'public'), {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
-  }
-}));
+// API: доступные года (из загруженных данных)
+app.get('/api/years', async (req, res) => {
+  try {
+    const cur = await getNps(YEAR);
+    const prev = YEAR > 2024 ? await getNps(YEAR - 1) : null;
 
-app.get(/(.*)/, (req, res) => {
-  if (path.extname(req.path)) return res.status(404).end();
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    const years = [];
+    if (prev && prev.months.some(m => m.sent > 0)) years.push(YEAR - 1);
+    if (cur && cur.months.some(m => m.sent > 0)) years.push(YEAR);
+
+    res.json(years.length ? years : [YEAR]);
+  } catch (e) {
+    res.json([YEAR]);
+  }
 });
 
 export default app;
-
-const isDirectRun = process.argv[1] === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  app.listen(PORT, '0.0.0.0', () => console.log(`😊 NPS на http://0.0.0.0:${PORT}`));
-}
