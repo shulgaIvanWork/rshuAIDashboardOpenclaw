@@ -1,0 +1,5 @@
+/* Стили дашборда NPS (Bootstrap 5 + /shared.css при необходимости) */
+
+/* Кнопка «Инструкция» — единый вид (как в остальных дашбордах) */
+.btn-guide { display:inline-block; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600; line-height:1.2; text-decoration:none; cursor:pointer; background:#eef1f8; color:#093EB4; border:1px solid #093EB4; }
+.btn-guide:hover { background:#093EB4; color:#fff; }

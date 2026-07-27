@@ -34,5 +34,9 @@
   "plan-fact-dashboard": {
     "label": "План-факт выручки",
     "icon": "📋"
+  },
+  "nps-dashboard": {
+    "label": "NPS",
+    "icon": "😊"
   }
 }

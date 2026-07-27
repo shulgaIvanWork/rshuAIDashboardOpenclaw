@@ -132,6 +132,7 @@ app.use('/participants-dashboard',    requireDashboardAccess('participants-dashb
 app.use('/test-dashboard',            requireDashboardAccess('test-dashboard'),            lazyApp('test-dashboard',            () => import('../dashboards/test-dashboard/server.js')));
 app.use('/manager-report-dev',        requireDashboardAccess('manager-report-dev'),        lazyApp('manager-report-dev',        () => import('../dashboards/manager-report-dev/server.js')));
 app.use('/plan-fact-dashboard',       requireDashboardAccess('plan-fact-dashboard'),       lazyApp('plan-fact-dashboard',       () => import('../dashboards/plan-fact-dashboard/server.js')));
+app.use('/nps-dashboard',             requireDashboardAccess('nps-dashboard'),             lazyApp('nps-dashboard',             () => import('../dashboards/nps-dashboard/server.js')));
 
 // --------------- Dashboards page ---------------
 app.get('/dashboards', requireAuth, (req, res) => {
@@ -331,7 +332,8 @@ function getAvailableDashboards(user) {
     'participants-dashboard': { url: '/participants-dashboard/' },
     'test-dashboard': { url: '/test-dashboard/' },
     'manager-report-dev': { url: '/manager-report-dev/' },
-    'plan-fact-dashboard': { url: '/plan-fact-dashboard/' }
+    'plan-fact-dashboard': { url: '/plan-fact-dashboard/' },
+    'nps-dashboard': { url: '/nps-dashboard/' }
   };
 
   try {
