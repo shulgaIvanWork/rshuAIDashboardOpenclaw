@@ -188,7 +188,7 @@ app.post('/api/admin/users', requireAdmin, (req, res) => {
     name,
     password: rawPassword,
     role: isGuest ? 'guest' : 'admin',
-    avatar: isGuest ? '👤' : '👨‍💻',
+    avatar: isGuest ? '👤' : '👨💻',
     dashboards: isGuest && Array.isArray(dashboards) && dashboards.length ? dashboards : undefined
   };
   users.push(newUser);
