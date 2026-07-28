@@ -52,6 +52,7 @@ td.nps-low {
   font-weight: 600;
 }
 
+/* Числа в таблице — моноширинный для выравнивания */
 .insight {
   padding: 10px 14px;
   margin-bottom: 6px;
@@ -95,6 +96,7 @@ td.nps-low {
   font-size: 0.9rem;
 }
 
+/* Выбор года */
 .panel-header-right {
   display: flex;
   align-items: center;

@@ -120,6 +120,8 @@ function render() {
   if (data.slices) {
     const slicesCard = document.getElementById('slicesCard');
     if (slicesCard) {
+      const hasAny = (data.slices.directions && data.slices.directions.length > 0)
+        || (data.slices.clientTypes && data.slices.clientTypes.length > 0);
       slicesCard.style.display = 'block';
     }
     renderSliceTable('directionsBody', data.slices.directions);
@@ -141,7 +143,7 @@ function render() {
     insightsBlock.style.display = 'none';
   }
 
-  // KPI — берём последний месяц с данными
+  // KPI
   const lastWithData = [...data.months].reverse().find(m => m.sent > 0);
   if (lastWithData) {
     kpiNps.querySelector('.kpi-value').textContent = lastWithData.sent > 0
@@ -159,7 +161,6 @@ function render() {
 
   const monthsWithData = data.months.filter(m => m.sent > 0);
 
-  // Строки по месяцам
   for (const m of monthsWithData) {
     npsTableBody.appendChild(renderMonthRow(m, false));
   }
@@ -187,8 +188,6 @@ function render() {
   }
 }
 
-// ── Загрузка данных ───────────────────────────────────────────────────────────
-
 async function loadData(year) {
   try {
     const res = await api('/api/data?year=' + year);
@@ -212,12 +211,9 @@ async function loadYears() {
       loadData(state.year);
     });
   } catch (e) {
-    // Если не загрузились — показываем текущий год
     yearSelect.innerHTML = '<option value="' + state.year + '">' + state.year + '</option>';
   }
 }
-
-// ── Инициализация ─────────────────────────────────────────────────────────────
 
 async function init() {
   await loadYears();
