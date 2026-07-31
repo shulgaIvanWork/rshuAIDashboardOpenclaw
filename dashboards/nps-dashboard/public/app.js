@@ -83,7 +83,7 @@ function render() {
   const loaded = data._loadedAt
     ? new Date(data._loadedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '';
-  $('refreshInfo').textContent = '(за ' + year + ' год' + (loaded ? ' · данные на ' + loaded : '') + ')';
+  $('refreshInfo').textContent = '(' + (loaded ? 'Данные на ' + loaded : '') + ')';
 
   // KPI — последний месяц с данными
   const last = [...data.months].reverse().find(m => m.sent > 0);
