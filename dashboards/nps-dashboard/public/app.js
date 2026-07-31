@@ -156,21 +156,7 @@ async function loadData(year) {
   }
 }
 
-async function loadYears() {
-  const sel = $('yearSelect');
-  try {
-    const years = await api('/api/years');
-    sel.innerHTML = years.map(y =>
-      '<option value="' + y + '"' + (y === state.year ? ' selected' : '') + '>' + y + '</option>'
-    ).join('');
-  } catch (e) {
-    sel.innerHTML = '<option value="' + state.year + '">' + state.year + '</option>';
-  }
-  sel.addEventListener('change', () => loadData(parseInt(sel.value, 10)));
-}
-
 async function init() {
-  await loadYears();
   await loadData(state.year);
 }
 
