@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="container-fluid p-4">
+<div class="container-fluid">
 
   <!-- Хедер -->
   <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
@@ -41,9 +41,6 @@
       <div class="val">—</div>
     </div>
   </div>
-
-  <!-- Текстовые выводы -->
-  <div id="insightsBlock" class="mb-3" style="display:none;"></div>
 
   <!-- Помесячная таблица -->
   <div class="card">
@@ -77,60 +74,69 @@
     </div>
   </div>
 
-  <!-- Срезы -->
-  <div class="card" id="slicesCard" style="display:none;">
-    <h2 class="h5 mb-3">NPS по направлениям</h2>
-    <div class="table-responsive mb-4">
-      <table class="table table-sm table-hover align-middle text-center sortable" id="directionsTable">
-        <thead><tr>
-          <th class="sort" data-col="0">Направление</th>
-          <th class="sort" data-col="1">Отправлено</th>
-          <th class="sort" data-col="2">Заполнили</th>
-          <th class="sort" data-col="3">Конверсия</th>
-          <th class="sort" data-col="4">Промоутеры</th>
-          <th class="sort" data-col="5">Пассивные</th>
-          <th class="sort" data-col="6">Детракторы</th>
-          <th class="sort" data-col="7">NPS</th>
-          <th class="sort" data-col="8">Средняя оценка</th>
-        </tr></thead>
-        <tbody id="directionsBody"></tbody>
-      </table>
+  <!-- Текстовые выводы — под таблицей статистики опросов -->
+  <div id="insightsBlock" class="mb-3" style="display:none;"></div>
+
+  <!-- Срезы: три отдельные карточки -->
+  <div id="slicesCard" style="display:none;">
+    <div class="card">
+      <h2 class="h5 mb-3">NPS по направлениям</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle text-center sortable" id="directionsTable">
+          <thead><tr>
+            <th class="sort" data-col="0">Направление</th>
+            <th class="sort" data-col="1">Отправлено</th>
+            <th class="sort" data-col="2">Заполнили</th>
+            <th class="sort" data-col="3">Конверсия</th>
+            <th class="sort" data-col="4">Промоутеры</th>
+            <th class="sort" data-col="5">Пассивные</th>
+            <th class="sort" data-col="6">Детракторы</th>
+            <th class="sort" data-col="7">NPS</th>
+            <th class="sort" data-col="8">Средняя оценка</th>
+          </tr></thead>
+          <tbody id="directionsBody"></tbody>
+        </table>
+      </div>
     </div>
 
-    <h2 class="h5 mb-3">NPS по формату обучения</h2>
-    <div class="table-responsive mb-4">
-      <table class="table table-sm table-hover align-middle text-center sortable" id="formatTable">
-        <thead><tr>
-          <th class="sort" data-col="0">Формат</th>
-          <th class="sort" data-col="1">Отправлено</th>
-          <th class="sort" data-col="2">Заполнили</th>
-          <th class="sort" data-col="3">Конверсия</th>
-          <th class="sort" data-col="4">Промоутеры</th>
-          <th class="sort" data-col="5">Пассивные</th>
-          <th class="sort" data-col="6">Детракторы</th>
-          <th class="sort" data-col="7">NPS</th>
-          <th class="sort" data-col="8">Средняя оценка</th>
-        </tr></thead>
-        <tbody id="formatBody"></tbody>
-      </table>
+    <div class="card">
+      <h2 class="h5 mb-3">NPS по формату обучения</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle text-center sortable" id="formatTable">
+          <thead><tr>
+            <th class="sort" data-col="0">Формат</th>
+            <th class="sort" data-col="1">Отправлено</th>
+            <th class="sort" data-col="2">Заполнили</th>
+            <th class="sort" data-col="3">Конверсия</th>
+            <th class="sort" data-col="4">Промоутеры</th>
+            <th class="sort" data-col="5">Пассивные</th>
+            <th class="sort" data-col="6">Детракторы</th>
+            <th class="sort" data-col="7">NPS</th>
+            <th class="sort" data-col="8">Средняя оценка</th>
+          </tr></thead>
+          <tbody id="formatBody"></tbody>
+        </table>
+      </div>
     </div>
 
-    <h2 class="h5 mb-3">NPS по типу клиента</h2>
-    <div class="table-responsive">
-      <table class="table table-sm table-hover align-middle text-center sortable" id="b2bTable">
-        <thead><tr>
-          <th class="sort" data-col="0">Тип</th>
-          <th class="sort" data-col="1">Отправлено</th>
-          <th class="sort" data-col="2">Заполнили</th>
-          <th class="sort" data-col="3">Конверсия</th>
-          <th class="sort" data-col="4">Промоутеры</th>
-          <th class="sort" data-col="5">Пассивные</th>
-          <th class="sort" data-col="6">Детракторы</th>
-          <th class="sort" data-col="7">NPS</th>
-          <th class="sort" data-col="8">Средняя оценка</th>
-        </tr></thead>
-        <tbody id="b2bBody"></tbody>
-      </table>
+    <div class="card">
+      <h2 class="h5 mb-3">NPS по типу клиента</h2>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle text-center sortable" id="b2bTable">
+          <thead><tr>
+            <th class="sort" data-col="0">Тип</th>
+            <th class="sort" data-col="1">Отправлено</th>
+            <th class="sort" data-col="2">Заполнили</th>
+            <th class="sort" data-col="3">Конверсия</th>
+            <th class="sort" data-col="4">Промоутеры</th>
+            <th class="sort" data-col="5">Пассивные</th>
+            <th class="sort" data-col="6">Детракторы</th>
+            <th class="sort" data-col="7">NPS</th>
+            <th class="sort" data-col="8">Средняя оценка</th>
+          </tr></thead>
+          <tbody id="b2bBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
