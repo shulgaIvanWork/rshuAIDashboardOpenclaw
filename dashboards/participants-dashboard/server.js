@@ -1,3 +1,22 @@
+/**
+ * participants-dashboard/server.js — дашборд «Участники» (sub-app оболочки).
+ *
+ * ЗАЧЕМ:
+ *   Пофамильный список участников обучения по выбранной НЕДЕЛЕ: кто, программа/
+ *   модуль, компания, регион, статус сделки и счёта, суммы, цикл сделки,
+ *   предыдущее обучение участника/компании.
+ *
+ * ЧТО ДЕЛАЕТ (API):
+ *   GET /api/weeks         — недели года + текущая (для селектора);
+ *   GET /api/participants  — участники за неделю (ядро: buildParticipants());
+ *   GET /api/data,/data/new— YTD-агрегаты из getAgg() (метаданные/шапка);
+ *   GET /api/export        — выгрузка недели в Excel (lib/export-excel.js);
+ *   catch-all — index.html только на путях БЕЗ расширения (см. README).
+ *
+ * ИСТОЧНИКИ: getAgg() (сделки/справочники) + cache/modules.json (даты модулей).
+ *   Неделя = ISO-неделя; участник в неделе, если её пересекает модуль программы.
+ */
+
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';

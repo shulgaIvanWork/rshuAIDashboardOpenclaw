@@ -43,15 +43,16 @@ dashboards/<name>/  ← каждый дашборд = отдельное Express
 
 ## Как добавить новый дашборд
 
-Просто положить папку в `dashboards/` — НЕДОСТАТОЧНО (и это специально, иначе неконтролируемый доступ).
-Нужно 3 шага в `clover-web/server.js` + мета:
+Единый источник правды — `clover-web/data/dashboards.json`. Нужно 2 шага:
 
-1. **Смонтировать** в списке маршрутов:
-   `app.use('/my-dashboard', requireAuth, lazyApp('my-dashboard', () => import('../dashboards/my-dashboard/server.js')));`
-2. **Зарегистрировать** в `knownProjects` (функция `getAvailableDashboards`): `'my-dashboard': { url: '/my-dashboard/' }`
-3. **Добавить мету** в `clover-web/data/dashboards.json`: `"my-dashboard": { "label": "...", "icon": "..." }`
+1. **Положить папку** `dashboards/my-dashboard/` с `server.js` (экспорт `default` app/Router).
+2. **Добавить запись** в `clover-web/data/dashboards.json`:
+   `"my-dashboard": { "label": "...", "icon": "..." }`
 
-Папки вне `knownProjects` в списке не показываются (запасной `/dashboard-files` удалён).
+Всё остальное автоматически: `clover-web/server.js` по ключам `dashboards.json`
+монтирует sub-app (`requireDashboardAccess` + `lazyApp`) и строит список для пользователей.
+Имя ключа = имя папки = префикс URL (`/my-dashboard/`). Папки без записи в
+`dashboards.json` не монтируются и не показываются (никакого неконтролируемого доступа).
 
 ## Права доступа (текущее состояние)
 
@@ -59,9 +60,9 @@ dashboards/<name>/  ← каждый дашборд = отдельное Express
 - `requireAdmin` — роль `admin`, иначе → `/dashboards`.
 - Гость с непустым `user.dashboards[]` видит в СПИСКЕ только свои; админ — все.
 
-⚠️ Известный пробел (в работе): дашборды смонтированы только с `requireAuth`, без проверки
-персонального списка на уровне маршрута. Значит гость может открыть чужой дашборд по ПРЯМОЙ ссылке,
-хотя в списке его нет. Нужно добавить middleware авторизации по дашборду на каждый mount.
+✅ Доступ по прямой ссылке закрыт: каждый дашборд смонтирован через
+`requireDashboardAccess(name)` (server.js) — админ видит все, гость получает только
+дашборды из своего `user.dashboards[]`, иначе редирект на `/dashboards`. Пустой список = нет доступа.
 
 Пароли сейчас — bcrypt-хэш (необратимо): показываются один раз при создании, потом админ может
 только сбросить (не «посмотреть»). Пересмотр CRUD паролей — в работе.

@@ -1,5 +1,13 @@
-// api(), fmt(), escapeHtml(), initTableSort() — в /shared.js (общие для всех дашбордов)
-// Сервер отдаёт готовые агрегаты из Bitrix24 (/api/data) — здесь только рендер.
+/**
+ * plan-fact-dashboard/app.js — фронтенд дашборда «План-факт выручки».
+ *
+ * ЗАЧЕМ: показывает выручку в разрезах неделя × направление × формат и вкладки
+ *   сравнения план/факт. Вся агрегация — на сервере (/api/data); здесь только рендер.
+ * ЧТО ДЕЛАЕТ: грузит готовые агрегаты в dataCache, переключает вкладки (currentTab),
+ *   рисует таблицы (renderWeekly и др.) с ИТОГО по неделям.
+ *
+ * Хелперы api(), fmt(), escapeHtml(), initTableSort() — в /shared.js.
+ */
 
 var dataCache = null;
 var currentTab = 'weekly';

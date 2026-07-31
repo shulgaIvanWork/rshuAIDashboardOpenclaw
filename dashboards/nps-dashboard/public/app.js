@@ -1,47 +1,25 @@
 /**
  * nps-dashboard/app.js — фронтенд NPS-дашборда.
+ * Хелперы api(), fmt(), escapeHtml(), initTableSort() — из /shared.js (общие).
  */
 
 const MONTHS = [
   'Январь','Февраль','Март','Апрель','Май','Июнь',
-  'Июль','Август','Сентябрь','Окторябрь','Ноябрь','Декабрь'
+  'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'
 ];
 
-// ── Состояние ─────────────────────────────────────────────────────────────────
-let state = {
-  year: new Date().getFullYear(),
-  data: null,
-};
+let state = { year: new Date().getFullYear(), data: null };
 
-// ── DOM-ссылки ────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
-const yearSelect = $('yearSelect');
-const npsTableBody = $('npsTableBody');
-const kpiNps = $('kpiNps');
-const kpiConversion = $('kpiConversion');
-const kpiFilled = $('kpiFilled');
-const kpiSent = $('kpiSent');
-const refreshInfo = $('refreshInfo');
 
-// ── Форматирование ────────────────────────────────────────────────────────────
+// ── Презентационные хелперы (специфичны для NPS, не дублируют shared) ───────────
 
-function fmt(val, decimals) {
-  if (val === null || val === undefined) return '—';
-  if (typeof val === 'number') {
-    if (decimals !== undefined) return val.toFixed(decimals);
-    return String(val);
-  }
-  return String(val);
-}
-
-function fmtPct(val, decimals) {
+// Дельта со знаком и цветом. Классы .delta-up/.delta-down/.delta-flat — из shared.css.
+function deltaHtml(val, pp) {
   if (val === null || val === undefined || val === 0) return '—';
-  return (val >= 0 ? '+' : '') + val.toFixed(decimals !== undefined ? decimals : 1) + '%';
-}
-
-function deltaClass(val) {
-  if (val === null || val === undefined || val === 0) return 'delta-neutral';
-  return val > 0 ? 'delta-up' : 'delta-down';
+  const cls = val > 0 ? 'delta-up' : 'delta-down';
+  const sign = val > 0 ? '+' : '';
+  return '<span class="' + cls + '">' + sign + val.toFixed(1) + (pp ? ' п.п.' : '%') + '</span>';
 }
 
 function npsClass(val) {
@@ -50,169 +28,145 @@ function npsClass(val) {
   return 'nps-low';
 }
 
-// ── Рендер ────────────────────────────────────────────────────────────────────
+function pct(val) { return val > 0 ? val + '%' : '—'; }
+function score(val) { return val > 0 ? val.toFixed(2) : '—'; }
 
-function renderMonthRow(m, isTotal) {
-  const tr = document.createElement('tr');
-  if (isTotal) tr.className = 'total-row';
+function setKpi(cardId, text) {
+  const el = document.querySelector('#' + cardId + ' .val');
+  if (el) el.textContent = text;
+}
 
+// ── Рендер ──────────────────────────────────────────────────────────────────────
+
+function monthRowHtml(m, isTotal) {
   const label = isTotal ? 'Итого' : MONTHS[m.month - 1];
-  const convStr = m.conversion > 0 ? m.conversion + '%' : '—';
-  const convGrowthStr = m.conversionGrowth !== null
-    ? ('<span class="delta ' + deltaClass(m.conversionGrowth) + '">' + fmtPct(m.conversionGrowth) + '</span>')
-    : '—';
-  const npsStr = m.sent > 0 ? '<span class="' + npsClass(m.nps) + '">' + fmt(m.nps, 1) + '%</span>' : '—';
-  const npsGrowthStr = m.npsGrowth !== null
-    ? ('<span class="delta ' + deltaClass(m.npsGrowth) + '">' + fmtPct(m.npsGrowth) + '</span>')
-    : '—';
-  const npsGrowthAbsStr = m.npsGrowthAbs !== null
-    ? ('<span class="delta ' + deltaClass(m.npsGrowthAbs) + '">'
-      + (m.npsGrowthAbs >= 0 ? '+' : '') + m.npsGrowthAbs.toFixed(1) + ' п.п.</span>')
-    : '—';
+  const npsCell = m.sent > 0
+    ? '<td class="' + npsClass(m.nps) + '">' + m.nps.toFixed(1) + '%</td>'
+    : '<td>—</td>';
+  return '' +
+    '<td><strong>' + label + '</strong></td>' +
+    '<td>' + fmt(m.sent) + '</td>' +
+    '<td>' + fmt(m.notFilled) + '</td>' +
+    '<td>' + fmt(m.filled) + '</td>' +
+    '<td>' + pct(m.conversion) + '</td>' +
+    '<td>' + deltaHtml(m.conversionGrowth) + '</td>' +
+    '<td>' + fmt(m.promoters) + '</td>' +
+    '<td>' + fmt(m.neutrals) + '</td>' +
+    '<td>' + fmt(m.detractors) + '</td>' +
+    '<td>' + pct(m.detractorPct) + '</td>' +
+    npsCell +
+    '<td>' + score(m.avgScore) + '</td>' +
+    '<td>' + deltaHtml(m.npsGrowth) + '</td>' +
+    '<td>' + deltaHtml(m.npsGrowthAbs, true) + '</td>';
+}
 
-  tr.innerHTML = `
-    <td><strong>${label}</strong></td>
-    <td class="num">${m.sent}</td>
-    <td class="num">${m.notFilled}</td>
-    <td class="num">${m.filled}</td>
-    <td class="num">${convStr}</td>
-    <td class="num">${convGrowthStr}</td>
-    <td class="num">${m.promoters}</td>
-    <td class="num">${m.neutrals}</td>
-    <td class="num">${m.detractors}</td>
-    <td class="num">${m.detractorPct > 0 ? m.detractorPct + '%' : '—'}</td>
-    <td class="num">${npsStr}</td>
-    <td class="num">${m.avgScore > 0 ? fmt(m.avgScore, 2) : '—'}</td>
-    <td class="num">${npsGrowthStr}</td>
-    <td class="num">${npsGrowthAbsStr}</td>
-  `;
-
-  return tr;
+function sliceRowsHtml(items) {
+  return items.map(d =>
+    '<tr>' +
+      '<td><strong>' + escapeHtml(d.label) + '</strong></td>' +
+      '<td>' + fmt(d.sent) + '</td>' +
+      '<td>' + fmt(d.filled) + '</td>' +
+      '<td>' + pct(d.conversion) + '</td>' +
+      '<td>' + fmt(d.promoters) + '</td>' +
+      '<td>' + fmt(d.neutrals) + '</td>' +
+      '<td>' + fmt(d.detractors) + '</td>' +
+      '<td class="' + npsClass(d.nps) + '">' + d.nps + '%</td>' +
+      '<td>' + score(d.avgScore) + '</td>' +
+    '</tr>'
+  ).join('');
 }
 
 function render() {
   const { data, year } = state;
   if (!data || !data.months) return;
 
-  // Заголовок
-  refreshInfo.textContent = 'за ' + year + ' год';
+  const loaded = data._loadedAt
+    ? new Date(data._loadedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '';
+  $('refreshInfo').textContent = '(за ' + year + ' год' + (loaded ? ' · данные на ' + loaded : '') + ')';
 
-  // Вспомогательная функция отрисовки среза
-  function renderSliceTable(bodyId, items) {
-    const body = document.getElementById(bodyId);
-    if (!body || !items || !items.length) return;
-    body.innerHTML = items.map(d =>
-      '<tr>' +
-        '<td><strong>' + escapeHtml(d.label) + '</strong></td>' +
-        '<td class="num">' + d.sent + '</td>' +
-        '<td class="num">' + d.filled + '</td>' +
-        '<td class="num">' + (d.conversion > 0 ? d.conversion + '%' : '—') + '</td>' +
-        '<td class="num">' + d.promoters + '</td>' +
-        '<td class="num">' + d.neutrals + '</td>' +
-        '<td class="num">' + d.detractors + '</td>' +
-        '<td class="num ' + (d.nps >= 70 ? 'nps-high' : d.nps >= 30 ? 'nps-mid' : 'nps-low') + '">' + d.nps + '%</td>' +
-        '<td class="num">' + (d.avgScore > 0 ? d.avgScore.toFixed(2) : '—') + '</td>' +
-      '</tr>'
-    ).join('');
+  // KPI — последний месяц с данными
+  const last = [...data.months].reverse().find(m => m.sent > 0);
+  if (last) {
+    setKpi('kpiNps', last.nps.toFixed(1) + '%');
+    setKpi('kpiConversion', pct(last.conversion));
+    setKpi('kpiFilled', fmt(last.filled));
+    setKpi('kpiSent', fmt(last.sent));
   }
+
+  // Помесячная таблица
+  const body = $('npsTableBody');
+  const rows = data.months.filter(m => m.sent > 0).map(m => '<tr>' + monthRowHtml(m, false) + '</tr>');
+  if (data.total && data.total.sent > 0) {
+    const promoters = data.months.reduce((s, m) => s + m.promoters, 0);
+    const neutrals  = data.months.reduce((s, m) => s + m.neutrals, 0);
+    const detractors = data.months.reduce((s, m) => s + m.detractors, 0);
+    const filled = data.total.filled;
+    rows.push('<tr class="total-row">' + monthRowHtml({
+      month: 0, sent: data.total.sent, notFilled: data.total.sent - filled, filled,
+      conversion: data.total.conversion, conversionGrowth: null,
+      promoters, neutrals, detractors,
+      detractorPct: filled > 0 ? Math.round((detractors / filled) * 1000) / 10 : 0,
+      nps: data.total.nps, avgScore: data.total.avgScore,
+      npsGrowth: null, npsGrowthAbs: null,
+    }, true) + '</tr>');
+  }
+  body.innerHTML = rows.join('');
 
   // Срезы
-  if (data.slices) {
-    const slicesCard = document.getElementById('slicesCard');
-    if (slicesCard) {
-      const hasAny = (data.slices.directions && data.slices.directions.length > 0)
-        || (data.slices.clientTypes && data.slices.clientTypes.length > 0);
-      slicesCard.style.display = 'block';
-    }
-    renderSliceTable('directionsBody', data.slices.directions);
-    renderSliceTable('b2bBody', data.slices.clientTypes);
+  const s = data.slices || {};
+  const hasAny = ['directions', 'formats', 'clientTypes'].some(k => (s[k] || []).length > 0);
+  $('slicesCard').style.display = hasAny ? 'block' : 'none';
+  if (hasAny) {
+    $('directionsBody').innerHTML = sliceRowsHtml(s.directions || []);
+    $('formatBody').innerHTML = sliceRowsHtml(s.formats || []);
+    $('b2bBody').innerHTML = sliceRowsHtml(s.clientTypes || []);
   }
 
-  // Текстовые выводы
-  const insightsBlock = document.getElementById('insightsBlock');
-  if (data.insights && data.insights.length > 0 && insightsBlock) {
-    const emojiMap = { good: '🟢', bad: '🔴', mid: '🟡', neutral: '💡' };
-    insightsBlock.innerHTML = data.insights.map(i =>
-      '<div class="insight insight-' + i.type + '">' +
-        '<span class="insight-icon">' + (emojiMap[i.type] || '💡') + '</span>' +
-        '<span class="insight-text">' + escapeHtml(i.text) + '</span>' +
+  // Текстовые выводы — Bootstrap alerts
+  const insights = $('insightsBlock');
+  if (data.insights && data.insights.length) {
+    const alertClass = { good: 'alert-success', bad: 'alert-danger', mid: 'alert-warning', neutral: 'alert-info' };
+    const emoji = { good: '🟢', bad: '🔴', mid: '🟡', neutral: '💡' };
+    insights.innerHTML = data.insights.map(i =>
+      '<div class="alert ' + (alertClass[i.type] || 'alert-info') + ' py-2 mb-2">' +
+        (emoji[i.type] || '💡') + ' ' + escapeHtml(i.text) +
       '</div>'
     ).join('');
-    insightsBlock.style.display = 'block';
-  } else if (insightsBlock) {
-    insightsBlock.style.display = 'none';
+    insights.style.display = 'block';
+  } else {
+    insights.style.display = 'none';
   }
 
-  // KPI
-  const lastWithData = [...data.months].reverse().find(m => m.sent > 0);
-  if (lastWithData) {
-    kpiNps.querySelector('.kpi-value').textContent = lastWithData.sent > 0
-      ? fmt(lastWithData.nps, 1) + '%'
-      : '—';
-    kpiConversion.querySelector('.kpi-value').textContent = lastWithData.conversion > 0
-      ? fmt(lastWithData.conversion, 1) + '%'
-      : '—';
-    kpiFilled.querySelector('.kpi-value').textContent = fmt(lastWithData.filled);
-    kpiSent.querySelector('.kpi-value').textContent = fmt(lastWithData.sent);
-  }
-
-  // Таблица
-  npsTableBody.innerHTML = '';
-
-  const monthsWithData = data.months.filter(m => m.sent > 0);
-
-  for (const m of monthsWithData) {
-    npsTableBody.appendChild(renderMonthRow(m, false));
-  }
-
-  // Итоговая строка
-  if (data.total && data.total.sent > 0) {
-    npsTableBody.appendChild(renderMonthRow({
-      month: 0,
-      sent: data.total.sent,
-      notFilled: data.total.sent - data.total.filled,
-      filled: data.total.filled,
-      conversion: data.total.conversion,
-      conversionGrowth: null,
-      promoters: data.months.reduce((s, m) => s + m.promoters, 0),
-      neutrals: data.months.reduce((s, m) => s + m.neutrals, 0),
-      detractors: data.months.reduce((s, m) => s + m.detractors, 0),
-      detractorPct: data.total.filled > 0
-        ? Math.round((data.months.reduce((s, m) => s + m.detractors, 0) / data.total.filled) * 1000) / 10
-        : 0,
-      nps: data.total.nps,
-      avgScore: data.total.avgScore,
-      npsGrowth: null,
-      npsGrowthAbs: null,
-    }, true));
-  }
+  // Сортировка — после отрисовки ВСЕХ таблиц
+  ['npsTable', 'directionsTable', 'formatTable', 'b2bTable'].forEach(id => initTableSort(id));
 }
+
+// ── Загрузка ──────────────────────────────────────────────────────────────────
 
 async function loadData(year) {
   try {
-    const res = await api('/api/data?year=' + year);
-    state.data = res;
+    state.data = await api('/api/data?year=' + year);
     state.year = year;
     render();
   } catch (e) {
     console.error('loadData error:', e);
-    npsTableBody.innerHTML = '<tr><td colspan="13" style="color:#C62828;padding:20px;">Ошибка загрузки: ' + escapeHtml(e.message) + '</td></tr>';
+    $('npsTableBody').innerHTML =
+      '<tr><td colspan="14" class="text-danger p-3">Ошибка загрузки: ' + escapeHtml(e.message) + '</td></tr>';
   }
 }
 
 async function loadYears() {
+  const sel = $('yearSelect');
   try {
     const years = await api('/api/years');
-    yearSelect.innerHTML = years.map(y =>
+    sel.innerHTML = years.map(y =>
       '<option value="' + y + '"' + (y === state.year ? ' selected' : '') + '>' + y + '</option>'
     ).join('');
-    yearSelect.addEventListener('change', () => {
-      state.year = parseInt(yearSelect.value, 10);
-      loadData(state.year);
-    });
   } catch (e) {
-    yearSelect.innerHTML = '<option value="' + state.year + '">' + state.year + '</option>';
+    sel.innerHTML = '<option value="' + state.year + '">' + state.year + '</option>';
   }
+  sel.addEventListener('change', () => loadData(parseInt(sel.value, 10)));
 }
 
 async function init() {

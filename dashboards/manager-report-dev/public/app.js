@@ -1,3 +1,9 @@
+/**
+ * manager-report-dev/app.js — фронтенд «Отчёт для менеджеров (dev)» (В РАЗРАБОТКЕ).
+ * ЗАЧЕМ: рендер отчёта по менеджерам и воронки из /api/managers, /api/funnel.
+ * NB: BASE_PATH вычисляется из URL прямо здесь (ниже).
+ */
+
 var _p = window.location.pathname;
 var _m = _p.match(/^\/([^/]+?)(?:\/|$)/);
 var BP = _m ? '/' + _m[1] : '';

@@ -1,4 +1,14 @@
-// api(), fmt(), escapeHtml(), initTableSort() — в /shared.js (общие для всех дашбордов)
+/**
+ * participants-dashboard/app.js — фронтенд дашборда «Участники».
+ *
+ * ЗАЧЕМ: рендерит таблицу участников за выбранную неделю с фильтром по направлению
+ *   и клиентской сортировкой; ставит ссылку выгрузки в Excel по текущей неделе.
+ * ЧТО ДЕЛАЕТ: селектор недель (/api/weeks) → загрузка (/api/participants) →
+ *   buildParticipantsTable() → initTableSort(). Фильтр по направлению — без
+ *   повторного запроса (по lastRes). Метаданные шапки — из /api/data/new.
+ *
+ * Хелперы api(), fmt(), escapeHtml(), initTableSort(), shortCompany() — в /shared.js.
+ */
 
 let dataCache = null;
 

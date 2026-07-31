@@ -1,118 +1,26 @@
-/* NPS Dashboard — специфичные стили */
+/* NPS-дашборд — только уникальное. Базовые компоненты берём из /shared.css
+   (.kpi/.lbl/.val, .btn-guide, .delta-*, .page-title-meta) и Bootstrap. */
 
-.kpis-4 {
-  grid-template-columns: repeat(4, 1fr);
-}
+/* Bootstrap reboot ставит table{border-collapse:collapse} — ломает брендовую
+   шапку и sticky. Тот же фикс, что в participants-dashboard. */
+.table { border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.table > :not(caption) > * > * { border-bottom: 1px solid var(--bs-border-color); }
+.table thead th { background: #093EB4; color: #fff; border-bottom-color: #093EB4; text-align: center; vertical-align: middle; }
+.table th, .table td { vertical-align: middle; }
+.table-responsive { overflow-y: visible; }
 
-@media (max-width: 768px) {
-  .kpis-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
+/* Двухрядная сгруппированная шапка месячной таблицы — без sticky
+   (иначе два ряда перекрываются на top:0). */
+#npsTable thead th { position: static; white-space: nowrap; }
 
-/* Карточка KPI для NPS */
-#kpiNps .kpi-value {
-  font-size: 2.2rem;
-}
+/* 4 KPI-карточки (в shared .kpis по умолчанию 7 колонок). */
+.kpis-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 768px) { .kpis-4 { grid-template-columns: repeat(2, 1fr); } }
 
-/* Индикатор дельты */
-.delta {
-  font-size: 0.85rem;
-  font-weight: 600;
-  display: inline-block;
-}
-.delta.delta-up {
-  color: #2E7D32;
-}
-.delta.delta-down {
-  color: #C62828;
-}
-.delta.delta-neutral {
-  color: #F57C00;
-}
+/* Итоговая строка */
+tr.total-row td { font-weight: 700; background: #E8EDF5; border-top: 2px solid #093EB4; }
 
-/* Строка итогов */
-tr.total-row td {
-  font-weight: 700;
-  background: #E8EDF5;
-  border-top: 2px solid #093EB4;
-}
-
-/* Подсветка NPS */
-td.nps-high {
-  color: #2E7D32;
-  font-weight: 600;
-}
-td.nps-mid {
-  color: #F57C00;
-  font-weight: 600;
-}
-td.nps-low {
-  color: #C62828;
-  font-weight: 600;
-}
-
-/* Числа в таблице — моноширинный для выравнивания */
-.insight {
-  padding: 10px 14px;
-  margin-bottom: 6px;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  line-height: 1.4;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.insight-good {
-  background: #E8F5E9;
-  color: #1B5E20;
-}
-.insight-bad {
-  background: #FFEBEE;
-  color: #B71C1C;
-}
-.insight-mid {
-  background: #FFF8E1;
-  color: #E65100;
-}
-.insight-neutral {
-  background: #E3F2FD;
-  color: #0D47A1;
-}
-.insight-icon {
-  font-size: 1.1rem;
-  flex-shrink: 0;
-}
-
-.section-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin: 0 0 12px 0;
-  color: #1A1A2E;
-}
-
-.data-table td.num {
-  font-family: 'SF Mono', SFMono-Regular, 'JetBrains Mono', monospace;
-  font-size: 0.9rem;
-}
-
-/* Выбор года */
-.panel-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.period-select {
-  padding: 8px 12px;
-  border: 1px solid #D0D5DD;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  background: white;
-  color: #1A1A2E;
-  cursor: pointer;
-  outline: none;
-}
-.period-select:focus {
-  border-color: #093EB4;
-  box-shadow: 0 0 0 2px rgba(9, 62, 180, 0.15);
-}
+/* Цветовая шкала NPS */
+td.nps-high { color: #2E7D32; font-weight: 600; }
+td.nps-mid  { color: #F57C00; font-weight: 600; }
+td.nps-low  { color: #C62828; font-weight: 600; }

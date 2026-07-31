@@ -1,3 +1,22 @@
+/**
+ * rshu-management-dashboard/server.js — «Управленческий дашборд РШУ» (sub-app).
+ *
+ * ЗАЧЕМ:
+ *   Сводка для руководства за произвольный ПЕРИОД (кастомный календарь-диапазон):
+ *   KPI по каналам (Очный/Онлайн/СДО/КОМ), воронка регистраций/лидов→оплат,
+ *   аномалии данных.
+ *
+ * ЧТО ДЕЛАЕТ (API):
+ *   GET /api/data       — базовые агрегаты из getAgg();
+ *   GET /api/kpi        — KPI за период (period-kpi.js), разрезы по каналам;
+ *   GET /api/reg-funnel — воронка источников когортами (см. README: этапы по
+ *                         РАЗНЫМ датам — создание/счёт/оплата, иначе конверсии >100%);
+ *   GET /api/artifacts  — аномалии данных;
+ *   catch-all — index.html только на путях БЕЗ расширения.
+ *
+ * ВЁРСТКА: Bootstrap + shared.css + кастомный виджет периода (/vendor/range-calendar/).
+ */
+
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';

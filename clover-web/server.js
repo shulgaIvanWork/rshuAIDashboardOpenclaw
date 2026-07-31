@@ -1,3 +1,30 @@
+/**
+ * clover-web/server.js — оболочка проекта (порт 3000).
+ *
+ * ЗАЧЕМ:
+ *   Единая точка входа для всех дашбордов РШУ. Держит аутентификацию, права
+ *   доступа и список дашбордов, а сами дашборды монтирует как под-приложения
+ *   (sub-app) Express. Дашборды НЕ поднимают свои порты — только эта оболочка.
+ *
+ * ЧТО ДЕЛАЕТ:
+ *   1. Сессии (express-session + FileStore) и вход по логину/паролю.
+ *      Пароли: открытый текст ИЛИ старый bcrypt-хеш — verifyPassword() понимает оба.
+ *      users.json перечитывается на каждый запрос (loadUsers) — правки видны сразу.
+ *   2. Права:
+ *        requireAuth            — есть сессия;
+ *        requireAdmin           — роль admin;
+ *        requireDashboardAccess — админ ко всем, гость только к своим (закрывает
+ *                                 доступ к чужому дашборду по прямой ссылке).
+ *   3. Ленивый монтаж дашбордов (lazyApp) — модуль грузится при первом обращении.
+ *   4. Админка: CRUD пользователей и раздача доступа к дашбордам.
+ *   5. Общий error-handler отдаёт JSON (а не HTML), чтобы фронт не редиректил на /login.
+ *
+ * РЕЕСТР ДАШБОРДОВ ведётся в ТРЁХ местах (осознанно, см. README «Как добавить»):
+ *   mount-список ниже + knownProjects() + clover-web/data/dashboards.json.
+ *
+ * Зависимости окружения: ../.env (SESSION_SECRET; PORT опц.). Node 20+, ESM.
+ */
+
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -49,11 +76,22 @@ function lazyApp(name, importFn) {
 // --------------- App ---------------
 const app = express();
 
+// View-engine (объявляем в блоке инициализации, до маршрутов с res.render)
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// SESSION_SECRET обязателен: без него cookie сессий подписываются предсказуемым
+// ключом из кода — любой мог бы подделать админскую сессию. Останавливаем запуск.
+if (!process.env.SESSION_SECRET) {
+  console.error('❌ SESSION_SECRET не задан в ../.env — запуск остановлен (небезопасно без него).');
+  process.exit(1);
+}
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'clover-web-secret-2026',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   store: new FileStoreSession({ path: path.join(DATA_DIR, 'sessions'), logFn: () => {} }),
@@ -122,17 +160,15 @@ app.get('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
 });
 
-// --------------- Mount dashboards (with auth, lazy-loaded) ---------------
-app.use('/rshu-dashboard',            requireDashboardAccess('rshu-dashboard'),            lazyApp('rshu-dashboard',            () => import('../dashboards/rshu-dashboard/server.js')));
-app.use('/kom-dashboard',             requireDashboardAccess('kom-dashboard'),             lazyApp('kom-dashboard',             () => import('../dashboards/kom-dashboard/server.js')));
-app.use('/drop-dashboard',            requireDashboardAccess('drop-dashboard'),            lazyApp('drop-dashboard',            () => import('../dashboards/drop-dashboard/server.js')));
-app.use('/rshu-management-dashboard', requireDashboardAccess('rshu-management-dashboard'), lazyApp('rshu-management-dashboard', () => import('../dashboards/rshu-management-dashboard/server.js')));
-app.use('/ratings-dashboard',         requireDashboardAccess('ratings-dashboard'),         lazyApp('ratings-dashboard',         () => import('../dashboards/ratings-dashboard/server.js')));
-app.use('/participants-dashboard',    requireDashboardAccess('participants-dashboard'),    lazyApp('participants-dashboard',    () => import('../dashboards/participants-dashboard/server.js')));
-app.use('/test-dashboard',            requireDashboardAccess('test-dashboard'),            lazyApp('test-dashboard',            () => import('../dashboards/test-dashboard/server.js')));
-app.use('/manager-report-dev',        requireDashboardAccess('manager-report-dev'),        lazyApp('manager-report-dev',        () => import('../dashboards/manager-report-dev/server.js')));
-app.use('/plan-fact-dashboard',       requireDashboardAccess('plan-fact-dashboard'),       lazyApp('plan-fact-dashboard',       () => import('../dashboards/plan-fact-dashboard/server.js')));
-app.use('/nps-dashboard',             requireDashboardAccess('nps-dashboard'),             lazyApp('nps-dashboard',             () => import('../dashboards/nps-dashboard/server.js')));
+// --------------- Mount dashboards (единый источник = data/dashboards.json) ---------
+// Добавить дашборд = положить папку dashboards/<name>/ + запись в dashboards.json.
+// Отсюда по этим именам монтируем sub-app: проверка доступа + ленивая загрузка.
+// Имя в JSON = имя папки = префикс URL (/<name>/). Другого реестра нет.
+for (const name of Object.keys(readDashboardsMeta())) {
+  app.use('/' + name,
+    requireDashboardAccess(name),
+    lazyApp(name, () => import(`../dashboards/${name}/server.js`)));
+}
 
 // --------------- Dashboards page ---------------
 app.get('/dashboards', requireAuth, (req, res) => {
@@ -247,10 +283,6 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// --------------- Views ---------------
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
 // --------------- Global error handler ---------------
 // Перехватывает необработанные ошибки из дашбордов и возвращает JSON,
 // а не HTML-страницу ошибки — иначе фронтенд делает редирект на /login → /dashboards
@@ -263,9 +295,6 @@ app.use((err, req, res, next) => {
 // --------------- Start ---------------
 app.listen(PORT, '127.0.0.1', () => {
   console.log('📊 РШУ дашборды на http://127.0.0.1:' + PORT);
-  if (!process.env.SESSION_SECRET) {
-    console.warn('⚠️  SESSION_SECRET не задан в .env — используется дефолтный (небезопасно)');
-  }
 });
 
 // ============== Helpers ==============
@@ -306,10 +335,6 @@ function readDashboardsMeta() {
   }
 }
 
-function writeDashboardsMeta(meta) {
-  fs.writeFileSync(DASHBOARDS_FILE, JSON.stringify(meta, null, 2));
-}
-
 function getAllDashboardsMeta() {
   return readDashboardsMeta();
 }
@@ -323,24 +348,16 @@ function getAvailableDashboards(user) {
   const dashboards = [];
   const isAdmin = user.role === 'admin';
   const allowedDashboards = user.dashboards || [];
-  const knownProjects = {
-    'rshu-dashboard': { url: '/rshu-dashboard/' },
-    'drop-dashboard': { url: '/drop-dashboard/' },
-    'rshu-management-dashboard': { url: '/rshu-management-dashboard/' },
-    'ratings-dashboard': { url: '/ratings-dashboard/' },
-    'kom-dashboard': { url: '/kom-dashboard/' },
-    'participants-dashboard': { url: '/participants-dashboard/' },
-    'test-dashboard': { url: '/test-dashboard/' },
-    'manager-report-dev': { url: '/manager-report-dev/' },
-    'plan-fact-dashboard': { url: '/plan-fact-dashboard/' },
-    'nps-dashboard': { url: '/nps-dashboard/' }
-  };
+  // Тот же единый источник, что и для монтажа: имена из dashboards.json.
+  const knownProjects = Object.fromEntries(
+    Object.keys(readDashboardsMeta()).map(n => [n, { url: '/' + n + '/' }])
+  );
 
   try {
     const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-      if (entry.name.startsWith('.') || entry.name === 'web-interface' || entry.name === 'dashboard2') continue;
+      if (entry.name === 'web-interface' || entry.name === 'dashboard2') continue;
 
       const meta = getDashboardStatus(entry.name);
 
@@ -356,8 +373,8 @@ function getAvailableDashboards(user) {
           url: kp.url
         });
       }
-      // Папки вне knownProjects не показываем — новый дашборд нужно
-      // зарегистрировать в knownProjects и смонтировать выше.
+      // Папки без записи в dashboards.json не показываем и не монтируем —
+      // добавить дашборд = папка + запись в dashboards.json.
     }
   } catch (e) { console.error('Error scanning dashboards:', e.message); }
   return dashboards;

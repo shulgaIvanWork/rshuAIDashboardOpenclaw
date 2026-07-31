@@ -1,3 +1,17 @@
+/**
+ * rshu-dashboard/server.js — «Отчёт по продажам за последний месяц» (sub-app). В РАЗРАБОТКЕ.
+ *
+ * ЗАЧЕМ: сводный отчёт по продажам — обзор, переносы (carryover), KPI, топ-менеджеры,
+ *   воронка источников, прогноз, рейтинг продуктов (за месяц и за год).
+ *
+ * ОСОБЕННОСТЬ АРХИТЕКТУРЫ: держит СВОИ предрассчитанные кэши в памяти
+ *   (dataState, kpiCache, dealsCache, dictsCache, topMgrsCache) и пересчитывает их
+ *   по /api/refresh — отдельный от общего agg-cache подход (см. README о слоях).
+ *
+ * ЧТО ДЕЛАЕТ (API): /api/status,/overview,/carryover,/kpi,/top-managers,/refresh,
+ *   /month-report,/deals,/dicts,/source-report,/forecast,/product-ranking[-year].
+ */
+
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';

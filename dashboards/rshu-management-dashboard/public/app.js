@@ -1,4 +1,14 @@
-// escapeHtml(), api(), fmt(), fmtPct(), initTableSort() — в /shared.js
+/**
+ * rshu-management-dashboard/app.js — фронтенд «Управленческого дашборда РШУ».
+ *
+ * ЗАЧЕМ: сводка для руководства за произвольный период — KPI по каналам, воронка
+ *   регистраций/источников, графики, блок аномалий данных.
+ * ЧТО ДЕЛАЕТ: читает период из кастомного календаря (/vendor/range-calendar/),
+ *   запрашивает /api/kpi и /api/reg-funnel, рисует KPI-карточки, воронку и графики
+ *   (Chart.js), показывает /api/artifacts.
+ *
+ * Хелперы escapeHtml/api/fmt/fmtPct/initTableSort — в /shared.js.
+ */
 
 function loadArtifacts() {
   fetch((window.BASE_PATH || '') + '/api/artifacts').then(function(r) {

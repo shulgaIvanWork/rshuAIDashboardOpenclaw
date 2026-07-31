@@ -1,3 +1,21 @@
+/**
+ * ratings-dashboard/server.js — дашборд «Рейтинги» (sub-app оболочки).
+ *
+ * ЗАЧЕМ:
+ *   Рейтинги продаж по продуктам / источникам / компаниям за период. Тонкий
+ *   сервер: отдаёт недельные агрегаты, а сами таблицы РЕЙТИНГОВ считаются НА
+ *   КЛИЕНТЕ из weeks[].by_prod/by_src/by_company (см. README — важная договорённость:
+ *   любые фильтры надо дублировать в недельной агрегации analyze.js).
+ *
+ * ЧТО ДЕЛАЕТ (API):
+ *   GET /api/data,/data/new — агрегаты из getAgg() (недели + YTD);
+ *   GET /api/artifacts      — аномалии данных (возвраты, оплаты без сделки и т.п.);
+ *   POST /api/export        — выгрузка текущего среза в Excel;
+ *   catch-all — index.html только на путях БЕЗ расширения.
+ *
+ * ВЁРСТКА: только shared.css (без Bootstrap — reboot ломает кастомную вёрстку).
+ */
+
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';

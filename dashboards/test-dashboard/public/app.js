@@ -1,3 +1,9 @@
+/**
+ * test-dashboard/app.js — фронтенд тестового дашборда «прогноз» (В РАЗРАБОТКЕ).
+ * ЗАЧЕМ: рендер прогноза и внешней аналитики (Метрика/Roistat/Bitrix), расчёт мотивации.
+ * Данные тянутся из BASE = '/test-dashboard/api' (ниже).
+ */
+
 // ============ DATA FETCHING ============
 const BASE = '/test-dashboard/api';
 

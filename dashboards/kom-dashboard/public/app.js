@@ -1,3 +1,9 @@
+/**
+ * kom-dashboard/app.js — фронтенд «КОМ: корпоративное обучение» (В РАЗРАБОТКЕ).
+ * ЗАЧЕМ: рендер отчёта по корпоративным сделкам из /api/data и /api/kom-extended.
+ * NB: BASE_PATH вычисляется из URL прямо здесь (ниже), до/без общего shared.js.
+ */
+
 var _p = window.location.pathname;
 var _m = _p.match(/^\/([^/]+)\//);
 window.BASE_PATH = _m ? '/' + _m[1] : '';

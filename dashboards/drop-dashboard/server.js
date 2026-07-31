@@ -1,3 +1,11 @@
+/**
+ * drop-dashboard/server.js — «ДРОП: отчёт по продажам» (sub-app). В РАЗРАБОТКЕ.
+ *
+ * ЗАЧЕМ: черновой дашборд продаж (ранняя версия отчёта), тонкий сервер поверх getAgg().
+ * ЧТО ДЕЛАЕТ (API): /api/status, /api/user, /api/data, /api/data/new — агрегаты и мета.
+ * Источник данных: getAgg() из data-service. Фронт ещё не финализирован.
+ */
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';

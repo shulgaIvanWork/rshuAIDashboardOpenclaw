@@ -1,3 +1,13 @@
+/**
+ * manager-report-dev/server.js — «Отчёт для менеджеров (dev)» (sub-app). В РАЗРАБОТКЕ.
+ *
+ * ЗАЧЕМ: персональный отчёт по менеджерам — результативность и воронка.
+ * ЧТО ДЕЛАЕТ (API, на express.Router): /api/managers — метрики по менеджерам;
+ *   /api/funnel — воронка; /api/status — состояние данных.
+ * Источник — getAgg() + deal-rules (MIN_OPP, VALID_CATS, YEAR).
+ * NB: экспортирует Router (а не app) — монтируется тем же lazyApp в оболочке.
+ */
+
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';

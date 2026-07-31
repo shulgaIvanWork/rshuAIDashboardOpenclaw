@@ -1,3 +1,11 @@
+/**
+ * kom-dashboard/server.js — «КОМ: корпоративное обучение» (sub-app). В РАЗРАБОТКЕ.
+ *
+ * ЗАЧЕМ: отчёт по корпоративным сделкам (КОМ) — продажи и метрики корп-обучения.
+ * ЧТО ДЕЛАЕТ (API): /api/data — базовые агрегаты; /api/kom-extended — расширенный
+ *   разрез по КОМ. Источник — getAgg() + deal-rules (isKomDeal).
+ */
+
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';

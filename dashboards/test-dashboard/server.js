@@ -1,3 +1,13 @@
+/**
+ * test-dashboard/server.js — «Тестовый дашборд (прогноз)» (sub-app). В РАЗРАБОТКЕ.
+ *
+ * ЗАЧЕМ: песочница для прогноза продаж и интеграций внешней аналитики.
+ * ЧТО ДЕЛАЕТ (API): Яндекс.Метрика (/api/metrika-*), Roistat (/api/roistat-*),
+ *   Bitrix (/api/bitrix-deals), планы (/api/plans GET/POST), расчёт мотивации
+ *   (/api/motivation-calc), рейтинг продуктов, выгрузка анализа. catch-all → index.html.
+ * ВНИМАНИЕ: ходит во ВНЕШНИЕ сервисы (Метрика/Roistat), не только в getAgg().
+ */
+
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
