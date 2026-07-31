@@ -1,6 +1,16 @@
-// escapeHtml(), api(), fmt(), fmtPct(), initTableSort(), shortCompany(),
-// window.BASE_PATH — всё в /shared.js (подключается перед app.js).
-// Здесь оставлены только специфичные для рейтингов хелперы (safeFetch и т.п.).
+/**
+ * ratings-dashboard/app.js — фронтенд дашборда «Рейтинги».
+ *
+ * ЗАЧЕМ: рейтинги по продуктам/источникам/компаниям за период. Таблицы считаются
+ *   НА КЛИЕНТЕ (buildFilteredData из недельных weeks[].by_prod/by_src/by_company),
+ *   поэтому фильтры (исключить КОМ и т.п.) должны быть и в недельной агрегации
+ *   analyze.js — иначе на дашборде не сработают (см. README).
+ * ЧТО ДЕЛАЕТ: грузит агрегаты, строит фильтруемые рейтинги, показывает блок
+ *   аномалий (/api/artifacts), выгрузка среза в Excel (POST /api/export).
+ *
+ * Общие хелперы (escapeHtml/api/fmt/fmtPct/initTableSort/shortCompany/BASE_PATH) —
+ * в /shared.js. Здесь — только специфичные для рейтингов (safeFetch и т.п.).
+ */
 
 function loadArtifacts(){
   fetch(window.BASE_PATH+'/api/artifacts').then(function(r){return r.json();}).then(function(d){
@@ -197,7 +207,8 @@ function buildFilteredData(orig, filteredWeeks) {
     // by_prod
     Object.entries(w.by_prod || {}).forEach(function(e) {
       var name = e[0], v = e[1];
-      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
+      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:v.dir||'—'};
+      if ((!prodAgg[name].dir || prodAgg[name].dir==='—') && v.dir) prodAgg[name].dir = v.dir;
       prodAgg[name].deals += v.deals||0; prodAgg[name].sum += v.sum||0;
       prodAgg[name].fmt_ochn_cnt += v.fmt_ochn_cnt||0; prodAgg[name].fmt_ochn_sum += v.fmt_ochn_sum||0;
       prodAgg[name].fmt_om_cnt += v.fmt_om_cnt||0; prodAgg[name].fmt_om_sum += v.fmt_om_sum||0;
@@ -229,7 +240,7 @@ function buildFilteredData(orig, filteredWeeks) {
     var avgCheck = v.deals ? Math.round(v.sum/v.deals) : 0;
     var avgDur = Math.round(avg(v.durs)*10)/10;
     return {name:name, deals:v.deals, sum:v.sum, avg_check:avgCheck,
-      avg_won_days:avgDur, share:Math.round(v.sum/totalSum*100*10)/10,
+      avg_won_days:avgDur, share:Math.round(v.sum/totalSum*100*10)/10, dir:v.dir||'—',
       fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
       fmt_om_cnt:v.fmt_om_cnt, fmt_om_sum:v.fmt_om_sum,
       fmt_sdo_cnt:v.fmt_sdo_cnt, fmt_sdo_sum:v.fmt_sdo_sum};
@@ -251,6 +262,7 @@ function buildFilteredData(orig, filteredWeeks) {
       fmt_sdo_sum:rest.reduce(function(s,p){return s+p.fmt_sdo_sum;},0)});
   }
   out.top_products = top20;
+  out.all_products = prodList;  // полный список с направлением (dir) — для фильтра по направлению
 
   // Построить src_rating — MQL/SQL берём из оригинала по имени источника
   var origSrcByName = {};
@@ -396,7 +408,7 @@ async function renderPageMainNew(d) {
     html += '<div class="card" style="margin-top:8px"><h3>Поступления по линейке ММВА</h3><div id="newMbaTable"></div></div>';
 
     // Топ-20 продуктов
-    html += '<div class="card" style="margin-top:8px"><h2>ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · по доле в поступлениях</span></h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
+    html += '<div class="card" style="margin-top:8px"><div class="d-flex align-items-center justify-content-between flex-wrap gap-2"><h2 style="margin:0">ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · по доле в поступлениях</span></h2><label style="font-size:12px;color:#475569">Направление: <select id="prodDirFilter" class="rc-input" style="width:auto;font-size:12px;padding:4px 8px"></select></label></div><div class="sub" style="margin:6px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
     // Источники
     html += '<div class="card"><h2>Рейтинг источников поступлений (открытое обучение без КОМ)</h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newSrcTable"></div></div></div>';
     html += '<div class="card"><h2>Топ-20 компаний</h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newCompaniesTable"></div></div></div>';
@@ -404,7 +416,6 @@ async function renderPageMainNew(d) {
     areaNew.innerHTML = html;
 
     // Fill tables
-    var prods = d.top_products||[];
     function fmtFmt(cnt, sum) { return cnt+' / '+fmt(sum)+' р'; }
     // «📦 Остальные» — агрегат хвоста; топ-20 считаем без него, «все продукты» — вместе с ним
     function isRest(p){ return (p.name||'').includes('Остальные'); }
@@ -428,22 +439,58 @@ async function renderPageMainNew(d) {
     function totalRow(label, t, shareTxt) {
       return '<tr class="total-row" style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>'+(t.avgCycle||0).toFixed(1)+'</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
     }
-    var t20  = totalsOf(prods.filter(function(p){ return p.name && !isRest(p); }));
-    var tAll = totalsOf(prods.filter(function(p){ return p.name; }));
     function prodDataRow(p, num, isRem){
       return '<tr'+(isRem?' class="total-row" style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':num)+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td><b>'+(p.cnt||p.deals||0)+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
     }
-    // thead: шапка + ИТОГО(топ-20) · tbody: данные (сортируются) · tfoot: Остальные + ИТОГО(все) — 3 итоговых статичны
-    var prodStr = '<table class="sortable" style="font-size:11px"><thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">Сделки</th><th class="sort" data-col="3">Поступления, ₽</th><th class="sort" data-col="4">Ср.чек, ₽</th><th class="sort" data-col="5">Цикл сделки, дн.</th><th class="sort" data-col="6">Доля</th><th class="sort" data-col="7">Очно</th><th class="sort" data-col="8">Онлайн</th><th class="sort" data-col="9">Дистанционно</th></tr>';
-    prodStr += totalRow('📊 ИТОГО (топ-20)', t20, t20.share.toFixed(1)+'%') + '</thead><tbody>';
-    var prodNum = 0;
-    prods.slice(0,21).forEach(function(p){ if(!p.name || isRest(p)) return; prodNum++; prodStr += prodDataRow(p, prodNum, false); });
-    prodStr += '</tbody><tfoot>';
-    var prodRest = prods.slice(0,21).find(function(p){ return p.name && isRest(p); });
-    if (prodRest) prodStr += prodDataRow(prodRest, 0, true);
-    prodStr += totalRow('📊 ИТОГО (все продукты)', tAll, '100%');
-    prodStr += '</tfoot></table>';
-    var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
+    // Топ-20 + «Остальные» из полного списка с фильтром по направлению; доли — внутри выборки
+    function prodSliceForDir(dir) {
+      var all = d.all_products || d.top_products || [];
+      var list = (dir ? all.filter(function(p){ return (p.dir||'—')===dir; }) : all)
+        .filter(function(p){ return p.name && !isRest(p); }).slice().sort(function(a,b){ return b.sum-a.sum; });
+      var totalSum = list.reduce(function(s,p){ return s+(p.sum||0); }, 0) || 1;
+      var withShare = list.map(function(p){ return Object.assign({}, p, { share: Math.round(p.sum/totalSum*100*10)/10 }); });
+      var top20 = withShare.slice(0,20), rest = withShare.slice(20);
+      if (rest.length) {
+        var rs = rest.reduce(function(s,p){return s+(p.sum||0);},0), rd = rest.reduce(function(s,p){return s+(p.deals||0);},0);
+        var rcn = rest.reduce(function(s,p){return s+((p.avg_won_days||0)*(p.deals||0));},0);
+        top20.push({ name:'📦 Остальные ('+rest.length+' продуктов)', deals:rd, sum:rs, avg_check:rd?Math.round(rs/rd):0, avg_won_days:rd?rcn/rd:0, share:Math.round(rs/totalSum*100*10)/10,
+          fmt_ochn_cnt:rest.reduce(function(s,p){return s+(p.fmt_ochn_cnt||0);},0), fmt_ochn_sum:rest.reduce(function(s,p){return s+(p.fmt_ochn_sum||0);},0),
+          fmt_om_cnt:rest.reduce(function(s,p){return s+(p.fmt_om_cnt||0);},0), fmt_om_sum:rest.reduce(function(s,p){return s+(p.fmt_om_sum||0);},0),
+          fmt_sdo_cnt:rest.reduce(function(s,p){return s+(p.fmt_sdo_cnt||0);},0), fmt_sdo_sum:rest.reduce(function(s,p){return s+(p.fmt_sdo_sum||0);},0) });
+      }
+      return top20;
+    }
+    function renderProductsTable(dir, attachSort) {
+      var prods = prodSliceForDir(dir);
+      var t20  = totalsOf(prods.filter(function(p){ return p.name && !isRest(p); }));
+      var tAll = totalsOf(prods.filter(function(p){ return p.name; }));
+      // thead: шапка + ИТОГО(топ-20) · tbody: данные (сортируются) · tfoot: Остальные + ИТОГО(все) — 3 итоговых статичны
+      var prodStr = '<table id="prodTable" class="sortable" style="font-size:11px"><thead><tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">Продукт</th><th class="sort" data-col="2">Сделки</th><th class="sort" data-col="3">Поступления, ₽</th><th class="sort" data-col="4">Ср.чек, ₽</th><th class="sort" data-col="5">Цикл сделки, дн.</th><th class="sort" data-col="6">Доля</th><th class="sort" data-col="7">Очно</th><th class="sort" data-col="8">Онлайн</th><th class="sort" data-col="9">Дистанционно</th></tr>';
+      prodStr += totalRow('📊 ИТОГО (топ-20)', t20, t20.share.toFixed(1)+'%') + '</thead><tbody>';
+      var prodNum = 0;
+      prods.forEach(function(p){ if(!p.name || isRest(p)) return; prodNum++; prodStr += prodDataRow(p, prodNum, false); });
+      prodStr += '</tbody><tfoot>';
+      var prodRest = prods.find(function(p){ return p.name && isRest(p); });
+      if (prodRest) prodStr += prodDataRow(prodRest, 0, true);
+      prodStr += totalRow('📊 ИТОГО (все продукты)', tAll, '100%');
+      prodStr += '</tfoot></table>';
+      var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
+      // На первом рендере сортировку вешает общий initTableSort() в конце renderPageMainNew;
+      // при смене фильтра таблица пересоздаётся — привязываем точечно (attachSort=true).
+      if (attachSort && typeof initTableSort === 'function') initTableSort('prodTable');
+    }
+    // Заполняем селектор направлений (по убыванию поступлений) и вешаем фильтр
+    (function(){
+      var dirs = {};
+      (d.all_products || []).forEach(function(p){ if (p.dir && p.dir !== '—') dirs[p.dir] = (dirs[p.dir]||0) + (p.sum||0); });
+      var sorted = Object.keys(dirs).sort(function(a,b){ return dirs[b]-dirs[a]; });
+      var sel = document.getElementById('prodDirFilter');
+      if (sel) {
+        sel.innerHTML = '<option value="">Все направления</option>' + sorted.map(function(nm){ return '<option value="'+escapeHtml(nm)+'">'+escapeHtml(nm)+'</option>'; }).join('');
+        sel.onchange = function(){ renderProductsTable(sel.value, true); };
+      }
+    })();
+    renderProductsTable('', false);
 
     // ── Рейтинг источников (полная воронка, без КОМ) ─────────────────────
     var srcFunnel = d.src_funnel || [];

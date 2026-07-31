@@ -383,6 +383,7 @@ export async function analyze(onProgress) {
   const cats       = dicts.categories || {};
   const usersMap   = dicts.users || {};
   const sourcesMap = dicts.sources || {};
+  const directions = dicts.directions || {};
 
   const TODAY = dateOnly(new Date());
   const [, curW] = isoCalendar(TODAY);
@@ -396,7 +397,9 @@ export async function analyze(onProgress) {
     let fmt = detectFormat(x.TITLE||'', x.UF_FORMAT);
     if (String(x.ID)==='321458'||String(x.ID)==='321895') fmt='Видеокурс';
     const dir = x.UF_CRM_1498466811||[];
+    const dirArr = Array.isArray(dir)?dir:(dir?[dir]:[]);
     return {
+      DIR: dirArr.length ? (directions[String(dirArr[0])] || '—') : '—',
       ID: x.ID, TITLE: x.TITLE||'',
       OPP: parseFloat(x.OPPORTUNITY||0),
       SEM: x.STAGE_SEMANTIC_ID||null, STAGE: x.STAGE_ID||'',
@@ -525,7 +528,8 @@ export async function analyze(onProgress) {
           // by_prod: только ООМ, без конструктора (ILP) — таблица продуктов пересчитывается из by_prod
           if (!r.IS_KOM && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')) {
             const pk=r.PRODUCT.slice(0,90);
-            if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};
+            if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR};
+            if (!wd.by_prod[pk].dir || wd.by_prod[pk].dir==='—') wd.by_prod[pk].dir=r.DIR;  // направление курса (для фильтра в рейтингах)
             wd.by_prod[pk].deals++; wd.by_prod[pk].sum+=r.OPP;
             if (r.FORMAT==='Очный') { wd.by_prod[pk].fmt_ochn_cnt++; wd.by_prod[pk].fmt_ochn_sum+=r.OPP; }
             else if (r.FORMAT==='Онлайн') { wd.by_prod[pk].fmt_om_cnt++; wd.by_prod[pk].fmt_om_sum+=r.OPP; }
