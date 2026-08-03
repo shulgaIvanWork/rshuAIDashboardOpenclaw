@@ -19,6 +19,7 @@ import {
   LEARNER_STATUS,
   LEARNER_STATUS_FILLED,
   UF,
+  FORMAT_MAP,
 } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -275,15 +276,12 @@ const DICT = {
   '16471': 'Школа продаж',
   '34365': 'Продажи и коммерция', '35002': 'Строительство и девелопмент',
   '13615': 'Организация обучения', '10837': 'Архив',
-  // UF_CRM_1744961443398 — Форматы
-  '33559': 'Очно в РШУ', '33560': 'Очно у заказчика',
-  '33561': 'Очно выезд/аренда', '33562': 'Онлайн', '33563': 'Видео',
   // UF_CRM_1672140275546 — B2B/B2C
   '18027': 'B2B', '18028': 'B2C', '18029': 'B2B/B2C',
 };
 
 /** Агрегирует NPS по значению поля (срез) */
-export function aggregateBySlice(deals, year, fieldCode) {
+export function aggregateBySlice(deals, year, fieldCode, labelMap = DICT) {
   const groups = {};
 
   for (const d of deals) {
@@ -327,7 +325,7 @@ export function aggregateBySlice(deals, year, fieldCode) {
         : 0;
       return {
         id: key,
-        label: DICT[key] || key,
+        label: labelMap[key] || key,
         sent: g.sent,
         filled: g.filled,
         conversion: g.sent > 0 ? Math.round((g.filled / g.sent) * 1000) / 10 : 0,
@@ -460,7 +458,7 @@ export async function getNpsAggFull(year) {
 
   // Срезы
   const directions = aggregateBySlice(deals, year, 'UF_CRM_1498466811');
-  const formats = aggregateBySlice(deals, year, 'UF_CRM_1744961443398');
+  const formats = aggregateBySlice(deals, year, UF.FORMAT, FORMAT_MAP);
   const clientTypes = aggregateBySlice(deals, year, 'UF_CRM_1672140275546');
 
   const slices = { directions, formats, clientTypes };
