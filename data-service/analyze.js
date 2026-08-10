@@ -98,6 +98,7 @@ const RE_KOMPFX = /^КОМ[.,\s]*/;
 const RE_GIFT  = /\bПодарок[_:\s]*/g;
 const RE_CONTRACT = /\s*Договор\s*№.*$/i;
 const RE_CITY  = /\s*в\s+г\.?\s*[А-ЯЁA-Z][а-яёa-z\-]+/gi;
+const RE_DRANGE = /\b\d{1,2}-\d{1,2}\.\d{1,2}\.\d{2,4}\b|\b\d{1,2}\.\d{1,2}-\d{1,2}\.\d{1,2}\.\d{2,4}\b/g;  // диапазон дат: 17-20.08.2026 или 30.11-03.12.2026 — до одиночных дат
 const RE_DATE2 = /\b\d{1,2}\.\d{1,2}\.\d{2,4}\b/g;
 const RE_DATE  = /\d{1,2}[.\-\/]\d{1,2}([.\-\/]\d{2,4})?(-\d{1,2}[.\-\/]\d{1,2}([.\-\/]\d{2,4})?)?/g;
 const RE_RANGE = /\d{1,2}-\d{1,2}\.?\d{0,2}/g;
@@ -107,7 +108,7 @@ const RE_SDO   = /\(\s*СДО\s*\)/g;
 function normalizeProduct(title) {
   let t = title || '';
   t = t.replace(RE_COPY,'').replace(RE_KOMPFX,'').replace(RE_GIFT,'').replace(RE_CONTRACT,'');
-  t = t.replace(RE_CITY,'').replace(RE_DATE2,'').replace(RE_DATE,'').replace(RE_RANGE,'');
+  t = t.replace(RE_CITY,'').replace(RE_DRANGE,'').replace(RE_DATE2,'').replace(RE_DATE,'').replace(RE_RANGE,'');
   t = t.replace(RE_PDATE,'').replace(RE_SDO,'').replace(/_+/g,' ').replace(/\s+/g,' ').trim();
   return t.replace(/^[ .,:;"«»()\-–—]+|[ .,:;"«»()\-–—]+$/g,'') || title;
 }
