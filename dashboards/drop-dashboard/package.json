@@ -1,5 +1,5 @@
 {
-  "name": "drop-dashboard",
+  "name": "rshu-management-dashboard",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -7,8 +7,8 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "@rshu/data-service": "*",
-    "express": "^4.22.2"
+    "express": "^4.22.2",
+    "@rshu/data-service": "*"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"
