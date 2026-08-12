@@ -15,7 +15,12 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <script src="/vendor/range-calendar/range-calendar.js"></script>
   <script src="/shared.js" defer></script>
-  <script src="app.js" defer></script>
+  <!-- app.js разбит на модули (<script defer>, общий global-scope). Порядок важен:
+       core → data → render → boot (boot запускает loadAll() последним). -->
+  <script src="app-core.js" defer></script>
+  <script src="app-data.js" defer></script>
+  <script src="app-render.js" defer></script>
+  <script src="app-boot.js" defer></script>
 </head>
 <body>
 <div class="container-fluid p-4">

@@ -142,6 +142,68 @@ function render() {
   ['npsTable', 'directionsTable', 'formatTable', 'b2bTable'].forEach(id => initTableSort(id));
 }
 
+// ── Excel-экспорт ───────────────────────────────────────────────────────────────
+// Собираем те же таблицы, что на экране (помесячная + 3 среза), и отдаём серверу
+// (POST /api/export → xlsx). null/undefined в колонках прироста → пустая ячейка.
+async function exportNpsExcel() {
+  const data = state.data;
+  if (!data || !data.months) return;
+  const num = v => (v === null || v === undefined) ? '' : v;
+
+  const monthSheet = {
+    name: 'Помесячно',
+    header: ['Месяц', 'Отправлено', 'Не заполнили', 'Заполнили', 'Конверсия, %', 'Прирост конверсии, %',
+      'Промоутеры', 'Пассивные', 'Детракторы', '% детракторов', 'NPS, %', 'Средняя оценка',
+      'Прирост NPS, %', 'Прирост NPS, п.п.'],
+    rows: data.months.filter(m => m.sent > 0).map(m => [
+      MONTHS[m.month - 1], m.sent, m.notFilled, m.filled, num(m.conversion), num(m.conversionGrowth),
+      m.promoters, m.neutrals, m.detractors, num(m.detractorPct), num(m.nps), num(m.avgScore),
+      num(m.npsGrowth), num(m.npsGrowthAbs),
+    ]),
+  };
+  if (data.total && data.total.sent > 0) {
+    const promoters = data.months.reduce((s, m) => s + m.promoters, 0);
+    const neutrals = data.months.reduce((s, m) => s + m.neutrals, 0);
+    const detractors = data.months.reduce((s, m) => s + m.detractors, 0);
+    const filled = data.total.filled;
+    monthSheet.rows.push([
+      'Итого', data.total.sent, data.total.sent - filled, filled, num(data.total.conversion), '',
+      promoters, neutrals, detractors, filled > 0 ? Math.round((detractors / filled) * 1000) / 10 : 0,
+      num(data.total.nps), num(data.total.avgScore), '', '',
+    ]);
+  }
+
+  const s = data.slices || {};
+  const sliceSheet = (name, label, items) => ({
+    name,
+    header: [label, 'Отправлено', 'Заполнили', 'Конверсия, %', 'Промоутеры', 'Пассивные', 'Детракторы', 'NPS, %', 'Средняя оценка'],
+    rows: (items || []).map(d => [d.label, d.sent, d.filled, num(d.conversion), d.promoters, d.neutrals, d.detractors, num(d.nps), num(d.avgScore)]),
+  });
+
+  const sheets = [
+    monthSheet,
+    sliceSheet('По направлениям', 'Направление', s.directions),
+    sliceSheet('По форматам', 'Формат', s.formats),
+    sliceSheet('По типу клиента', 'Тип', s.clientTypes),
+  ].filter(sh => sh.rows.length);
+
+  const fileName = 'nps_' + (state.year || new Date().getFullYear()) + '.xlsx';
+  try {
+    const resp = await fetch((window.BASE_PATH || '') + '/api/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sheets, fileName }),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; document.body.appendChild(a); a.click();
+    a.remove(); URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('Ошибка экспорта: ' + e.message);
+  }
+}
+
 // ── Загрузка ──────────────────────────────────────────────────────────────────
 
 async function loadData(year) {
@@ -157,6 +219,8 @@ async function loadData(year) {
 }
 
 async function init() {
+  const btn = $('exportExcelBtn');
+  if (btn) btn.addEventListener('click', exportNpsExcel);
   await loadData(state.year);
 }
 
