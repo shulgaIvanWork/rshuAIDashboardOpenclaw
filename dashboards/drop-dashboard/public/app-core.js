@@ -76,7 +76,7 @@ var rcCompare = RangeCalendar.attach(document.getElementById('compareDisplay'), 
 });
 
 // Переключатель Недели/Месяцы для понедельных графиков и таблицы
-window.periodModes = window.periodModes || { pos: 'weeks', table: 'weeks' };
+window.periodModes = window.periodModes || { pos: 'weeks', funnel: 'weeks', table: 'weeks' };
 let lastRenderData = null;
 window.setPeriodMode = function(block, m) {
   window.periodModes[block] = m;
