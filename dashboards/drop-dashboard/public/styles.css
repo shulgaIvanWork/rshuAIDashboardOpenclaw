@@ -23,6 +23,15 @@ body { padding: 0 !important; }
 /* Строки-группы в таблице менеджеров (Автооплаты/ОЗК/Прочие) */
 .mgr-group-row td { background: #f5f6fa; color: #475569; font-weight: 600; }
 
+/* Отчёт по менеджерам: бейдж конверсии (Таблица 1) и подсветка отклонений (Таблица 2) */
+.mgr-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.mgr-badge-green  { background: #e8f5e9; color: #2e7d32; }
+.mgr-badge-red    { background: #ffebee; color: #c62828; }
+.mgr-badge-yellow { background: #fff8e1; color: #e65100; }
+.mgr-hl-green  { color: #2e7d32; }
+.mgr-hl-red    { color: #c62828; }
+.mgr-hl-yellow { color: #e65100; }
+
 /* Поля дат (RangeCalendar/только для отображения) — тот же вид, что раньше был
    у input[type=date] в shared.css */
 .rc-input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; width: 200px; cursor: pointer; background: #fff; }

@@ -24,10 +24,12 @@ import { fileURLToPath } from 'url';
 
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила (isKomDeal, границы сумм, источник «Регистрация»)
-import { isKomDeal, MIN_OPP, REG_SRC_ID, VALID_CATS, MQL_SALE_STAGES } from '@rshu/data-service/lib/deal-rules.js';
+import { isKomDeal, MIN_OPP, REG_SRC_ID, VALID_CATS, MQL_SALE_STAGES, NOT_MQL_SALE, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 import { enrichForKpi, calcPeriodKpi } from '@rshu/data-service/lib/period-kpi.js';
 // Единый справочник групп менеджеров
 import { getMgrGroup, MGR_GROUP_LABELS } from '@rshu/data-service/lib/mgr-groups.js';
+// Полный расчёт KPI по менеджерам (Таблица 1/2, срезы) — общий с manager-report
+import { calcManagers } from '@rshu/data-service/lib/managers-kpi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -211,6 +213,144 @@ app.get('/api/managers-sales', async (req, res) => {
     });
   } catch (e) {
     console.error('/api/managers-sales error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Полный отчёт по менеджерам за период (Таблица 1: показатели, Таблица 2: конверсии,
+// срезы B2B/B2C·источники·форматы). Расчёт — общий calcManagers (managers-kpi.js),
+// группы — mgr-groups.js. Менеджеры уже агрегированы (индивид. + Автооплаты/ОЗК/Прочие).
+app.get('/api/managers-report', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const [dealsRaw, dicts] = await Promise.all([
+      fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
+      fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').then(JSON.parse),
+    ]);
+    let fromDate = null, toDate = null;
+    if (from && to) {
+      fromDate = new Date(from + 'T00:00:00');
+      toDate   = new Date(to   + 'T23:59:59');
+      if (isNaN(fromDate) || isNaN(toDate) || fromDate > toDate) {
+        return res.status(400).json({ error: 'некорректный диапазон дат' });
+      }
+    }
+    const all = calcManagers(dealsRaw, dicts, fromDate, toDate);
+    const g = k => all.filter(m => m.group === k);
+    res.json({
+      period:   (from && to) ? `${from} — ${to}` : 'YTD',
+      managers: [...g('main'), ...g('autopay'), ...g('ozk'), ...g('other'), ...g('tech')],
+      loadedAt: new Date(getCacheAt()).toISOString(),
+    });
+  } catch (e) {
+    console.error('/api/managers-report error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Недельная/месячная динамика для ОДНОГО менеджера (или всех при mgr=all).
+// Метрики и бакетирование — 1:1 как в analyze.js (leads/mql/sql по дате создания,
+// счёт по дате счёта, оплаты по дате оплаты). Мета недель/месяцев берём из getAgg,
+// чтобы подписи и порядок точно совпадали с таблицей «Все». Данные — за весь YEAR.
+app.get('/api/manager-weeks', async (req, res) => {
+  try {
+    const mgrId = String(req.query.mgr || '');
+    if (!mgrId) return res.status(400).json({ error: 'mgr обязателен (id или all)' });
+    const filterAll = mgrId === 'all';
+    const [dealsRaw, agg] = await Promise.all([
+      fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
+      getAgg(),
+    ]);
+
+    const parseDt = s => {
+      if (!s) return null;
+      let m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+      m = String(s).match(/^(\d{2})\.(\d{2})\.(\d{4})/); if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+      return null;
+    };
+    const dateOnly = d => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
+    const isoWeek = d => { const l = dateOnly(d); const dow = l.getDay() || 7; const thu = new Date(l); thu.setDate(l.getDate() + 4 - dow); const yr = thu.getFullYear(); return Math.floor((thu - new Date(yr, 0, 1)) / (7*86400000)) + 1; };
+    const daysBetween = (a, b) => Math.round((dateOnly(b) - dateOnly(a)) / 86400000);
+
+    const isAllLead  = r => VALID_CATS.has(r.CAT_ID) && !(r.SEM === 'S' && r.OPP < MIN_OPP);
+    const isQualLead = r => {
+      if (!VALID_CATS.has(r.CAT_ID)) return false;
+      if (r.SEM === 'S' && r.OPP < MIN_OPP) return false;
+      if (r.CAT_ID === 0)  return NOT_MQL_SALE.has(r.STAGE) ? false : MQL_SALE_STAGES.has(r.STAGE);
+      if (r.CAT_ID === 19) return !(r.SEM === 'S' || r.SEM === 'F');
+      return false;
+    };
+    const isSqlByCreate = r => {
+      const st = r.STAGE;
+      if (['DETAILS','PROPOSAL','2','6','WON'].includes(st)) return true;
+      if (r.CAT_ID === 19 && r.SEM !== 'S') {
+        const ks = (st || '').replace('C19:', '');
+        if (['EXECUTING','UC_C670BC','UC_I443UQ'].includes(ks)) return true;
+        if (r.UF5 && ['UC_ALOZ6B','UC_W4ML6H','LOSE'].includes(ks)) return true;
+      }
+      if (r.INV && ['LOSE','UC_F2YC3N','UC_W6SCHG','UC_670ME2','UC_VKPN0N'].includes(st)) return true;
+      return false;
+    };
+
+    const wk = {}, mo = {};
+    const blank = () => ({ leads:0, mql:0, sql:0, invoice_cnt:0, oplata:0, postupleniya:0, won_cnt:0, durSum:0, durN:0 });
+    const eW = k => (wk[k] || (wk[k] = blank()));
+    const eM = k => (mo[k] || (mo[k] = blank()));
+
+    for (const x of dealsRaw) {
+      if (!filterAll && String(x.ASSIGNED_BY_ID || '') !== mgrId) continue;
+      const r = {
+        OPP: parseFloat(x.OPPORTUNITY || 0), SEM: x.STAGE_SEMANTIC_ID || null,
+        STAGE: x.STAGE_ID || '', CAT_ID: parseInt(x.CATEGORY_ID || 0),
+        DC: parseDt(x.DATE_CREATE), PAY_DT: parseDt(x.UF_DATE_PAY_1C),
+        INV_DT: parseDt(x.UF_CRM_1753272713011), INV: x.UF_CRM_1753272713011,
+        UF5: x.UF_CRM_5D133690E1, IS_KOM: isKomDeal(x),
+      };
+      // leads/mql/sql — по дате создания
+      if (r.DC && r.DC.getFullYear() === YEAR) {
+        const w = isoWeek(r.DC), mm = r.DC.getMonth();
+        if (isAllLead(r))     { eW(w).leads++;  eM(mm).leads++; }
+        if (isQualLead(r))    { eW(w).mql++;    eM(mm).mql++; }
+        if (isSqlByCreate(r)) { eW(w).sql++;    eM(mm).sql++; }
+      }
+      // счёт — по дате счёта
+      if (r.INV_DT && r.INV_DT.getFullYear() === YEAR) {
+        eW(isoWeek(r.INV_DT)).invoice_cnt++; eM(r.INV_DT.getMonth()).invoice_cnt++;
+      }
+      // оплаты — по дате оплаты
+      if (r.OPP >= MIN_OPP && r.PAY_DT && r.PAY_DT.getFullYear() === YEAR && VALID_CATS.has(r.CAT_ID)) {
+        const w = isoWeek(r.PAY_DT), mm = r.PAY_DT.getMonth();
+        eW(w).oplata++; eW(w).postupleniya += r.OPP;
+        eM(mm).oplata++; eM(mm).postupleniya += r.OPP;
+        if (!r.IS_KOM) { eW(w).won_cnt++; eM(mm).won_cnt++; }
+        if (r.DC) { const dd = daysBetween(r.DC, r.PAY_DT); if (dd >= 0) { eW(w).durSum += dd; eW(w).durN++; eM(mm).durSum += dd; eM(mm).durN++; } }
+      }
+    }
+
+    const finalize = (metaArr, store, keyFn) => (metaArr || []).map(meta => {
+      const b = store[keyFn(meta)] || blank();
+      const post = b.postupleniya || 0, opl = b.oplata || 0, won = b.won_cnt || 0;
+      return {
+        week: meta.week, month: meta.month, label_dates: meta.label_dates,
+        leads: b.leads, mql: b.mql, sql: b.sql, invoice_cnt: b.invoice_cnt,
+        oplata: opl, postupleniya: post,
+        avg_check: won ? post / won : 0,
+        avg_dur: b.durN ? b.durSum / b.durN : 0,
+        conv_lead_mql:       b.leads ? b.mql / b.leads * 100 : 0,
+        conv_mql_sql:        b.mql   ? b.sql / b.mql * 100 : 0,
+        conv_sql_invoice:    b.sql   ? b.invoice_cnt / b.sql * 100 : 0,
+        conv_invoice_oplata: b.invoice_cnt ? opl / b.invoice_cnt * 100 : 0,
+      };
+    });
+
+    res.json({
+      mgr:      mgrId,
+      weeks:    finalize(agg.weeks,  wk, m => m.week),
+      months:   finalize(agg.months, mo, m => (m.month != null ? m.month - 1 : m.week - 1)),
+      loadedAt: new Date(getCacheAt()).toISOString(),
+    });
+  } catch (e) {
+    console.error('/api/manager-weeks error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
