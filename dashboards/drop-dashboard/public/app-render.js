@@ -7,6 +7,91 @@
  * Переключатель Недели/Месяцы — через window.periodModes (app-core.js) и setPeriodMode().
  */
 
+// ── Блок «Продажи по менеджерам» ─────────────────────────────────────────────
+// mgr — ответ /api/managers-sales: {managers, groups, labels, total, period, prev_period}.
+// Одна таблица: менеджеры продаж + строки-группы (Автооплаты, ОЗК, Прочие) без
+// расшифровки состава + общая строка ИТОГО (как во всех таблицах дашборда).
+function renderManagersBlock(mgr) {
+  // Строка менеджера или группы (у группы gname — название, иначе имя менеджера)
+  function rowHtml(name, m, opts) {
+    var dCls = 'delta-flat', dSym = '→', dTxt = '—';
+    if (m.prev_postupleniya > 0) {
+      dCls = m.delta_pct >= 0 ? 'delta-up' : 'delta-down';
+      dSym = m.delta_pct >= 0 ? '▲' : '▼';
+      dTxt = Math.abs(m.delta_pct).toFixed(1) + '%';
+    } else if (m.postupleniya > 0) {
+      dTxt = 'новый';
+    }
+    return '<tr' + (opts && opts.cls ? ' class="' + opts.cls + '"' : '') + '>'
+      + '<td>' + escapeHtml(name) + '</td>'
+      + '<td>' + fmt(m.won_cnt) + '</td>'
+      + '<td>' + fmt(m.postupleniya) + ' ₽</td>'
+      + '<td>' + fmt(m.avg_check) + ' ₽</td>'
+      + '<td>' + (m.avg_close_days_won || 0).toFixed(1) + '</td>'
+      + '<td>' + fmt(m.leads) + '</td>'
+      + '<td>' + fmt(m.mql) + '</td>'
+      + '<td><span class="' + dCls + '">' + dSym + ' ' + dTxt + '</span></td>'
+      + '<td>' + (m.share_pct || 0).toFixed(1) + '%</td>'
+      + '</tr>';
+  }
+  // Сумма по группе менеджеров (без расшифровки состава)
+  function sumGroup(arr) {
+    var s = arr.reduce(function (a, m) {
+      return { postupleniya: a.postupleniya + m.postupleniya, won_cnt: a.won_cnt + m.won_cnt, leads: a.leads + (m.leads || 0), mql: a.mql + (m.mql || 0), prev: a.prev + (m.prev_postupleniya || 0), durSum: a.durSum + (m.avg_close_days_won || 0) * (m.won_cnt || 0) };
+    }, { postupleniya: 0, won_cnt: 0, leads: 0, mql: 0, prev: 0, durSum: 0 });
+    var deltaAbs = s.postupleniya - s.prev;
+    var deltaPct = s.prev > 0 ? (deltaAbs / s.prev * 1000 / 10) : (s.postupleniya > 0 ? 100 : 0);
+    return {
+      won_cnt: s.won_cnt,
+      postupleniya: s.postupleniya,
+      avg_check: s.won_cnt ? Math.round(s.postupleniya / s.won_cnt) : 0,
+      avg_close_days_won: s.won_cnt ? Math.round(s.durSum / s.won_cnt * 10) / 10 : 0,
+      leads: s.leads, mql: s.mql,
+      prev_postupleniya: s.prev, delta_pct: deltaPct,
+    };
+  }
+
+  var rows = [];
+  var managers = mgr.managers || [];
+  var grpAuto = ((mgr.groups || {}).autopay || []).filter(function (m) { return m.postupleniya > 0; });
+  var grpOzk   = ((mgr.groups || {}).ozk   || []).filter(function (m) { return m.postupleniya > 0; });
+  var grpOther = ((mgr.groups || {}).other || []).filter(function (m) { return m.postupleniya > 0; });
+
+  // Строки: менеджеры + группы (Автооплаты, ОЗК, Прочие)
+  managers.forEach(function (m) { rows.push(rowHtml(m.name, m, {})); });
+  var ga = sumGroup(grpAuto);
+  var go = sumGroup(grpOzk);
+  var gp = sumGroup(grpOther);
+  if (grpAuto.length)  rows.push(rowHtml('🤖 Автооплаты', ga, { cls: 'mgr-group-row' }));
+  if (grpOzk.length)   rows.push(rowHtml('🏭 ОЗК', go, { cls: 'mgr-group-row' }));
+  if (grpOther.length) rows.push(rowHtml('🗂 Прочие <span style="font-weight:400;color:#94a3b8">(уволенные)</span>', gp, { cls: 'mgr-group-row' }));
+
+  // Общие итоги по всем строкам таблицы
+  var totM = managers.reduce(function (a, m) { return { p: a.p + m.postupleniya, c: a.c + m.won_cnt, l: a.l + (m.leads || 0), q: a.q + (m.mql || 0) }; }, { p: 0, c: 0, l: 0, q: 0 });
+  var totSum = totM.p + ga.postupleniya + go.postupleniya + gp.postupleniya;
+  var totCnt = totM.c + ga.won_cnt + go.won_cnt + gp.won_cnt;
+  var totLeads = totM.l + ga.leads + go.leads + gp.leads;
+  var totMql = totM.q + ga.mql + go.mql + gp.mql;
+
+  // Доли — от общей суммы строк таблицы (ИТОГО = 100%)
+  if (totSum > 0) {
+    managers.forEach(function (m) { m.share_pct = m.postupleniya / totSum * 100; });
+    if (grpAuto.length)  ga.share_pct = ga.postupleniya / totSum * 100;
+    if (grpOzk.length)   go.share_pct = go.postupleniya / totSum * 100;
+    if (grpOther.length) gp.share_pct = gp.postupleniya / totSum * 100;
+  }
+
+  var head = '<tr><th class="sort" data-col="0">Менеджер</th><th class="sort" data-col="1">Сделок</th><th class="sort" data-col="2">Поступления</th><th class="sort" data-col="3">Ср. чек</th><th class="sort" data-col="4">Цикл, дн</th><th class="sort" data-col="5">Лиды</th><th class="sort" data-col="6">MQL</th><th class="sort" data-col="7">Δ к пред.</th><th class="sort" data-col="8">Доля</th></tr>';
+  var totDur = [ga, go, gp].reduce(function (a, g) { return a + (g.avg_close_days_won || 0) * (g.won_cnt || 0); }, managers.reduce(function (a, m) { return a + (m.avg_close_days_won || 0) * (m.won_cnt || 0); }, 0));
+  var totDurV = totCnt ? Math.round(totDur / totCnt * 10) / 10 : 0;
+  var h = '<div class="card" style="margin-top:8px"><h2>👥 Продажи по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(за выбранный период · пред.: ' + mgr.prev_period.from + ' — ' + mgr.prev_period.to + ')</span></h2>';
+  h += '<div class="scroll-x"><table class="table table-sm sortable" id="mgrTableMain" style="font-size:11px;margin-bottom:0"><thead>' + head + '</thead><tbody>';
+  h += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td>📊 ИТОГО</td><td>' + fmt(totCnt) + '</td><td>' + fmt(totSum) + ' ₽</td><td>' + fmt(totCnt ? Math.round(totSum / totCnt) : 0) + ' ₽</td><td>' + totDurV.toFixed(1) + '</td><td>' + fmt(totLeads) + '</td><td>' + fmt(totMql) + '</td><td>—</td><td>100%</td></tr>';
+  rows.forEach(function (r) { h += r; });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
 async function renderPageMainNew(d) {
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
@@ -109,6 +194,8 @@ async function renderPageMainNew(d) {
     html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0, d.pp && d.pp.ytd, d.pp && d.pp.leads_ytd, d.pp && d.pp.qual_lead_ytd);
     html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev, d.pp && d.pp.oom_ytd, d.pp && d.pp.oom_leads_ytd, d.pp && d.pp.oom_qual_lead_ytd);
     html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
+    // 👥 Продажи по менеджерам — сравнение за выбранный период
+    if (d.mgr_sales) html += renderManagersBlock(d.mgr_sales);
     // Поступления по неделям/месяцам (на всю ширину) + переключатель
     html += '<div class="card" style="margin-top:8px"><h2>Поступления '+(isMonths('pos')?'по месяцам':'по неделям')+perToggle('pos')+'</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
     // Форматы + Тип обучения
@@ -255,6 +342,9 @@ async function renderPageMainNew(d) {
 
     // Артефакты грузятся параллельно — не блокируют рендер
     loadArtifacts();
+
+    // Сортировка таблицы блока «Продажи по менеджерам» (после вставки HTML)
+    if (d.mgr_sales) initTableSort('mgrTableMain');
 
     // Now fill in table data (elements exist now)
     var fmtData = d.fmt_ytd||{};

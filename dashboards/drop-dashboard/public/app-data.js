@@ -119,6 +119,12 @@ async function renderFilteredData() {
     infoEl.textContent = 'период: ' + days + ' дн. (пред.: ' + (filteredData.pp && filteredData.pp.label || '—') + ')';
   }
 
+  // Продажи по менеджерам — за выбранный период (сравнение + группы)
+  try {
+    var msParams = '?from=' + dateFrom + '&to=' + dateTo;
+    filteredData.mgr_sales = await api('/api/managers-sales' + msParams);
+  } catch (e) { console.error('/api/managers-sales error:', e); filteredData.mgr_sales = null; }
+
   lastRenderData = filteredData;
   renderPageMainNew(filteredData);
 }

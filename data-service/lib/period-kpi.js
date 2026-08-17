@@ -37,6 +37,7 @@ export function enrichForKpi(dealsRaw) {
       EDU_TYPE: String(x.UF_CRM_1765896709800 || ''),
       BTYPE: detectB2b(x),
       IS_INTERNAL_SRC: isInternalSource(x.SOURCE_ID || ''),
+      MGR_ID: String(x.ASSIGNED_BY_ID || ''),
     };
   });
 }

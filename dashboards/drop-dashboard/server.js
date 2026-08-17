@@ -1,5 +1,5 @@
 /**
- * rshu-management-dashboard/server.js — «Управленческий дашборд РШУ» (sub-app).
+ * rshu-management-dashboard/server.js — «Дашборд отдела продаж РШУ» (sub-app).
  *
  * ЗАЧЕМ:
  *   Сводка для руководства за произвольный ПЕРИОД (кастомный календарь-диапазон):
@@ -24,8 +24,10 @@ import { fileURLToPath } from 'url';
 
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила (isKomDeal, границы сумм, источник «Регистрация»)
-import { isKomDeal, MIN_OPP, REG_SRC_ID, VALID_CATS } from '@rshu/data-service/lib/deal-rules.js';
+import { isKomDeal, MIN_OPP, REG_SRC_ID, VALID_CATS, MQL_SALE_STAGES } from '@rshu/data-service/lib/deal-rules.js';
 import { enrichForKpi, calcPeriodKpi } from '@rshu/data-service/lib/period-kpi.js';
+// Единый справочник групп менеджеров
+import { getMgrGroup, MGR_GROUP_LABELS } from '@rshu/data-service/lib/mgr-groups.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -86,6 +88,129 @@ app.get('/api/kpi', async (req, res) => {
     });
   } catch (e) {
     console.error('/api/kpi error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Продажи по менеджерам: сравнение менеджеров за период + дельта к прошлому периоду.
+// Правила принадлежности периоду — как в /api/kpi (деньги по UF_DATE_PAY_1C, лиды по DATE_CREATE).
+// Ответ: managers (осн. группа), groups (автооплаты/ОЗК/tech/скрытые), total, prev_period.
+app.get('/api/managers-sales', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from и to обязательны (YYYY-MM-DD)' });
+    const dtFrom = new Date(from), dtTo = new Date(to);
+    if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
+      return res.status(400).json({ error: 'некорректный диапазон дат' });
+    }
+
+    const [dealsRaw, dicts] = await Promise.all([
+      fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
+      fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').then(JSON.parse),
+    ]);
+    const users = (dicts && dicts.users) || {};
+    const rows = enrichForKpi(dealsRaw).map(r => ({
+      ...r,
+      MGR_NAME: users[r.MGR_ID] || r.MGR_ID || '(без ответственного)',
+    }));
+
+    // Предыдущий период той же длины вплотную назад (как /api/kpi)
+    const lenMs = dtTo - dtFrom + 86400000;
+    const ppTo   = new Date(dtFrom.getTime() - 86400000);
+    const ppFrom = new Date(dtFrom.getTime() - lenMs);
+
+    const isPaid = r => r.OPP >= MIN_OPP && r.PAY_DT !== null;
+    const isAllLead  = r => VALID_CATS.has(r.CAT_ID) && !(r.SEM === 'S' && r.OPP < MIN_OPP);
+    const isQualLead = r => {
+      if (!VALID_CATS.has(r.CAT_ID)) return false;
+      if (r.SEM === 'S' && r.OPP < MIN_OPP) return false;
+      if (r.CAT_ID === 0) {
+        const st = String(r.STAGE || '').replace(/^C\d+:/, '');
+        return MQL_SALE_STAGES.has(st);
+      }
+      if (r.CAT_ID === 19) return !(r.SEM === 'S' || r.SEM === 'F');
+      return false;
+    };
+
+    // Пустая запись менеджера
+    function emptyMgr(id, name) {
+      return { id, name, group: getMgrGroup(id),
+        postupleniya: 0, won_cnt: 0, avg_check: 0, avg_close_days_won: 0,
+        leads: 0, mql: 0, prev_postupleniya: 0, prev_won_cnt: 0,
+        delta_abs: 0, delta_pct: 0, share_pct: 0 };
+    }
+    const curM = {}, prevM = {};
+    const touch = (map, id, name) => { if (!map[id]) map[id] = emptyMgr(id, name); return map[id]; };
+
+    for (const r of rows) {
+      if (isPaid(r) && r.PAY_DT >= dtFrom && r.PAY_DT <= dtTo) {
+        const m = touch(curM, r.MGR_ID, r.MGR_NAME);
+        m.postupleniya += r.OPP; m.won_cnt++;
+        if (r.DC) {
+          const dd = Math.round((r.PAY_DT - r.DC) / 86400000);
+          if (dd >= 0) { m.durs_sum = (m.durs_sum || 0) + dd; m.durs_cnt = (m.durs_cnt || 0) + 1; }
+        }
+      }
+      if (isPaid(r) && r.PAY_DT >= ppFrom && r.PAY_DT <= ppTo) {
+        const m = touch(prevM, r.MGR_ID, r.MGR_NAME);
+        m.prev_postupleniya += r.OPP; m.prev_won_cnt++;
+      }
+      if (r.DC && r.DC >= dtFrom && r.DC <= dtTo) {
+        if (isAllLead(r)) {
+          const m = touch(curM, r.MGR_ID, r.MGR_NAME);
+          m.leads++;
+          if (isQualLead(r)) m.mql++;
+        }
+      }
+    }
+
+    // Финальная сборка: доли, дельты, средние
+    const all = {};
+    const ids = new Set([...Object.keys(curM), ...Object.keys(prevM)]);
+    for (const id of ids) {
+      const c = curM[id] || emptyMgr(id, users[id] || id || '(без ответственного)');
+      const p = prevM[id];
+      if (p) { c.prev_postupleniya = p.prev_postupleniya; c.prev_won_cnt = p.prev_won_cnt; }
+      c.avg_check = c.won_cnt ? Math.round(c.postupleniya / c.won_cnt) : 0;
+      c.avg_close_days_won = c.durs_cnt ? Math.round((c.durs_sum / c.durs_cnt) * 10) / 10 : 0;
+      delete c.durs_sum; delete c.durs_cnt;
+      c.delta_abs = Math.round(c.postupleniya - c.prev_postupleniya);
+      c.delta_pct = c.prev_postupleniya > 0 ? Math.round((c.delta_abs / c.prev_postupleniya) * 1000) / 10 : (c.postupleniya > 0 ? 100 : 0);
+      all[id] = c;
+    }
+
+    // Видимые группы (main/autopay/ozk/bond/afanasyev) — база для доли; tech/hidden не размывают
+    const visibleGroups = new Set(['main', 'autopay', 'ozk', 'bond', 'afanasyev']);
+    const totalSum = Object.values(all).filter(m => visibleGroups.has(m.group)).reduce((s, m) => s + m.postupleniya, 0);
+    const totalCnt = Object.values(all).filter(m => visibleGroups.has(m.group)).reduce((s, m) => s + m.won_cnt, 0);
+    for (const m of Object.values(all)) {
+      m.share_pct = totalSum > 0 ? Math.round((m.postupleniya / totalSum) * 1000) / 10 : 0;
+    }
+
+    const sortByPost = arr => arr.sort((a, b) => b.postupleniya - a.postupleniya);
+    const groups = {};
+    for (const g of Object.keys(MGR_GROUP_LABELS)) groups[g] = [];
+    for (const m of Object.values(all)) groups[m.group] = groups[m.group] || [];
+    for (const m of Object.values(all)) groups[m.group].push(m);
+    for (const g of Object.keys(groups)) sortByPost(groups[g]);
+
+    const iso = d => d.toISOString().substring(0, 10);
+    res.json({
+      period:      { from, to },
+      prev_period: { from: iso(ppFrom), to: iso(ppTo) },
+      managers:    groups.main,
+      groups,
+      labels:      MGR_GROUP_LABELS,
+      total: {
+        postupleniya: Math.round(totalSum),
+        won_cnt: totalCnt,
+        avg_check: totalCnt ? Math.round(totalSum / totalCnt) : 0,
+        managers_cnt: groups.main.length,
+      },
+      loadedAt: new Date(getCacheAt()).toISOString(),
+    });
+  } catch (e) {
+    console.error('/api/managers-sales error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

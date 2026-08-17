@@ -20,6 +20,9 @@ body { padding: 0 !important; }
 .table > :not(caption) > * > * { border-bottom: 1px solid var(--bs-border-color); }
 .table thead th { background: #093EB4; color: #fff; border-bottom-color: #093EB4; position: sticky; top: 0; }
 
+/* Строки-группы в таблице менеджеров (Автооплаты/ОЗК/Прочие) */
+.mgr-group-row td { background: #f5f6fa; color: #475569; font-weight: 600; }
+
 /* Поля дат (RangeCalendar/только для отображения) — тот же вид, что раньше был
    у input[type=date] в shared.css */
 .rc-input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; width: 200px; cursor: pointer; background: #fff; }
