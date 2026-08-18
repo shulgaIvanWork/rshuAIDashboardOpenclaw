@@ -24,7 +24,7 @@ import { fileURLToPath } from 'url';
 
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила (isKomDeal, границы сумм, источник «Регистрация»)
-import { isKomDeal, MIN_OPP, REG_SRC_ID, VALID_CATS, MQL_SALE_STAGES, NOT_MQL_SALE, YEAR } from '@rshu/data-service/lib/deal-rules.js';
+import { isKomDeal, isInternalSource, MIN_OPP, REG_SRC_ID, VALID_CATS, MQL_SALE_STAGES, NOT_MQL_SALE, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 import { enrichForKpi, calcPeriodKpi } from '@rshu/data-service/lib/period-kpi.js';
 // Единый справочник групп менеджеров
 import { getMgrGroup, MGR_GROUP_LABELS } from '@rshu/data-service/lib/mgr-groups.js';
@@ -223,7 +223,11 @@ app.get('/api/managers-sales', async (req, res) => {
 app.get('/api/managers-report', async (req, res) => {
   try {
     const { from, to } = req.query;
-    const [dealsRaw, dicts] = await Promise.all([
+    // Фильтры: форма обучения (all|oom|kom) и трафик (all|internal|market).
+    // Фильтруем ВХОДНЫЕ сделки до calcManagers — метрики пересчитываются по подвыборке.
+    const form    = String(req.query.form || 'all');
+    const traffic = String(req.query.traffic || 'all');
+    const [dealsAll, dicts] = await Promise.all([
       fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
       fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').then(JSON.parse),
     ]);
@@ -235,6 +239,14 @@ app.get('/api/managers-report', async (req, res) => {
         return res.status(400).json({ error: 'некорректный диапазон дат' });
       }
     }
+    const dealsRaw = dealsAll.filter(d => {
+      if (form === 'oom' && isKomDeal(d)) return false;         // открытое обучение = не КОМ
+      if (form === 'kom' && !isKomDeal(d)) return false;        // корпоративное обучение = КОМ
+      const internal = isInternalSource(d.SOURCE_ID);
+      if (traffic === 'internal' && !internal) return false;    // внутренняя база
+      if (traffic === 'market'   &&  internal) return false;    // маркетинговый трафик
+      return true;
+    });
     const all = calcManagers(dealsRaw, dicts, fromDate, toDate);
     const g = k => all.filter(m => m.group === k);
     res.json({
@@ -351,6 +363,45 @@ app.get('/api/manager-weeks', async (req, res) => {
     });
   } catch (e) {
     console.error('/api/manager-weeks error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Дневная динамика поступлений (ООМ/КОМ) за YEAR — для режима «Дни» блока «Поступления».
+// Бакетируем по дате оплаты, непрерывный ряд от 1 января до сегодня (дни без оплат = 0).
+app.get('/api/day-series', async (req, res) => {
+  try {
+    const dealsRaw = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
+    const parseDt = s => {
+      if (!s) return null;
+      let m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+      m = String(s).match(/^(\d{2})\.(\d{2})\.(\d{4})/); if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+      return null;
+    };
+    const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const bucket = {};
+    for (const x of dealsRaw) {
+      const opp = parseFloat(x.OPPORTUNITY || 0);
+      if (opp < MIN_OPP) continue;
+      const pd = parseDt(x.UF_DATE_PAY_1C);
+      if (!pd || pd.getFullYear() !== YEAR) continue;
+      if (!VALID_CATS.has(parseInt(x.CATEGORY_ID || 0))) continue;
+      const b = bucket[key(pd)] || (bucket[key(pd)] = { oom_postupleniya: 0, kom_postupleniya: 0 });
+      if (isKomDeal(x)) b.kom_postupleniya += opp; else b.oom_postupleniya += opp;
+    }
+    const today = new Date();
+    const end = today.getFullYear() === YEAR ? new Date(YEAR, today.getMonth(), today.getDate()) : new Date(YEAR, 11, 31);
+    const days = [];
+    for (let dt = new Date(YEAR, 0, 1); dt <= end; dt.setDate(dt.getDate() + 1)) {
+      const b = bucket[key(dt)] || { oom_postupleniya: 0, kom_postupleniya: 0 };
+      days.push({
+        label_dates: `${String(dt.getDate()).padStart(2,'0')}.${String(dt.getMonth()+1).padStart(2,'0')}`,
+        oom_postupleniya: b.oom_postupleniya, kom_postupleniya: b.kom_postupleniya,
+      });
+    }
+    res.json({ days, loadedAt: new Date(getCacheAt()).toISOString() });
+  } catch (e) {
+    console.error('/api/day-series error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

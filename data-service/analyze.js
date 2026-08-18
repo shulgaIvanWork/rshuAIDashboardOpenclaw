@@ -36,7 +36,7 @@ const DATA_SERVICE_CACHE = path.join(__dirname, 'cache');
 import {
   YEAR, MIN_OPP, VALID_CATS, REG_SRC_ID, MBA_DIRECTION_IDS,
   MQL_SALE_STAGES, NOT_MQL_SALE, EDU_TYPE_MAP,
-  isKomDeal, isInternalSource, detectFormat, detectB2b,
+  isKomDeal, isInternalSource, detectFormat, detectB2b, isFullYearLearn,
 } from './lib/deal-rules.js';
 
 // ── Даты ─────────────────────────────────────────────────────────────────────
@@ -415,6 +415,8 @@ export async function analyze(onProgress) {
       COMPANY_ID: String(x.COMPANY_ID||'0'),
       BTYPE: detectB2b(x),
       PRODUCT: normalizeProduct(x.TITLE||''),
+      // «Фантом на весь год» (01.01–31.12): исключаем из рейтингов by_prod/by_src/by_company.
+      IS_FULLYEAR: isFullYearLearn(x),
       IS_KOM: isKom, IS_OOM: !isKom,
       IS_PRESALE: cat==='Pre Sale',
       EDU_TYPE: String(x.UF_CRM_1765896709800||''),
@@ -497,7 +499,7 @@ export async function analyze(onProgress) {
       if (inv && inv.getFullYear()===YEAR) {
         const [,wk]=isoCalendar(inv);
         if (wk in weekly) { const wd=weekly[wk]; wd.invoice_cnt++;
-          if(!r.IS_KOM){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].invoice_cnt++; } }
+          if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].invoice_cnt++; } }
       }
     }
 
@@ -527,7 +529,7 @@ export async function analyze(onProgress) {
             if (d>=0) { wd.durs.push(d); if(r.IS_KOM) wd.kom_durs.push(d); else wd.oom_durs.push(d); }
           }
           // by_prod: только ООМ, без конструктора (ILP) — таблица продуктов пересчитывается из by_prod
-          if (!r.IS_KOM && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')) {
+          if (!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')) {
             const pk=r.PRODUCT.slice(0,90);
             if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR};
             if (!wd.by_prod[pk].dir || wd.by_prod[pk].dir==='—') wd.by_prod[pk].dir=r.DIR;  // направление курса (для фильтра в рейтингах)
@@ -541,9 +543,9 @@ export async function analyze(onProgress) {
           // by_src: сделки/поступления — по дате оплаты (реальные деньги).
           // MQL/SQL — по дате создания, счёт — по дате счёта (см. секции ниже),
           // чтобы воронка источников была как в управленческом (без >100%).
-          if(!r.IS_KOM){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
+          if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
           // by_company
-          { const cid=r.COMPANY_ID; if(cid&&cid!=='0'){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; if(!r.IS_KOM){wd.by_company[cid].om_cnt++;wd.by_company[cid].om_sum+=r.OPP;} else {wd.by_company[cid].kom_cnt++;wd.by_company[cid].kom_sum+=r.OPP;} const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
+          { const cid=r.COMPANY_ID; if(cid&&cid!=='0' && !r.IS_FULLYEAR){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; if(!r.IS_KOM){wd.by_company[cid].om_cnt++;wd.by_company[cid].om_sum+=r.OPP;} else {wd.by_company[cid].kom_cnt++;wd.by_company[cid].kom_sum+=r.OPP;} const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
           // by_mba
           { const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else if(r.FORMAT==='Онлайн'){wd.by_mba[mt].fmt_om_cnt++;wd.by_mba[mt].fmt_om_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_mba[mt].durs.push(d);}}}}
         }
@@ -554,9 +556,9 @@ export async function analyze(onProgress) {
     if (r.DC && r.DC.getFullYear()===YEAR && isQualLeadW(r)) {
       const [,wk]=isoCalendar(r.DC);
       if (wk in weekly) { const wd=weekly[wk]; wd.mql++; if(r.IS_OOM) wd.oom_mql++;
-        if(!r.IS_KOM){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].mql++; }
+        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].mql++; }
         // «Лиды» продукта/МВА = MQL (к продукту лид привязывается только с MQL). По дате создания.
-        if(!r.IS_KOM && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')){ const pk=r.PRODUCT.slice(0,90); if(!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR}; if(!wd.by_prod[pk].dir||wd.by_prod[pk].dir==='—')wd.by_prod[pk].dir=r.DIR; wd.by_prod[pk].mql++; }
+        if(!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')){ const pk=r.PRODUCT.slice(0,90); if(!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR}; if(!wd.by_prod[pk].dir||wd.by_prod[pk].dir==='—')wd.by_prod[pk].dir=r.DIR; wd.by_prod[pk].mql++; }
         { const isMbaQ=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMbaQ){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].mql++;}} }
       }
     }
@@ -565,7 +567,7 @@ export async function analyze(onProgress) {
     if (isSqlByCreate(r) && r.DC && r.DC.getFullYear()===YEAR) {
       const [,wk]=isoCalendar(r.DC);
       if (wk in weekly) { const wd=weekly[wk]; wd.sql++;
-        if(!r.IS_KOM){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].sql++; } }
+        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].sql++; } }
     }
 
     // Pre Sale duration
@@ -580,7 +582,7 @@ export async function analyze(onProgress) {
     if (r.DC && r.DC.getFullYear()===YEAR && isAllLead(r)) {
       const [,wk]=isoCalendar(r.DC);
       if (wk in weekly) { weekly[wk].leads++; if(r.IS_OOM) weekly[wk].oom_leads++;
-        if(!r.IS_KOM){ const sn=r.SRC; if(!weekly[wk].by_src[sn]) weekly[wk].by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; weekly[wk].by_src[sn].leads++; } }
+        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!weekly[wk].by_src[sn]) weekly[wk].by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; weekly[wk].by_src[sn].leads++; } }
     }
   }
 

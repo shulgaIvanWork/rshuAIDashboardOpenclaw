@@ -23,7 +23,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила: КОМ-признак, «настоящая оплата», отчётный год
-import { isKomDeal, isPaidDeal, YEAR } from '@rshu/data-service/lib/deal-rules.js';
+import { isKomDeal, isPaidDeal, isFullYearLearn, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -311,6 +311,10 @@ async function buildParticipants(weekNum) {
 
   for (const d of candidateDeals) {
     const did = d.ID;
+    // Правило «весь год»: период обучения 01.01–31.12 — это заглушка (агентские/
+    // рамочные оплаты без модулей), из-за которой сделка висела бы в КАЖДОЙ неделе.
+    // Не показываем и не учитываем в счётчиках/выгрузке. См. deal-rules.isFullYearLearn.
+    if (isFullYearLearn(d)) continue;
     const dealModules = modulesData[did] || [];
 
     if (dealModules.length === 0) {

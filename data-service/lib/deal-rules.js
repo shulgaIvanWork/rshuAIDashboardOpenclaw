@@ -190,3 +190,17 @@ export function detectB2b(d) {
   const cid = d.COMPANY_ID;
   return (cid && String(cid) !== '0') ? 'B2B' : 'B2C';
 }
+
+/**
+ * «Фантомная» сделка на весь календарный год: период обучения задан как
+ * 01.01–31.12 (LEARN_START / LEARN_END). Это не реальное расписание, а заглушка
+ * (агентские/рамочные оплаты без модулей). Из-за неё сделка «висит» в КАЖДОЙ
+ * неделе дашборда «Участники» и мусорит в рейтингах продуктов/источников/компаний.
+ * Исключается: participants buildParticipants() (отображение + счётчики) и
+ * analyze.js by_prod/by_src/by_company (рейтинги). См. также docs.
+ */
+export function isFullYearLearn(d) {
+  const s = String(d[UF.LEARN_START] || '').slice(0, 10);
+  const e = String(d[UF.LEARN_END] || '').slice(0, 10);
+  return /^\d{4}-01-01$/.test(s) && /^\d{4}-12-31$/.test(e);
+}

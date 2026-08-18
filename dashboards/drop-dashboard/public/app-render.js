@@ -1,10 +1,10 @@
 /**
  * app-render.js — renderPageMainNew(): вся отрисовка страницы.
  *
- * KPI-секции (Итого/ООМ/КОМ с дельтами к периоду сравнения), донаты (форматы/тип обучения/
- * B2B/источники) с таблицами, «Ключевые выводы», KPI регистрации, недельная/месячная таблица
- * и графики Chart.js (в setTimeout, после вставки canvas). Вызывает loadArtifacts() (app-core.js).
- * Переключатель Недели/Месяцы — через window.periodModes (app-core.js) и setPeriodMode().
+ * KPI-секции (Итого/ООМ/КОМ с дельтами к периоду сравнения), блок «Отчёт по менеджерам»
+ * (Таблица 1/2 + горизонтальные срезы), поступления (Дни/Недели/Месяцы), две воронки,
+ * KPI регистрации, недельная/месячная таблица и графики Chart.js (в setTimeout).
+ * Переключатель Дни/Недели/Месяцы — через window.periodModes (app-core.js) и setPeriodMode().
  */
 
 // ── Блок «Продажи по менеджерам» ─────────────────────────────────────────────
@@ -77,20 +77,55 @@ function renderManagersBlock(mgr) {
   // Строки: менеджеры + группы (Автооплаты, ОЗК, Прочие) — после пересчёта долей
   var rows = [];
   managers.forEach(function (m) { rows.push(rowHtml(m.name, m, {})); });
-  if (grpAuto.length)  rows.push(rowHtml('🤖 Автооплаты', ga, { cls: 'mgr-group-row' }));
-  if (grpOzk.length)   rows.push(rowHtml('🏭 ОЗК', go, { cls: 'mgr-group-row' }));
-  if (grpOther.length) rows.push(rowHtml('🗂 Прочие (уволенные)', gp, { cls: 'mgr-group-row' }));
+  if (grpAuto.length)  rows.push(rowHtml('Автооплаты', ga, { cls: 'mgr-group-row' }));
+  if (grpOzk.length)   rows.push(rowHtml('ОЗК', go, { cls: 'mgr-group-row' }));
+  if (grpOther.length) rows.push(rowHtml('Прочие (уволенные)', gp, { cls: 'mgr-group-row' }));
 
   var head ='<tr><th class="sort" data-col="0">Менеджер</th><th class="sort" data-col="1">Сделок</th><th class="sort" data-col="2">Поступления</th><th class="sort" data-col="3">Ср. чек</th><th class="sort" data-col="4">Цикл, дн</th><th class="sort" data-col="5">Лиды</th><th class="sort" data-col="6">MQL</th><th class="sort" data-col="7">Δ к пред.</th><th class="sort" data-col="8">Доля</th></tr>';
   var totDur = [ga, go, gp].reduce(function (a, g) { return a + (g.avg_close_days_won || 0) * (g.won_cnt || 0); }, managers.reduce(function (a, m) { return a + (m.avg_close_days_won || 0) * (m.won_cnt || 0); }, 0));
   var totDurV = totCnt ? Math.round(totDur / totCnt * 10) / 10 : 0;
-  var h = '<div class="card" style="margin-top:8px"><h2>👥 Продажи по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(за выбранный период · пред.: ' + mgr.prev_period.from + ' — ' + mgr.prev_period.to + ')</span></h2>';
+  var h = '<div class="card" style="margin-top:8px"><h2>Продажи по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(за выбранный период · пред.: ' + mgr.prev_period.from + ' — ' + mgr.prev_period.to + ')</span></h2>';
   h += '<div class="scroll-x"><table class="table table-sm sortable" id="mgrTableMain" style="font-size:11px;margin-bottom:0"><thead>' + head + '</thead><tbody>';
-  h += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td>📊 ИТОГО</td><td>' + fmt(totCnt) + '</td><td>' + fmt(totSum) + ' ₽</td><td>' + fmt(totCnt ? Math.round(totSum / totCnt) : 0) + ' ₽</td><td>' + totDurV.toFixed(1) + '</td><td>' + fmt(totLeads) + '</td><td>' + fmt(totMql) + '</td><td>—</td><td>100%</td></tr>';
+  h += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td>ИТОГО</td><td>' + fmt(totCnt) + '</td><td>' + fmt(totSum) + ' ₽</td><td>' + fmt(totCnt ? Math.round(totSum / totCnt) : 0) + ' ₽</td><td>' + totDurV.toFixed(1) + '</td><td>' + fmt(totLeads) + '</td><td>' + fmt(totMql) + '</td><td>—</td><td>100%</td></tr>';
   rows.forEach(function (r) { h += r; });
   h += '</tbody></table></div></div>';
   return h;
 }
+
+// ── Фильтры Таблиц 1/2: форма обучения + трафик ─────────────────────────────
+// Перезапрашивают /api/managers-report с параметрами form/traffic и перерисовывают
+// весь блок (таблицы + срезы). Состояние сохраняется при смене периода (app-data.js).
+window.mgrReportFilter = window.mgrReportFilter || { form: 'all', traffic: 'all' };
+function mgrReportFilterHtml() {
+  var f = window.mgrReportFilter;
+  function opt(v, l, cur) { return '<option value="' + v + '"' + (cur === v ? ' selected' : '') + '>' + l + '</option>'; }
+  return '<span style="float:right;font-weight:400;font-size:12px">'
+    + '<select onchange="setMgrReportFilter(\'form\',this.value)" style="padding:3px 8px;font-size:12px">'
+      + opt('all', 'Все формы', f.form) + opt('oom', 'Открытое обучение', f.form) + opt('kom', 'Корпоративное обучение', f.form)
+    + '</select>'
+    + '<select onchange="setMgrReportFilter(\'traffic\',this.value)" style="padding:3px 8px;font-size:12px;margin-left:6px">'
+      + opt('all', 'Весь трафик', f.traffic) + opt('internal', 'Внутренняя база', f.traffic) + opt('market', 'Маркетинговый трафик', f.traffic)
+    + '</select></span>';
+}
+window.setMgrReportFilter = function (kind, val) {
+  window.mgrReportFilter[kind] = val;
+  var from = (document.getElementById('dateFrom') || {}).value || '';
+  var to   = (document.getElementById('dateTo') || {}).value || '';
+  var qs = [];
+  if (from && to) qs.push('from=' + from, 'to=' + to);
+  qs.push('form=' + window.mgrReportFilter.form, 'traffic=' + window.mgrReportFilter.traffic);
+  var wrap = document.getElementById('mgrReportBlock');
+  if (wrap) wrap.style.opacity = '0.5';
+  api('/api/managers-report?' + qs.join('&')).then(function (rep) {
+    if (lastRenderData) lastRenderData.mgr_report = rep;
+    if (window.Chart && Chart.instances) {
+      Object.keys(Chart.instances).forEach(function (k) { var c = Chart.instances[k]; if (c.canvas && wrap && wrap.contains(c.canvas)) c.destroy(); });
+    }
+    if (wrap) wrap.outerHTML = renderMgrReportBlock(rep);
+    initTableSort('mgrTab1'); initTableSort('mgrTab2');
+    if (window.Chart) { try { initMgrReportCharts(rep, (lastRenderData && lastRenderData.weeks) || []); } catch (e) {} }
+  }).catch(function (e) { console.error('managers-report filter error:', e); var w = document.getElementById('mgrReportBlock'); if (w) w.style.opacity = '1'; });
+};
 
 // ── Отчёт по менеджерам: Таблица 1 (показатели), Таблица 2 (конверсии), срезы, воронка ──
 // rep — ответ /api/managers-report: {managers:[...], period}. Менеджеры уже
@@ -106,13 +141,13 @@ function renderMgrReportBlock(rep) {
 
   // ── Таблица 1: Основные показатели ──
   var cols1 = [
-    { k: 'name', l: 'Менеджер' }, { k: 'in_work_start', l: '📦 В работе(н)' },
-    { k: 'created', l: '➕ Создано' }, { k: 'na_kvalifikatsii', l: '🔍 На квал-и' },
-    { k: 'mql', l: '🎯 MQL' }, { k: 'sql', l: '📊 SQL' }, { k: 'invoice_cnt', l: '📄 Счёт' },
-    { k: 'paid', l: '✅ Оплачено' }, { k: 'kval_lost', l: '❌ Квал отказы' },
-    { k: 'nekval_lost', l: '❌ Не квал' }, { k: 'in_work_end', l: '🔄 В работе(к)' },
-    { k: 'paid_sum', l: '💰 Пост-я' }, { k: 'avg_check', l: '💵 Ср.чек' },
-    { k: 'avg_dur', l: '⏱ Цикл' }, { k: 'conv_pct', l: '📊 Конв.%' },
+    { k: 'name', l: 'Менеджер' }, { k: 'in_work_start', l: 'В работе(н)' },
+    { k: 'created', l: 'Создано' }, { k: 'na_kvalifikatsii', l: 'На квал-и' },
+    { k: 'mql', l: 'MQL' }, { k: 'sql', l: 'SQL' }, { k: 'invoice_cnt', l: 'Счёт' },
+    { k: 'paid', l: 'Оплачено' }, { k: 'kval_lost', l: 'Квал отказы' },
+    { k: 'nekval_lost', l: 'Не квал' }, { k: 'in_work_end', l: 'В работе(к)' },
+    { k: 'paid_sum', l: 'Пост-я' }, { k: 'avg_check', l: 'Ср.чек' },
+    { k: 'avg_dur', l: 'Цикл' }, { k: 'conv_pct', l: 'Конв.%' },
   ];
   function cell1(k, v) {
     if (k === 'paid_sum') return '<b>' + fmt(v) + '</b> ₽';
@@ -132,7 +167,7 @@ function renderMgrReportBlock(rep) {
   var t1 = '<table class="table table-sm sortable" id="mgrTab1" style="font-size:11px"><thead><tr>';
   cols1.forEach(function (c, i) { t1 += '<th class="sort" data-col="' + i + '">' + c.l + '</th>'; });
   t1 += '</tr></thead><tbody>';
-  t1 += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>📊 ИТОГО</b></td>';
+  t1 += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>ИТОГО</b></td>';
   cols1.forEach(function (c) { if (c.k !== 'name') t1 += '<td>' + cell1(c.k, T1[c.k]) + '</td>'; });
   t1 += '</tr>';
   mgrs.forEach(function (m) {
@@ -155,11 +190,11 @@ function renderMgrReportBlock(rep) {
     paid_sum:      sK(mgrs, 'paid_sum'),
   };
   var cols2 = [
-    { k: 'name', l: 'Менеджер' }, { k: 'conv_lead_mql', l: '📊 Создано→MQL' },
-    { k: 'conv_mql_sql', l: '📊 MQL→SQL' }, { k: 'conv_sql_inv', l: '📊 SQL→Счёт' },
-    { k: 'conv_inv_paid', l: '📊 Счёт→Оплата' }, { k: 'conv_pct', l: '📊 Конв.%' },
-    { k: 'avg_dur', l: '⏱ Цикл', rev: true }, { k: 'avg_check', l: '💵 Ср.чек' },
-    { k: 'paid_sum', l: '💰 Пост-я' },
+    { k: 'name', l: 'Менеджер' }, { k: 'conv_lead_mql', l: 'Создано→MQL' },
+    { k: 'conv_mql_sql', l: 'MQL→SQL' }, { k: 'conv_sql_inv', l: 'SQL→Счёт' },
+    { k: 'conv_inv_paid', l: 'Счёт→Оплата' }, { k: 'conv_pct', l: 'Конв.%' },
+    { k: 'avg_dur', l: 'Цикл', rev: true }, { k: 'avg_check', l: 'Ср.чек' },
+    { k: 'paid_sum', l: 'Пост-я' },
   ];
   function cell2(k, v) {
     if (k === 'paid_sum') return '<b>' + fmt(v) + '</b> ₽';
@@ -171,7 +206,7 @@ function renderMgrReportBlock(rep) {
   var t2 = '<table class="table table-sm sortable" id="mgrTab2" style="font-size:11px"><thead><tr>';
   cols2.forEach(function (c, i) { t2 += '<th class="sort" data-col="' + i + '" style="font-size:9px">' + c.l + '</th>'; });
   t2 += '</tr></thead><tbody>';
-  t2 += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>📊 СРЕДНЕЕ</b></td>';
+  t2 += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>СРЕДНЕЕ</b></td>';
   cols2.forEach(function (c) { if (c.k !== 'name') t2 += '<td><b>' + cell2(c.k, st[c.k]) + '</b></td>'; });
   t2 += '</tr>';
   mgrs.forEach(function (m) {
@@ -189,17 +224,18 @@ function renderMgrReportBlock(rep) {
   t2 += '</tbody></table>';
 
   var h = '';
-  h += '<div class="card" style="margin-top:8px"><h2>📋 Таблица 1: Основные показатели по менеджерам</h2><div class="scroll-x">' + t1 + '</div></div>';
-  h += '<div class="card" style="margin-top:8px"><h2>📊 Таблица 2: Конверсии и отклонения от среднего <span style="font-size:12px;color:#475569;font-weight:400">(цвет — отклонение от среднего по отделу)</span></h2><div class="scroll-x">' + t2 + '</div></div>';
-  // Срезы — вертикальные stacked-столбцы, сортировка по сумме (выше сумма — выше столбец)
-  h += '<div class="card" style="margin-top:8px"><h2>📊 Срезы по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(вертикальные столбцы, сортировка по сумме)</span></h2>';
-  h += '<h3 style="font-size:13px;margin:8px 0;color:#1f2a44">B2B vs B2C</h3><div style="height:360px;position:relative"><canvas id="mgrBarsB2b"></canvas></div>';
-  h += '<h3 style="font-size:13px;margin:20px 0 8px;color:#1f2a44">Источники (внутренняя база vs маркетинг)</h3><div style="height:360px;position:relative"><canvas id="mgrBarsSrc"></canvas></div>';
-  h += '<h3 style="font-size:13px;margin:20px 0 8px;color:#1f2a44">Форматы обучения</h3><div style="height:360px;position:relative"><canvas id="mgrBarsFmt"></canvas></div>';
+  h += '<div class="card" style="margin-top:8px"><h2>Таблица 1: Основные показатели по менеджерам' + mgrReportFilterHtml() + '</h2><div class="scroll-x">' + t1 + '</div></div>';
+  h += '<div class="card" style="margin-top:8px"><h2>Таблица 2: Конверсии и отклонения от среднего' + mgrReportFilterHtml() + ' <span style="font-size:12px;color:#475569;font-weight:400">(цвет — отклонение от среднего по отделу)</span></h2><div class="scroll-x">' + t2 + '</div></div>';
+  // Срезы — горизонтальные stacked-полосы, сортировка по сумме (выше сумма — выше полоса)
+  var barH = Math.max(280, mgrs.length * 26 + 90);
+  h += '<div class="card" style="margin-top:8px"><h2>Срезы по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(горизонтальные полосы, сортировка по сумме)</span></h2>';
+  h += '<h3 style="font-size:13px;margin:8px 0;color:#1f2a44">B2B vs B2C</h3><div style="height:'+barH+'px;position:relative"><canvas id="mgrBarsB2b"></canvas></div>';
+  h += '<h3 style="font-size:13px;margin:20px 0 8px;color:#1f2a44">Источники (внутренняя база vs маркетинг)</h3><div style="height:'+barH+'px;position:relative"><canvas id="mgrBarsSrc"></canvas></div>';
+  h += '<h3 style="font-size:13px;margin:20px 0 8px;color:#1f2a44">Форматы обучения</h3><div style="height:'+barH+'px;position:relative"><canvas id="mgrBarsFmt"></canvas></div>';
+  h += '<h3 style="font-size:13px;margin:20px 0 8px;color:#1f2a44">Тип обучения</h3><div style="height:'+barH+'px;position:relative"><canvas id="mgrBarsEdu"></canvas></div>';
   h += '</div>';
-  // Воронка (фиксация состояния в периоде с учётом переходящего остатка)
-  h += '<div class="card" style="margin-top:8px"><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учётом переходящего остатка)</span></h2><div style="height:600px;position:relative"><canvas id="mgrFunnelReport"></canvas></div></div>';
-  return h;
+  // Воронка (фиксация состояния) вынесена вниз — рядом с «Воронка по неделям» (см. renderPageMainNew).
+  return '<div id="mgrReportBlock">' + h + '</div>';
 }
 
 // Графики блока «Отчёт по менеджерам»: срезы (верт. stacked bar) + воронка (stack2 по неделям).
@@ -211,6 +247,7 @@ function initMgrReportCharts(rep, weeks) {
     { id: 'mgrBarsB2b', items: [ { k: 'b2b_sum', label: 'B2B', color: '#1f2a44' }, { k: 'b2c_sum', label: 'B2C', color: '#00bcd4' } ] },
     { id: 'mgrBarsSrc', items: [ { k: 'src_int_sum', label: 'Внутренняя база', color: '#2e7d32' }, { k: 'src_mkt_sum', label: 'Маркетинг', color: '#ff9800' } ] },
     { id: 'mgrBarsFmt', items: [ { k: 'fmt_oom_sum', label: 'ООМ (Очное)', color: '#1565c0' }, { k: 'fmt_om_sum', label: 'ОМ (Онлайн)', color: '#7b1fa2' }, { k: 'fmt_sdo_sum', label: 'СДО', color: '#e65100' } ] },
+    { id: 'mgrBarsEdu', items: [ { k: 'edu_pk_sum', label: 'Повышение квалификации', color: '#1565c0' }, { k: 'edu_pp_sum', label: 'Проф. переподготовка', color: '#00897b' }, { k: 'edu_kom_sum', label: 'Корпоративное обучение', color: '#ff9800' } ] },
   ];
   slices.forEach(function (sl) {
     var el = document.getElementById(sl.id);
@@ -227,6 +264,7 @@ function initMgrReportCharts(rep, weeks) {
         type: 'bar',
         data: { labels: rows.map(function (r) { return r.name; }), datasets: datasets },
         options: {
+          indexAxis: 'y',
           responsive: true, maintainAspectRatio: false,
           plugins: {
             legend: { position: 'top', labels: { font: { size: 10 } } },
@@ -237,31 +275,14 @@ function initMgrReportCharts(rep, weeks) {
               return ctx.dataset.label + ': ' + v.toLocaleString('ru-RU') + ' ₽ (' + p + '%)';
             } } },
           },
-          scales: { x: { stacked: true, ticks: { font: { size: 10 } } }, y: { stacked: true, beginAtZero: true } },
+          scales: { x: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 } } }, y: { stacked: true, ticks: { font: { size: 10 } } } },
         },
       });
     } catch (e) {}
   });
 
-  var fel = document.getElementById('mgrFunnelReport');
-  if (fel && weeks && weeks.length) {
-    var flabels = weeks.map(function (w) { return w.label_dates || ('Нед.' + String(w.week).padStart(2, '0')); });
-    try {
-      new Chart(fel, {
-        type: 'bar',
-        data: { labels: flabels, datasets: [
-          { label: 'Отказы неКвал', data: weeks.map(function (w) { return w.stack2_rej_nq || 0; }), backgroundColor: '#880E4F', borderRadius: 4 },
-          { label: 'Отказы',        data: weeks.map(function (w) { return w.stack2_rej    || 0; }), backgroundColor: '#E53935', borderRadius: 4 },
-          { label: 'Не квал',       data: weeks.map(function (w) { return w.stack2_nq     || 0; }), backgroundColor: '#FFD54F', borderRadius: 4 },
-          { label: 'MQL',           data: weeks.map(function (w) { return w.stack2_mql    || 0; }), backgroundColor: '#42A5F5', borderRadius: 4 },
-          { label: 'SQL',           data: weeks.map(function (w) { return w.stack2_sql    || 0; }), backgroundColor: '#1A237E', borderRadius: 4 },
-          { label: 'Счёт',          data: weeks.map(function (w) { return w.stack2_inv    || 0; }), backgroundColor: '#7E57C2', borderRadius: 4 },
-          { label: 'Оплата',        data: weeks.map(function (w) { return w.stack2_pay    || 0; }), backgroundColor: '#43A047', borderRadius: 4 },
-        ] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 10 } } }, datalabels: { display: false } }, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } },
-      });
-    } catch (e) {}
-  }
+  // Воронка «фиксация состояния» (mgrFunnelReport) инициализируется в основном
+  // рендере renderPageMainNew — рядом с «Воронка по неделям», а не здесь.
 }
 
 // ── Недельная/месячная таблица + фильтр по менеджеру ─────────────────────────
@@ -284,7 +305,7 @@ function buildWeekTableHtml(buckets, monthsMode) {
   var s = '<table class="table table-sm sortable" style="font-size:11px"><thead><tr>';
   colHeaders.forEach(function(h,i){ s += '<th class="sort" data-col="'+i+'">'+h.l+'</th>'; });
   s += '</tr></thead><tbody>';
-  s += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>📊 ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
+  s += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
   for (var j=buckets.length-1;j>=0;j--){
     var w = buckets[j];
     s += '<tr><td>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</td><td>'+(w.leads||0)+'</td><td>'+(w.mql||0)+'</td><td>'+(w.sql||0)+'</td><td>'+(w.invoice_cnt||0)+'</td><td>'+(w.oplata||0)+'</td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td><td>'+((w.leads||0)>0?(w.oplata/w.leads*100).toFixed(1):'0.0')+'%</td></tr>';
@@ -336,6 +357,17 @@ function mgrWeekSelectHtml(d) {
   list.forEach(function(m){ opts += '<option value="'+m.id+'"'+(window.mgrWeekFilter.id===String(m.id)?' selected':'')+'>'+escapeHtml(m.name)+'</option>'; });
   return '<span style="font-size:12px;font-weight:400;color:#475569;margin-left:10px">Менеджер:</span>'
     + '<select id="mgrTableFilter" onchange="setMgrWeekFilter(this.value)" style="margin-left:6px;padding:3px 8px;font-size:12px;font-weight:400">'+opts+'</select>';
+}
+
+// Ленивая загрузка дневного ряда поступлений (/api/day-series) в кэш + перерисовка.
+function ensurePosDays() {
+  if (window.posDayLoading || window.posDayCache) return;
+  window.posDayLoading = true;
+  api('/api/day-series').then(function (r) {
+    window.posDayCache = r.days || [];
+    window.posDayLoading = false;
+    if (lastRenderData) renderPageMainNew(lastRenderData);
+  }).catch(function (e) { window.posDayLoading = false; console.error('/api/day-series error:', e); });
 }
 
 async function renderPageMainNew(d) {
@@ -397,20 +429,27 @@ async function renderPageMainNew(d) {
       return r;
     }
 
-    var b2b = d.btype_ytd||{}, b2bRow = (b2b.B2B||{cnt:0,sum:0}), b2cRow = (b2b.B2C||{cnt:0,sum:0}), totB2b = b2bRow.sum+b2cRow.sum||1;
     var weeks = d.weeks||[], labels = weeks.map(function(w){return w.label_dates || w.label_short || 'Неделя'+String(w.week).padStart(2,'0');});
     // Недели или месяцы — независимо для каждого блока (Поступления/Воронка/таблица)
     var monthsArr = d.months || [];
     function mkLabels(arr) { return arr.map(function(w){return w.label_dates || w.label_short || 'Неделя'+String(w.week).padStart(2,'0');}); }
     function isMonths(block) { return window.periodModes[block] === 'months' && monthsArr.length > 0; }
-    function perToggle(block) {
-      var m = isMonths(block);
+    function perToggle(block, withDays) {
+      var mode = window.periodModes[block];
+      function btn(m, l) { return "<button class=\"tab"+(mode===m?' active':'')+"\" style=\"padding:4px 12px;font-size:12px\" onclick=\"setPeriodMode('"+block+"','"+m+"')\">"+l+"</button>"; }
       return '<span style="float:right;font-weight:400">'
-        + "<button class=\"tab"+(m?'':' active')+"\" style=\"padding:4px 12px;font-size:12px\" onclick=\"setPeriodMode('"+block+"','weeks')\">Недели</button>"
-        + "<button class=\"tab"+(m?' active':'')+"\" style=\"padding:4px 12px;font-size:12px\" onclick=\"setPeriodMode('"+block+"','months')\">Месяцы</button>"
+        + (withDays ? btn('days', 'Дни') : '')
+        + btn('weeks', 'Недели') + btn('months', 'Месяцы')
         + '</span>';
     }
-    var posBuckets = isMonths('pos') ? monthsArr : weeks, posLabels = mkLabels(posBuckets);
+    // «Поступления»: Дни/Недели/Месяцы. Дни грузятся лениво (/api/day-series) в кэш.
+    var posMode = window.periodModes.pos;
+    var posBuckets;
+    if (posMode === 'days') {
+      if (window.posDayCache) posBuckets = window.posDayCache;
+      else { posBuckets = []; ensurePosDays(); }
+    } else { posBuckets = isMonths('pos') ? monthsArr : weeks; }
+    var posLabels = mkLabels(posBuckets);
     var funBuckets = isMonths('funnel') ? monthsArr : weeks, funLabels = mkLabels(funBuckets);
     var fmtKeys = Object.keys(d.fmt_ytd||{}).filter(function(k){return k!=='period';});
 
@@ -444,179 +483,33 @@ async function renderPageMainNew(d) {
     // 📋 Отчёт по менеджерам: Таблица 1/2, срезы, воронка (перенос из manager-report-dev)
     if (d.mgr_report) html += renderMgrReportBlock(d.mgr_report);
     // Поступления по неделям/месяцам (на всю ширину) + переключатель
-    html += '<div class="card" style="margin-top:8px"><h2>Поступления '+(isMonths('pos')?'по месяцам':'по неделям')+perToggle('pos')+'</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
-    // Форматы + Тип обучения
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Поступления по форматам</h2><div class="chartbox-sm"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
-    html += '<div class="card"><h2>Поступления по типу обучения</h2><div class="chartbox-sm"><canvas id="newChEdu"></canvas></div><div id="newEduTable" style="margin-top:8px"></div></div>';
-    html += '</div>';
-    // B2B/B2C + Источники — под Форматами/Типом
-    html += '<div class="twocol" style="margin-top:8px">';
-    html += '<div class="card"><h2>Тип клиента: B2B / B2C</h2><div class="chartbox-sm"><canvas id="newChB2b"></canvas></div><div id="newB2bTable"></div></div>';
-    html += '<div class="card"><h2>Источники: Внутренняя база vs Маркетинговые сделки</h2><div class="chartbox-sm"><canvas id="newChSrcSplit"></canvas></div><div id="newSrcSplitTable"></div></div>';
-    html += '</div>';
+    var posTitle = posMode==='days' ? 'по дням' : (isMonths('pos') ? 'по месяцам' : 'по неделям');
+    html += '<div class="card" style="margin-top:8px"><h2>Поступления '+posTitle+perToggle('pos', true)+'</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
+    // Таблицы «Форматы / Тип обучения / B2B / Источники» удалены — заменены
+    // горизонтальными срезами по менеджерам (mgrBarsFmt/Edu/B2b/Src).
     // Стеки воронок - на всю ширину, друг под другом
     html += '<div class="card" style="margin-top:8px"><h2>Воронка '+(isMonths('funnel')?'по месяцам':'по неделям')+' <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии '+(isMonths('funnel')?'в том же месяце':'на той же неделе')+')</span>'+perToggle('funnel')+'</h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
+    // Воронка «фиксация состояния с учётом переходящего остатка» — перенесена сюда из блока отчёта по менеджерам
+    html += '<div class="card" style="margin-top:8px"><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учётом переходящего остатка)</span></h2><div style="height:600px;position:relative"><canvas id="mgrFunnelReport"></canvas></div></div>';
     // Конверсии
 
 
-    // Строка таблицы разбивки: период/пред.период
-    function splitRow(label, dotColor, name, row, tot, dashed) {
-      var avg = row.cnt > 0 ? Math.round(row.sum / row.cnt) : 0;
-      return '<tr'+(dashed?' style="border-top:1px dashed #ccc"':'')+'><td>'+label+'</td><td><span class="dot" style="background:'+dotColor+'"></span>'+name+'</td><td>'+row.cnt+'</td><td>'+fmt(row.sum)+'</td><td>'+fmt(avg)+'</td><td>'+(row.sum/tot*100).toFixed(1)+'%</td></tr>';
-    }
-    var ppSplits = (d.pp && d.pp.splits) || null;
-    var ppLbl = 'Пред. период' + (d.pp && d.pp.label ? '<br><span class="muted">' + d.pp.label + '</span>' : '');
-
-    // B2B: таблица под графиком — выбранный период + предыдущий
-    var b2bTbl = '<table style="font-size:11px;margin-top:8px"><tr><th>Период</th><th>Тип</th><th>Шт</th><th>Сумма</th><th>Средний чек</th><th>Доля,%</th></tr>'
-      + splitRow('За период', '#3079D2', 'B2B', b2bRow, totB2b, false)
-      + splitRow('', '#F57C00', 'B2C', b2cRow, totB2b, false);
-    if (ppSplits && ppSplits.btype) {
-      var ppB2b = ppSplits.btype.B2B || {cnt:0,sum:0}, ppB2c = ppSplits.btype.B2C || {cnt:0,sum:0};
-      var ppTotB2b = ppB2b.sum + ppB2c.sum || 1;
-      b2bTbl += splitRow(ppLbl, '#3079D2', 'B2B', ppB2b, ppTotB2b, true)
-              + splitRow('', '#F57C00', 'B2C', ppB2c, ppTotB2b, false);
-    }
-    b2bTbl += '</table>';
-
-    // Источники: таблица под графиком — выбранный период + предыдущий
-    var srcYtd = d.src_split_ytd||{};
-    var srcInternal = srcYtd.internal||{cnt:0,sum:0}, srcMkt = srcYtd.marketing||{cnt:0,sum:0};
-    var srcTot = srcInternal.sum+srcMkt.sum||1;
-    var srcTbl = '<table style="font-size:11px;margin-top:8px"><tr><th>Период</th><th>Тип</th><th>Шт</th><th>Сумма</th><th>Средний чек</th><th>Доля,%</th></tr>'
-      + splitRow('За период', '#1f2a44', ' Внутренняя база', srcInternal, srcTot, false)
-      + splitRow('', '#00bcd4', ' Маркетинговые сделки', srcMkt, srcTot, false);
-    if (ppSplits && ppSplits.src) {
-      var ppInt = ppSplits.src.internal || {cnt:0,sum:0}, ppMkt = ppSplits.src.marketing || {cnt:0,sum:0};
-      var ppSrcTot = ppInt.sum + ppMkt.sum || 1;
-      srcTbl += splitRow(ppLbl, '#1f2a44', ' Внутренняя база', ppInt, ppSrcTot, true)
-              + splitRow('', '#00bcd4', ' Маркетинговые сделки', ppMkt, ppSrcTot, false);
-    }
-    srcTbl += '</table>';
         // MBA — перенесён на ratings-dashboard
 
     // Регистрация — над недельной таблицей
     html += '<div class="kpis kpis-8" id="newRegKpis" style="margin-top:16px"></div>';
     html += '<div class="card"><h2>'+(isMonths('table')?'Таблица по месяцам':'Недельная таблица')+mgrWeekSelectHtml(d)+perToggle('table')+'</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
-    // --- Ключевые выводы ---
-    var weeks = d.weeks || [];
-    var lastIdx = weeks.length - 1;
-    while (lastIdx > 0 && weeks[lastIdx] && weeks[lastIdx].postupleniya === 0 && weeks[lastIdx].oplata === 0) {
-      lastIdx--;
-    }
-    var last = weeks[lastIdx] || {};
-    var prev = weeks[lastIdx - 1] || {};
-    var wkDelta = 0;
-    if (prev.postupleniya && prev.postupleniya > 0) {
-      wkDelta = (last.postupleniya - prev.postupleniya) / prev.postupleniya * 100;
-    } else if (last.postupleniya > 0) {
-      wkDelta = 100;
-    }
-    var ytd = d.ytd || {};
-    var srcTop = d.src_rating || [];
-    var fmtData = Object.entries(d.fmt_ytd || {}).filter(function(e){return e[0] !== 'period';}).sort(function(a,b){return (b[1].sum||0) - (a[1].sum||0);});
-    var mgrTop = d.mgr_top || [];
-    var btypeAll = d.btype_ytd || {};
-    var b2b = btypeAll.B2B || {cnt:0,sum:0};
-    var b2c = btypeAll.B2C || {cnt:0,sum:0};
-    var totSum = b2b.sum + b2c.sum || 1;
-    var b2bPct = (b2b.sum / totSum * 100).toFixed(0);
-    var b2cPct = (b2c.sum / totSum * 100).toFixed(0);
+    // Блоки «Ключевые выводы» и «Артефакты данных» удалены. reg нужен ниже для KPI регистрации.
     var reg = d.reg_ytd || {};
-    var regConv = reg.conv || 0;
-    var regPaid = reg.total_paid || 0;
-    var regTotal = reg.total || 0;
-
-    // Форматы по сумме и по количеству
-    var fmtSumSorted = fmtData.slice().sort(function(a,b){return (b[1].sum||0) - (a[1].sum||0);});
-    var fmtCntSorted = fmtData.slice().sort(function(a,b){return (b[1].cnt||0) - (a[1].cnt||0);});
-    var topFmtSum = fmtSumSorted.length > 0 ? fmtSumSorted[0] : null;
-    var topFmtCnt = fmtCntSorted.length > 0 ? fmtCntSorted[0] : null;
-
-    html += '<div class="card" style="background:linear-gradient(135deg,#f8f9ff,#eef1f8)">';
-    html += '<h2>📋 Ключевые выводы</h2>';
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">';
-    // Выбранный период
-    html += '<div><b>📊 В выбранном периоде:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Поступления: <b>'+fmt(ytd.postupleniya)+' ₽</b> ('+ytd.won_relevant_cnt+' сделок)</li>';
-    html += '<li>Средний чек: <b>'+fmt(ytd.avg_check)+' ₽</b></li>';
-    html += '<li>Медиана закрытия: <b>'+(ytd.median_close_days_won||0)+' дн.</b> · Взвешенный: <b>'+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн.</b></li>';
-    html += '<li>Конверсия лид→сделка: <b>'+(ytd.conv_deal_pct||0).toFixed(1)+'%</b></li>';
-    html += '<li>B2B <b>'+b2bPct+'%</b> ('+fmt(b2b.sum)+' ₽) / B2C <b>'+b2cPct+'%</b> ('+fmt(b2c.sum)+' ₽)</li>';
-    html += '</ul></div>';
-    // Неделя
-    var wkLabel = '№'+String(last.week||'');
-    var wkDates = last.label_dates || '';
-    html += '<div><b>📈 Текущая неделя '+wkLabel+' ('+wkDates+'):</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(wkDelta>=0?'📈 +':'📉 ')+Math.abs(wkDelta).toFixed(1)+'% к прошлой</li>';
-    html += '<li>Сделок: <b>'+(last.won_cnt||0)+'</b> · Лидов: <b>'+(last.leads||0)+'</b></li>';
-    html += '</ul></div>';
-    // Регистрация
-    html += '<div><b>📥 Регистрация:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Пришло: <b>'+fmt(regTotal)+'</b> · Оплачено: <b>'+regPaid+'</b> (<b>'+regConv+'%</b>)</li>';
-    html += '<li>Средний чек: <b>'+fmt(reg.avg_check || 0)+' ₽</b> · Цикл: <b>'+(reg.avg_dur||0).toFixed(1)+' дн.</b></li>';
-    html += '</ul></div>';
-    // Лидеры
-    html += '<div><b>🏆 Лидеры:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Формат: <b>'+(topFmtSum ? escapeHtml(topFmtSum[0]) : '-')+'</b> ('+fmt(topFmtSum ? topFmtSum[1].sum : 0)+' ₽)'+(topFmtCnt && topFmtCnt[0] !== topFmtSum[0] ? ' · <b>'+escapeHtml(topFmtCnt[0])+'</b> ('+topFmtCnt[1].cnt+' сд.)' : '')+'</li>';
-    // src_rating отсортирован по сумме ([0] — ИТОГО); Регистрацию ищем по имени,
-    // а не по индексу — её место в рейтинге меняется
-    var srcReg = srcTop.find(function(s){ return s.name === 'Регистрация'; });
-    html += '<li>Источник: <b>'+(srcTop.length > 1 ? escapeHtml(srcTop[1].name) : '-')+'</b> ('+fmt(srcTop.length > 1 ? srcTop[1].postupleniya : 0)+' ₽) · Регистрация: <b>'+fmt(srcReg ? srcReg.postupleniya : 0)+' ₽</b></li>';
-    html += '<li>'+(mgrTop.length > 0 ? 'Менеджер: <b>'+escapeHtml(mgrTop[0].name)+'</b> ('+fmt(mgrTop[0].postupleniya)+' ₽)' : '')+'</li>';
-    html += '</ul></div>';
-    // Выводы
-    html += '<div style="grid-column:1/-1"><b>💡 Выводы:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>🔵 Медиана закрытия <b>'+(ytd.median_close_days_won||0)+' дн.</b> — быстрые сделки, но взвешенный '+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн. — крупные КОМ растягивают среднюю</li>';
-    html += '<li>🟢 Регистрация: <b>'+regConv+'%</b> конверсии в сделку — лучшая среди всех источников</li>';
-    if (wkDelta < -20) {
-      html += '<li>🔴 Резкое падение ('+Math.abs(wkDelta).toFixed(0)+'% к прошлой неделе) — на фоне '+(last.leads||0)+' лидов может быть эффектом конца периода, а не просадкой спроса</li>';
-    }
-    html += '<li>📌 <b>'+escapeHtml(topFmtSum?topFmtSum[0]:'')+'</b> лидирует по сумме, <b>'+escapeHtml(topFmtCnt?topFmtCnt[0]:'')+'</b> — по количеству ('+(topFmtCnt?topFmtCnt[1].cnt:0)+' сд.)</li>';
-    if (ytd.conv_deal_pct < 25) {
-      html += '<li>🎯 Конверсия лид→сделка <b>'+(ytd.conv_deal_pct||0).toFixed(1)+'%</b> — ниже 25%, потенциал в улучшении качества лидов</li>';
-    }
-    html += '</ul></div>';
-    html += '</div></div>';
-
-    // Блок артефактов — виден только admin (403 для остальных обрабатывается внутри loadArtifacts)
-    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="text-center text-secondary py-4"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка...</div></div></div></div>';
 
     // Batch update all at once
     areaNew.innerHTML = html;
-
-    // Артефакты грузятся параллельно — не блокируют рендер
-    loadArtifacts();
 
     // Сортировка таблицы блока «Продажи по менеджерам» (после вставки HTML)
     if (d.mgr_sales) initTableSort('mgrTableMain');
     if (d.mgr_report) { initTableSort('mgrTab1'); initTableSort('mgrTab2'); }
 
-    // Now fill in table data (elements exist now)
-    var fmtData = d.fmt_ytd||{};
-    var fmtShort = function(n){return n.replace(' (Онлайн)','').replace(' (Очное)','');};
-    var fmtRename = {'ООМ':'Очный','ОМ':'Онлайн','СДО':'Дистанционный','КОМ':'Корпоративное обучение'};
-    var fmtDisplay = function(n){var s=fmtShort(n);return fmtRename[s]||s;};
-    var fmtOrder = ['Очный','Онлайн','Видеокурс','Корпоративное обучение'];
-    var fmtTot = 0, fmtEntries = [];
-    for(var ftk in fmtData){if(ftk!=='period'){fmtTot+=fmtData[ftk].sum||0;fmtEntries.push([ftk, fmtData[ftk]]);}}
-    fmtEntries.sort(function(a,b){
-      var ai = fmtOrder.indexOf(fmtDisplay(a[0])); if(ai===-1) ai=99;
-      var bi = fmtOrder.indexOf(fmtDisplay(b[0])); if(bi===-1) bi=99;
-      return ai - bi;
-    });
-    var fmtStr = '<table style="font-size:11px"><tr><th>Формат</th><th>Сумма</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>';
-    for (var fi = 0; fi < fmtEntries.length; fi++) {
-      var fk = fmtEntries[fi][0], fv = fmtEntries[fi][1];
-      fmtStr += '<tr><td>'+fmtDisplay(escapeHtml(fk))+'</td><td>'+fmt(fv.sum)+' \u20bd</td><td>'+fv.cnt+'</td><td>'+fmt(Math.round(fv.sum/fv.cnt))+' \u20bd</td><td>'+(fmtTot>0?(fv.sum/fmtTot*100).toFixed(1):'0.0')+'%</td></tr>';
-    }
-    fmtStr += '</table>';
-    var el = document.getElementById('newFmtTable');
-    if (el) el.innerHTML = fmtStr;
-    var el2 = document.getElementById('newFmtTableUnderChart');
-    if (el2) el2.innerHTML = fmtStr;
 
     // Регистрации: KPI (reg уже объявлен выше, в «Ключевых выводах»).
     // Тот же вид, что у верхних KPI-блоков: значение + дельта, предыдущий период серым снизу.
@@ -677,6 +570,9 @@ async function renderPageMainNew(d) {
           if (document.getElementById('newChFunnel2')) new Chart(document.getElementById('newChFunnel2'), {type:'bar', data:{labels:funLabels,datasets:[{label:'Отказы неКвал',data:funBuckets.map(function(w){return w.stack2_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4,seg:'rej_nq'},{label:'Отказы',data:funBuckets.map(function(w){return w.stack2_rej||0;}),backgroundColor:'#E53935',borderRadius:4,seg:'rej'},{label:'Не квал',data:funBuckets.map(function(w){return w.stack2_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4,seg:'nq'},{label:'MQL',data:funBuckets.map(function(w){return w.stack2_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4,seg:'mql'},{label:'SQL',data:funBuckets.map(function(w){return w.stack2_sql||0;}),backgroundColor:'#1A237E',borderRadius:4,seg:'sql'},{label:'Счёт',data:funBuckets.map(function(w){return w.stack2_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4,seg:'inv'},{label:'Сделка',data:funBuckets.map(function(w){return w.stack2_pay||0;}),backgroundColor:'#43A047',borderRadius:4,seg:'pay'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:function(ctx){return ctx.datasetIndex===ctx.chart.data.datasets.length-1?'auto':false;},color:'#333',anchor:'end',align:'end',font:{weight:'bold',size:10},formatter:function(v,ctx){var i=ctx.dataIndex;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].forEach(function(k){tot+=funBuckets[i][k]||0;});return tot?tot+' сд.':'';}},tooltip:{callbacks:{label:function(ctx){var l=ctx.dataset.label||'';var v=ctx.raw||0;var w=funBuckets[ctx.dataIndex]||{};var s=ctx.dataset.seg||'';var sumKey=s?'stack2_'+s+'_sum':'';var sumVal=sumKey?(w[sumKey]||0):0;var tot=0;['stack2_rej','stack2_rej_nq','stack2_nq','stack2_mql','stack2_sql','stack2_inv','stack2_pay'].map(function(k){tot+=w[k]||0;});var pct=tot>0?(v/tot*100).toFixed(1):0;var txt=l+': '+v+' сд. ('+pct+'%)';if(s==='sql'||s==='inv'||s==='pay'){txt+=' · '+sumVal.toLocaleString('ru-RU')+' ₽';}return txt;}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}},plugins:[{id:'legendSpacer',beforeLayout(chart){var leg=chart.legend;if(leg&&!leg.__spacer30){var of=leg.fit.bind(leg);leg.fit=function(){of();this.height+=30;};leg.__spacer30=true;}}}] });
         } catch(e){}
         try {
+          if (document.getElementById('mgrFunnelReport')) new Chart(document.getElementById('mgrFunnelReport'), {type:'bar', data:{labels:weeks.map(function(w){return w.label_dates||('Нед.'+String(w.week).padStart(2,'0'));}),datasets:[{label:'Отказы неКвал',data:weeks.map(function(w){return w.stack2_rej_nq||0;}),backgroundColor:'#880E4F',borderRadius:4},{label:'Отказы',data:weeks.map(function(w){return w.stack2_rej||0;}),backgroundColor:'#E53935',borderRadius:4},{label:'Не квал',data:weeks.map(function(w){return w.stack2_nq||0;}),backgroundColor:'#FFD54F',borderRadius:4},{label:'MQL',data:weeks.map(function(w){return w.stack2_mql||0;}),backgroundColor:'#42A5F5',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.stack2_sql||0;}),backgroundColor:'#1A237E',borderRadius:4},{label:'Счёт',data:weeks.map(function(w){return w.stack2_inv||0;}),backgroundColor:'#7E57C2',borderRadius:4},{label:'Оплата',data:weeks.map(function(w){return w.stack2_pay||0;}),backgroundColor:'#43A047',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+        } catch(e){}
+        try {
           if (document.getElementById('newChConv')) new Chart(document.getElementById('newChConv'), {type:'line', data:{labels:labels,datasets:[{label:'Лиды\u2192MQL %',data:weeks.map(function(w){return w.conv_lead_mql||0;}),borderColor:'#B0BEC5',tension:0.3,fill:false},{label:'MQL\u2192SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL\u2192Счёт %',data:weeks.map(function(w){return w.conv_sql_invoice||0;}),borderColor:'#43A047',tension:0.3,fill:false},{label:'Счёт\u2192Сделка %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
         } catch(e){}
         try {
@@ -684,30 +580,6 @@ async function renderPageMainNew(d) {
           // qual funnel
           if (document.getElementById('ch_funnel_new_qual')) new Chart(document.getElementById('ch_funnel_new_qual'), {type:'bar', data:{labels:labels,datasets:[{label:'MQL',data:weeks.map(function(w){return w.mql||0;}),backgroundColor:'#3079D2',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.sql||0;}),backgroundColor:'#9A7B3F',borderRadius:4},{label:'Оплачено',data:weeks.map(function(w){return w.oplata||0;}),backgroundColor:'#2E7D32',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
           if (document.getElementById('ch_conv_new_qual')) new Chart(document.getElementById('ch_conv_new_qual'), {type:'line', data:{labels:labels,datasets:[{label:'MQL→SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL→Сделки %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
-          try {
-          if (document.getElementById('newChFmt')){var fl=[],fv=[],fsn=[];var fmtRn={'ООМ':'Очный','ОМ':'Онлайн','СДО':'Дистанционный','КОМ':'Корпоративное обучение'};var fmtSh=function(n){var s=n.replace(' (Онлайн)','').replace(' (Очное)','');return fmtRn[s]||s;};for(var fk in fmtData){if(fk==='period')continue;fl.push(fk);fsn.push(fmtSh(fk));fv.push(fmtData[fk].sum||0);}var ftot=fv.reduce(function(a,b){return a+b;},0);new Chart(document.getElementById('newChFmt'),{type:'doughnut',data:{labels:fsn,datasets:[{data:fv,backgroundColor:['#2E7D32','#1976D2','#F57C00','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:12},formatter:function(v){var p=ftot>0?(v/ftot*100).toFixed(1):0;return p+'%';}}}}});}
-          // Тип обучения: пончик
-          var eduData = d.edu_ytd||{}; var eduFl=[], eduFv=[], eduFsn=[];
-          for(var ek in eduData){if(ek==='period')continue;eduFl.push(ek);eduFsn.push(ek);eduFv.push(eduData[ek].sum||0);}
-          var eduTot=eduFv.reduce(function(a,b){return a+b;},0);
-          if (document.getElementById('newChEdu')) new Chart(document.getElementById('newChEdu'),{type:'doughnut',data:{labels:eduFsn,datasets:[{data:eduFv,backgroundColor:['#1976D2','#00bcd4','#9C27B0']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9}}},datalabels:{color:'#fff',font:{weight:'bold',size:10},formatter:function(v){var p=eduTot>0?(v/eduTot*100).toFixed(1):0;return p+'%';}}}}});
-          // Тип обучения: таблица
-          var eduStr = '<table style="font-size:11px"><tr><th>Направление</th><th>Поступления</th><th>Шт</th><th>Ср.чек</th><th>Доля,%</th></tr>';
-          var edul=(eduData||{}); for(var ek in edul){if(ek==='period')continue;var ev=edul[ek]||{sum:0,cnt:0};eduStr+='<tr><td>'+ek+'</td><td>'+fmt(ev.sum)+' ₽</td><td>'+ev.cnt+'</td><td>'+(ev.cnt>0?fmt(Math.round(ev.sum/ev.cnt)):0)+' ₽</td><td>'+(eduTot>0?(ev.sum/eduTot*100).toFixed(1):'0.0')+'%</td></tr>';}
-          eduStr += '</table>';
-          var eduEl = document.getElementById('newEduTable'); if(eduEl) eduEl.innerHTML = eduStr;
-          } catch(e){}
-        } catch(e){}
-        try {
-          if (document.getElementById('newChB2b')) new Chart(document.getElementById('newChB2b'),{type:'doughnut',data:{labels:['B2B','B2C'],datasets:[{data:[b2bRow.sum,b2cRow.sum],backgroundColor:['#3079D2','#F57C00']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:14},formatter:function(v){var t=b2bRow.sum+b2cRow.sum;return t>0?(v/t*100).toFixed(1)+'%':'';}},tooltip:{callbacks:{label:function(ctx){var i=ctx.dataIndex;var row=i===0?b2bRow:b2cRow;return ctx.label+': '+row.cnt+' шт. · '+fmt(row.sum)+' ₽';}}}}}});
-          // B2B/B2C таблица под графиком
-          var b2bEl = document.getElementById('newB2bTable');
-          if (b2bEl) b2bEl.innerHTML = b2bTbl;
-          // Источники: пончик
-          if (document.getElementById('newChSrcSplit')) new Chart(document.getElementById('newChSrcSplit'),{type:'doughnut',data:{labels:['Внутренняя база','Маркетинговые сделки'],datasets:[{data:[srcInternal.sum,srcMkt.sum],backgroundColor:['#1f2a44','#00bcd4']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top',labels:{font:{size:10}}},datalabels:{color:'#fff',font:{weight:'bold',size:13},formatter:function(v){var t=srcInternal.sum+srcMkt.sum;return t>0?(v/t*100).toFixed(1)+'%':'';}},tooltip:{callbacks:{label:function(ctx){var i=ctx.dataIndex;var row=i===0?srcInternal:srcMkt;return ctx.label+': '+row.cnt+' шт. · '+fmt(row.sum)+' ₽';}}}}}});
-          // Источники: таблица под графиком
-          var srcEl = document.getElementById('newSrcSplitTable');
-          if (srcEl) srcEl.innerHTML = srcTbl;
         } catch(e){}
         try {
           if (document.getElementById('newChDur')) new Chart(document.getElementById('newChDur'),{type:'line',data:{labels:labels,datasets:[{label:'Цикл сделки, дн.',data:weeks.map(function(w){return w.avg_dur||0;}),borderColor:'#9A7B3F',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});

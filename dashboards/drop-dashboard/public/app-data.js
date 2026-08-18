@@ -125,9 +125,12 @@ async function renderFilteredData() {
     filteredData.mgr_sales = await api('/api/managers-sales' + msParams);
   } catch (e) { console.error('/api/managers-sales error:', e); filteredData.mgr_sales = null; }
 
-  // Полный отчёт по менеджерам (Таблица 1/2, срезы) — за выбранный период
+  // Полный отчёт по менеджерам (Таблица 1/2, срезы) — за выбранный период,
+  // с учётом выбранных фильтров формы/трафика (сохраняются при смене периода).
   try {
-    filteredData.mgr_report = await api('/api/managers-report?from=' + dateFrom + '&to=' + dateTo);
+    var mrf = window.mgrReportFilter || { form: 'all', traffic: 'all' };
+    filteredData.mgr_report = await api('/api/managers-report?from=' + dateFrom + '&to=' + dateTo
+      + '&form=' + (mrf.form || 'all') + '&traffic=' + (mrf.traffic || 'all'));
   } catch (e) { console.error('/api/managers-report error:', e); filteredData.mgr_report = null; }
 
   lastRenderData = filteredData;
