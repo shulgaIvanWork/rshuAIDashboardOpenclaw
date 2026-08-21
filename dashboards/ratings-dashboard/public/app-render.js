@@ -63,8 +63,9 @@ async function renderPageMainNew(d) {
     // Топ-20 + «Остальные» из полного списка с фильтром по направлению; доли — внутри выборки
     function prodSliceForDir(dir) {
       var all = d.all_products || d.top_products || [];
+      // Это рейтинг СДЕЛОК: строки с лидами/MQL, но без единой сделки не показываем.
       var list = (dir ? all.filter(function(p){ return (p.dir||'—')===dir; }) : all)
-        .filter(function(p){ return p.name && !isRest(p); }).slice().sort(function(a,b){ return b.sum-a.sum; });
+        .filter(function(p){ return p.name && !isRest(p) && (p.deals||p.cnt||0) > 0; }).slice().sort(function(a,b){ return b.sum-a.sum; });
       var totalSum = list.reduce(function(s,p){ return s+(p.sum||0); }, 0) || 1;
       var withShare = list.map(function(p){ return Object.assign({}, p, { share: Math.round(p.sum/totalSum*100*10)/10 }); });
       var top20 = withShare.slice(0,20), rest = withShare.slice(20);

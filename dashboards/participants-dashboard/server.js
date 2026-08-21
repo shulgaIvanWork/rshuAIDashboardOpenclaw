@@ -23,7 +23,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила: КОМ-признак, «настоящая оплата», отчётный год
-import { isKomDeal, isPaidDeal, isFullYearLearn, YEAR } from '@rshu/data-service/lib/deal-rules.js';
+import { isKomDeal, isPaidDeal, YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -311,25 +311,11 @@ async function buildParticipants(weekNum) {
 
   for (const d of candidateDeals) {
     const did = d.ID;
-    // Правило «весь год»: период обучения 01.01–31.12 — это заглушка (агентские/
-    // рамочные оплаты без модулей), из-за которой сделка висела бы в КАЖДОЙ неделе.
-    // Не показываем и не учитываем в счётчиках/выгрузке. См. deal-rules.isFullYearLearn.
-    if (isFullYearLearn(d)) continue;
+    // Показываем только сделки, у которых есть модули. Без модулей не выводим вовсе:
+    // прежний запасной вариант (learn-период UF_CRM_DATE_START/END_LEARN) вытягивал
+    // рамочные/агентские заглушки (в т.ч. «весь год»), которых на неделе быть не должно.
     const dealModules = modulesData[did] || [];
-
-    if (dealModules.length === 0) {
-      const learnStart = toDate(d.UF_CRM_DATE_START_LEARN);
-      const learnEnd = toDate(d.UF_CRM_DATE_END_LEARN);
-      if (!learnStart || !learnEnd) continue;
-      if (!(learnStart <= range.end && learnEnd >= range.start)) continue;
-      dealModules.push({
-        product_id: '0',
-        original_name: null,
-        product_name: d.TITLE,   // use deal title as program fallback
-        date_start: learnStart ? learnStart.toISOString().substring(0, 10) : null,
-        date_end: learnEnd ? learnEnd.toISOString().substring(0, 10) : null
-      });
-    }
+    if (dealModules.length === 0) continue;
 
     const weekModules = dealModules.filter(m => moduleOverlapsWeek(m));
     if (weekModules.length === 0) continue;
