@@ -10,7 +10,6 @@
  *   app-core.js        — состояние, safeFetch, date-хелперы, loadAll, renderFilteredData (ЭТОТ файл)
  *   app-build-data.js  — buildFilteredData: клиентская агрегация среза за период
  *   app-render.js      — renderPageMainNew: отрисовка таблиц (продукты/источники/компании/МВА)
- *   app-unused.js      — loadArtifacts, renderWeekRow, drawCharts — СЕЙЧАС НЕ ИСПОЛЬЗУЮТСЯ
  *   app-export.js      — календарь периода, Excel-экспорт, запуск loadAll() (грузится ПОСЛЕДНИМ)
  *
  * Общие хелперы (escapeHtml/api/fmt/fmtPct/initTableSort/shortCompany/BASE_PATH) —

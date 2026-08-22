@@ -34,11 +34,10 @@
 <script src="/shared.js"></script>
 <script src="/vendor/range-calendar/range-calendar.js"></script>
 <!-- app.js разбит на модули (classic-скрипты, общий global-scope). Порядок важен:
-     core → build-data → render → unused → export (export запускает loadAll() последним). -->
+     core → build-data → render → export (export запускает loadAll() последним). -->
 <script src="app-core.js"></script>
 <script src="app-build-data.js"></script>
 <script src="app-render.js"></script>
-<script src="app-unused.js"></script>
 <script src="app-export.js"></script>
 </body>
 </html>
