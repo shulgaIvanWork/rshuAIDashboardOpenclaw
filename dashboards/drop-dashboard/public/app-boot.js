@@ -14,3 +14,6 @@ loadAll().catch(function(e) {
   var areaNew = document.getElementById('contentAreaNew');
   if (areaNew) areaNew.innerHTML = '<div class="alert alert-danger">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
 });
+
+// Вкладка «КПЭ»: инициализация (месяцы, права админа)
+initKpiTab();

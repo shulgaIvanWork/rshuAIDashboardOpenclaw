@@ -44,3 +44,26 @@ body { padding: 0 !important; }
 .date-filter-group { display: flex; flex-direction: column; gap: 4px; }
 .date-filter-row { display: flex; align-items: center; gap: 12px; }
 
+/* ── Вкладки «Продажи / КПЭ» ─────────────────────────────────────────────── */
+.kpi-tabs { display: flex; gap: 8px; }
+.kpi-tab {
+  padding: 8px 18px;
+  border: 1px solid #d5dbe8;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.kpi-tab:hover { border-color: #093EB4; color: #093EB4; }
+.kpi-tab.active { background: #093EB4; border-color: #093EB4; color: #fff; }
+
+/* ── Вкладка «КПЭ»: карточки ─────────────────────────────────────────────── */
+.kpis-kpi { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 1200px) { .kpis-kpi { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .kpis-kpi { grid-template-columns: 1fr; } }
+.kpis-kpi .kpi { min-height: 118px; }
+.kpis-kpi .delta { margin-top: 6px; font-weight: 600; }
+

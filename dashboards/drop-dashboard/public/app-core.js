@@ -13,8 +13,8 @@
  * Хелперы escapeHtml/api/fmt/fmtPct/initTableSort — в /shared.js.
  */
 
-function loadArtifacts() {
-  fetch((window.BASE_PATH || '') + '/api/artifacts').then(function(r) {
+function loadArtifacts(mgr) {
+  fetch((window.BASE_PATH || '') + '/api/artifacts' + (mgr && mgr !== 'all' ? '?mgr=' + encodeURIComponent(mgr) : '')).then(function(r) {
     if (r.status === 403) return null;
     return r.json();
   }).then(function(d) {
@@ -23,7 +23,7 @@ function loadArtifacts() {
     var s = d.summary || {};
     var hasAny = s.returns?.cnt || s.inProgressPaid?.cnt || s.wonNoPay?.cnt || s.negativeDuration?.cnt ||
       s.otherCatPaid?.cnt || s.nextYear?.cnt || s.formatRule2?.cnt || s.oldActive?.cnt ||
-      s.mmbaDeals?.cnt || s.noTypeEdu?.cnt || s.autopayDeals?.cnt;
+      s.mmbaDeals?.cnt || s.noTypeEdu?.cnt || s.autopayDeals?.cnt || s.overdueAgreed?.cnt;
     if (!hasAny) {
       el.innerHTML = '<div style="padding:8px;color:#475569;font-size:12px">Аномалий не обнаружено ✅</div>';
       return;
@@ -41,6 +41,7 @@ function loadArtifacts() {
     if (s.mmbaDeals?.cnt)      h += '<tr><td>📋 MMBA→СДО</td><td style="text-align:right">'+s.mmbaDeals.cnt+' шт.</td><td style="text-align:right;color:#9C27B0">'+fmt(s.mmbaDeals.sum)+' ₽</td></tr>';
     if (s.noTypeEdu?.cnt)      h += '<tr><td>📝 Без типа обучения</td><td style="text-align:right">'+s.noTypeEdu.cnt+' шт.</td><td style="text-align:right;color:#00bcd4">'+fmt(s.noTypeEdu.sum)+' ₽</td></tr>';
     if (s.autopayDeals?.cnt)   h += '<tr><td>🔄 Автооплаты (без даты счёта)</td><td style="text-align:right">'+s.autopayDeals.cnt+' шт.</td><td style="text-align:right;color:#3079D2">'+fmt(s.autopayDeals.sum)+' ₽</td></tr>';
+    if (s.overdueAgreed?.cnt)  h += '<tr><td>⏰ Просрочена согласованная дата оплаты</td><td style="text-align:right">'+s.overdueAgreed.cnt+' шт.</td><td style="text-align:right;color:#F57C00">'+fmt(s.overdueAgreed.sum)+' ₽</td></tr>';
     h += '</table></div>';
     el.innerHTML = h;
   }).catch(function() {});
