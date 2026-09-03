@@ -12,6 +12,12 @@
  */
 
 // ── Переключение вкладок ─────────────────────────────────────────────────────
+// Признак админа и последний ответ /api/kpi-slices. Раньше админ определялся
+// чтением editor.style.display: после выбора группы редактор скрывался и обратно
+// уже не появлялся, а раскрытие просрочки перезагружало все запросы целиком.
+var kpiIsAdmin = false;
+var kpiLastSlices = null;
+
 window.switchDashTab = function (tab) {
   var salesBar = document.getElementById('salesFilterBar');
   var sales = document.getElementById('contentAreaNew');
@@ -81,7 +87,7 @@ window.initKpiTab = function () {
 
   // Редактор плана — только админам
   api('/api/user').then(function (u) {
-    if (u && u.role === 'admin') editor.style.display = '';
+    if (u && u.role === 'admin') { kpiIsAdmin = true; editor.style.display = ''; }
   }).catch(function () {});
 };
 
@@ -103,8 +109,7 @@ function loadKpi() {
     var editor = document.getElementById('kpiPlanEditor');
     var isGroup = mgr && mgr.indexOf('group:') === 0;
     if (editor) {
-      var admin = editor.style.display !== 'none';
-      editor.style.display = (admin && !isGroup) ? '' : 'none';
+      editor.style.display = (kpiIsAdmin && !isGroup) ? '' : 'none';
       if (!isGroup) {
         document.getElementById('kpiPlanMonth').textContent = d.month + (isPersonal ? ' · личный план' : '');
         document.getElementById('kpiPlanInput').value = d.plan || '';
@@ -260,6 +265,7 @@ function kpiChartDestroy(id) {
 function renderSlices(d, isPersonal) {
   var el = document.getElementById('kpiSlices');
   if (!el) return;
+  kpiLastSlices = d;
   var hideCoverage = isPersonal && !d.plan_set; // без личного плана покрытие не считаем
   var hideManagers = isPersonal;                // в персональном режиме график менеджеров скрыт
   if (d.weeks.length === 0 && d.managers.rows.length === 0 && d.calendar.length === 0) {
@@ -272,6 +278,10 @@ function renderSlices(d, isPersonal) {
     + (hideManagers ? '' : '<div class="card" style="margin-top:14px"><h2>Факт и ожидания по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(основные — персонально; автооплаты/ОЗК/bond/afanasyev — строками; «Артефакт» — уволенные и тех. аккаунты)</span></h2><div style="position:relative"><canvas id="kpiChManagers"></canvas></div><div id="mgrZeroDrill" style="display:none;margin-top:8px;font-size:12px;color:#475569"></div></div>')
     + renderOverdueBlock(d.overdue)
     + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(оставшиеся рабочие дни)</span></h2><div style="height:320px;position:relative"><canvas id="kpiChCalendar"></canvas></div></div>';
+
+  // Расшифровку заполняем ПОСЛЕ вставки разметки: раньше fillOverdueDrill вызывался
+  // из renderOverdueBlock, то есть до innerHTML, и писал в ещё не созданный узел.
+  if (window._overdueOpen && d.overdue && d.overdue.cnt) fillOverdueDrill(d.overdue);
 
   kpiChartDestroy('weeks'); kpiChartDestroy('managers'); kpiChartDestroy('calendar');
   renderWeeksChart(d);
@@ -354,7 +364,20 @@ function renderWeeksChart(d) {
           color: '#0F172A', font: { weight: 600, size: 10 }
         }
       }
-    }
+    },
+    // Подписи итога стоят над столбцами и упирались в легенду — раздвигаем её блок
+    // (тот же приём, что у воронки в app-render.js).
+    plugins: [{
+      id: 'legendSpacer',
+      beforeLayout: function (chart) {
+        var leg = chart.legend;
+        if (leg && !leg.__spacer24) {
+          var orig = leg.fit.bind(leg);
+          leg.fit = function () { orig(); this.height += 24; };
+          leg.__spacer24 = true;
+        }
+      }
+    }]
   });
 }
 
@@ -385,7 +408,7 @@ function renderManagersChart(d) {
           var el = document.getElementById('mgrZeroDrill');
           if (el) {
             el.style.display = el.style.display === 'none' ? '' : 'none';
-            el.textContent = 'Без результата: ' + (d.managers.zero_names || []).map(escapeHtml).join(', ');
+            el.textContent = 'Без результата: ' + (d.managers.zero_names || []).join(', ');
           }
         }
       },
@@ -428,16 +451,21 @@ function renderOverdueBlock(ovd) {
   var h = '<div class="card" style="margin-top:14px;border-left:4px solid ' + KPI_COLORS.overdue + '">'
     + '<h2>⏰ Просроченные ожидания <span style="font-size:12px;color:#475569;font-weight:400">(согласованная дата оплаты уже прошла, оплаты нет — переходят между месяцами)</span></h2>'
     + '<div class="date-filter-row"><span style="font-size:16px;font-weight:700;color:' + KPI_COLORS.overdue + '">' + ovd.cnt + ' шт · ' + fmt(ovd.sum) + ' ₽</span>'
-    + '<button class="btn btn-primary btn-sm" onclick="window.toggleOverdueDrill()">' + (window._overdueOpen ? 'Скрыть' : 'Расшифровать') + '</button></div>'
+    + '<button id="overdueDrillBtn" class="btn btn-primary btn-sm" onclick="window.toggleOverdueDrill()">' + (window._overdueOpen ? 'Скрыть' : 'Расшифровать') + '</button></div>'
     + '<div id="overdueDrill" style="' + (window._overdueOpen ? '' : 'display:none') + ';margin-top:10px"></div>'
     + '</div>';
-  if (window._overdueOpen) fillOverdueDrill(ovd);
   return h;
 }
 
 window.toggleOverdueDrill = function () {
   window._overdueOpen = !window._overdueOpen;
-  loadKpi(); // перерисовать срезы (простой и надёжный способ)
+  var el = document.getElementById('overdueDrill');
+  var btn = document.getElementById('overdueDrillBtn');
+  if (!el) return;
+  el.style.display = window._overdueOpen ? '' : 'none';
+  if (btn) btn.textContent = window._overdueOpen ? 'Скрыть' : 'Расшифровать';
+  var ovd = kpiLastSlices && kpiLastSlices.overdue;
+  if (window._overdueOpen && ovd && !el.innerHTML) fillOverdueDrill(ovd);
 };
 
 function fillOverdueDrill(ovd) {

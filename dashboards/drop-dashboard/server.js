@@ -179,29 +179,33 @@ const EXP_STAGES = new Set(['PROPOSAL', '6', '2']);
 const MSK_OFFSET_MS = 3 * 3600 * 1000;
 function todayMsk() {
   const now = new Date(Date.now() + MSK_OFFSET_MS);
-  return new Date(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+// ВАЖНО: парсим в UTC-полночь — ровно как parseDt в data-service/lib/period-kpi.js.
+// Локальная полночь ('T00:00:00') давала расхождение с calcPeriodKpi на серверах
+// со сдвигом от UTC (МСК): из месяца выпадал последний день, и сумма по менеджерам
+// не сходилась с общим KPI. Все границы ниже (monthRange, todayMsk) — тоже UTC.
 function parseDt(s) {
   if (!s) return null;
-  const d = new Date(String(s).substring(0, 10) + 'T00:00:00');
+  const d = new Date(String(s).substring(0, 10));
   return isNaN(d.getTime()) ? null : d;
 }
 
 function monthRange(monthStr) {
   const [y, m] = monthStr.split('-').map(Number);
-  return { from: new Date(y, m - 1, 1), to: new Date(y, m, 0) }; // to = последний день месяца
+  return { from: new Date(Date.UTC(y, m - 1, 1)), to: new Date(Date.UTC(y, m, 0)) }; // to = последний день месяца
 }
 
 // Рабочие дни (пн–пт) между датами включительно
 function workdaysBetween(from, to) {
   let n = 0;
-  const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  const d = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
+  const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
   while (d <= end) {
-    const dow = d.getDay();
+    const dow = d.getUTCDay();
     if (dow !== 0 && dow !== 6) n++;
-    d.setDate(d.getDate() + 1);
+    d.setUTCDate(d.getUTCDate() + 1);
   }
   return n;
 }
@@ -316,7 +320,7 @@ app.get('/api/kpi-month', async (req, res) => {
 
     res.json({
       month, prev,
-      plan, prev_plan: prevPlan, plan_source: planScope.source,
+      plan, plan_set: plan > 0, prev_plan: prevPlan, plan_source: planScope.source,
       fact, prev_fact: prevFact,
       pct: plan > 0 ? Math.round(fact.sum / plan * 1000) / 10 : null,
       prev_pct: prevPlan > 0 ? Math.round(prevFact.sum / prevPlan * 1000) / 10 : null,
@@ -343,7 +347,7 @@ app.get('/api/kpi-month', async (req, res) => {
 // ── КПЭ-срезы: недели / менеджеры / календарь / просроченные ──────────────────
 function fmtDate(d) {
   const p = n => String(n).padStart(2, '0');
-  return p(d.getDate()) + '.' + p(d.getMonth() + 1);
+  return p(d.getUTCDate()) + '.' + p(d.getUTCMonth() + 1);
 }
 
 // План-факт по неделям месяца. План недели пропорционален рабочим дням недели
@@ -352,11 +356,11 @@ function buildWeeks(dealsRaw, rows, range, plan, today) {
   const totalWd = workdaysBetween(range.from, range.to);
   const weeks = [];
   let cur = new Date(range.from);
-  const dow = cur.getDay() || 7; // 1..7 (пн..вс)
-  cur.setDate(cur.getDate() - (dow - 1)); // понедельник недели начала месяца
+  const dow = cur.getUTCDay() || 7; // 1..7 (пн..вс)
+  cur.setUTCDate(cur.getUTCDate() - (dow - 1)); // понедельник недели начала месяца
   while (cur <= range.to) {
     const ws = cur > range.from ? new Date(cur) : new Date(range.from);
-    const weRaw = new Date(cur); weRaw.setDate(weRaw.getDate() + 6);
+    const weRaw = new Date(cur); weRaw.setUTCDate(weRaw.getUTCDate() + 6);
     const we = weRaw < range.to ? weRaw : new Date(range.to);
     const wd = workdaysBetween(ws, we);
     const planSum = (plan > 0 && totalWd > 0) ? Math.round(plan * wd / totalWd) : 0;
@@ -385,7 +389,7 @@ function buildWeeks(dealsRaw, rows, range, plan, today) {
       forecast_sum: Math.round(forecast),
       variance: Math.round(forecast - planSum),
     });
-    cur.setDate(cur.getDate() + 7);
+    cur.setUTCDate(cur.getUTCDate() + 7);
   }
   return weeks;
 }
@@ -492,8 +496,8 @@ function buildCalendar(dealsRaw, dicts, range, today) {
   }
   const days = [];
   const start = today > range.from ? today : range.from;
-  for (let d = new Date(start); d <= range.to; d.setDate(d.getDate() + 1)) {
-    const dow = d.getDay();
+  for (let d = new Date(start); d <= range.to; d.setUTCDate(d.getUTCDate() + 1)) {
+    const dow = d.getUTCDay();
     if (dow === 0 || dow === 6) continue;
     const key = d.toISOString().substring(0, 10);
     const b = byDay[key];
@@ -1078,16 +1082,16 @@ app.get('/api/artifacts', async (req, res) => {
     // Частично оплачен / Постоплата), согласованная дата оплаты в прошлом, оплаты нет.
     // Такие сделки искажают «Ожидания»: при пересчёте закрытого месяца они "всплывают"
     // задним числом. Нужно решать по сделке: продлить согласованную дату или закрыть.
-    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const today = todayMsk();
+    const isOverdueAgreed = (d) => { const ad = parseDt(d[UF.AGREED_PAY_DATE]); return !!ad && ad < today; };
     const overdueAgreed = deals
-      .filter(d => ['PROPOSAL', '6', '2'].includes(String(d.STAGE_ID || '').replace(/^C\d+:/, ''))
+      .filter(d => EXP_STAGES.has(String(d.STAGE_ID || '').replace(/^C\d+:/, ''))
         && d.STAGE_SEMANTIC_ID === 'P'
         && !d.UF_DATE_PAY_1C
         && (parseFloat(d.OPPORTUNITY) || 0) >= MIN_OPP
         && validCats.has(String(d.CATEGORY_ID))
-        && d.UF_CRM_1474975772
-        && new Date(String(d.UF_CRM_1474975772).substring(0, 10)) < today)
-      .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, agreed: d.UF_CRM_1474975772, stage: d.STAGE_ID }));
+        && isOverdueAgreed(d))
+      .map(d => ({ id: d.ID, title: d.TITLE, sum: parseFloat(d.OPPORTUNITY) || 0, agreed: d[UF.AGREED_PAY_DATE], stage: d.STAGE_ID }));
 
     const sum = (arr) => arr.reduce((a, b) => a + (b.sum || 0), 0);
     res.json({
