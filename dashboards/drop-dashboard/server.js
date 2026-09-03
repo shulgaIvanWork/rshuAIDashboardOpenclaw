@@ -26,6 +26,7 @@ import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила (isKomDeal, границы сумм, источник «Регистрация»)
 import { isKomDeal, isInternalSource, MIN_OPP, REG_SRC_ID, VALID_CATS, MQL_SALE_STAGES, NOT_MQL_SALE, YEAR, UF } from '@rshu/data-service/lib/deal-rules.js';
 import { enrichForKpi, calcPeriodKpi } from '@rshu/data-service/lib/period-kpi.js';
+import { computeSalesFunnel } from '@rshu/data-service/lib/sales-funnel.js';
 // Единый справочник групп менеджеров
 import { getMgrGroup, MGR_GROUP_LABELS } from '@rshu/data-service/lib/mgr-groups.js';
 // Полный расчёт KPI по менеджерам (Таблица 1/2, срезы) — общий с manager-report
@@ -896,6 +897,36 @@ app.get('/api/day-series', async (req, res) => {
     res.json({ days, loadedAt: new Date(getCacheAt()).toISOString() });
   } catch (e) {
     console.error('/api/day-series error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Воронка продаж: когорта по дате создания, максимальный восстанавливаемый этап ──
+// Сделки, созданные в [from,to] (кат.0 Sale + кат.19 КОМ; PreSale — отдельно, воронка
+// «Квалификации»). Дедуп по ID. Расчёт: data-service/lib/sales-funnel.js.
+app.get('/api/funnel', async (req, res) => {
+  try {
+    const { from, to, mgr } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from и to обязательны (YYYY-MM-DD)' });
+    const dtFrom = new Date(from + 'T00:00:00');
+    const dtTo   = new Date(to   + 'T00:00:00');
+    if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
+      return res.status(400).json({ error: 'некорректный диапазон дат' });
+    }
+    const [dealsRaw, dictsRaw] = await Promise.all([
+      fs.readFile(DEALS_PATH, 'utf-8'),
+      fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').catch(() => '{}'),
+    ]);
+    const dicts = JSON.parse(dictsRaw);
+    const users = (dicts && dicts.users) || {};
+    const out = computeSalesFunnel(JSON.parse(dealsRaw), {
+      from: dtFrom, to: dtTo,
+      mgrId: mgr && mgr !== 'all' ? String(mgr) : null,
+      users,
+    });
+    res.json(Object.assign(out, { calculated_at: new Date(getCacheAt()).toISOString() }));
+  } catch (e) {
+    console.error('/api/funnel error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

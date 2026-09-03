@@ -21,6 +21,7 @@
   <script src="app-data.js" defer></script>
   <script src="app-render.js" defer></script>
   <script src="app-kpi.js" defer></script>
+  <script src="app-funnel.js" defer></script>
   <script src="app-boot.js" defer></script>
 </head>
 <body>
@@ -32,6 +33,7 @@
   <div class="kpi-tabs mb-2">
     <button class="kpi-tab active" data-tab="sales" onclick="window.switchDashTab('sales')">📊 Продажи</button>
     <button class="kpi-tab" data-tab="kpi" onclick="window.switchDashTab('kpi')">🎯 КПЭ</button>
+    <button class="kpi-tab" data-tab="funnel" onclick="window.switchDashTab('funnel')">🧲 Воронка продаж</button>
   </div>
   <div class="date-filter-bar" id="salesFilterBar">
     <div class="date-filter-group">
@@ -76,6 +78,24 @@
     </div>
     <div id="kpiSlices" style="margin-top:20px"></div>
     <div id="newArtifactsBlock" style="margin-top:12px"></div>
+  </div>
+  <div id="funnelTab" style="display:none">
+    <div class="date-filter-bar">
+      <div class="date-filter-group">
+        <div class="date-filter-row">
+          <label>📅 Период (дата создания):</label>
+          <input type="text" id="funnelPeriod" class="rc-input" readonly autocomplete="off">
+          <label style="margin-left:16px">⚡ Месяц:</label>
+          <select id="funnelMonthQuick" class="rc-input" style="width:auto"></select>
+          <label style="margin-left:16px">👤 Менеджер:</label>
+          <select id="funnelMgrSelect" class="rc-input" style="width:auto"></select>
+          <span id="funnelInfo" class="filter-info"></span>
+        </div>
+      </div>
+    </div>
+    <div id="funnelContent">
+      <div class="text-center text-secondary py-5" id="funnelLoading"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка воронки…</div></div>
+    </div>
   </div>
   <div id="contentAreaNew">
     <div class="text-center text-secondary py-5" id="loadingStateNew"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка данных…</div></div>
