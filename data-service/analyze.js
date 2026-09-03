@@ -347,6 +347,179 @@ function detectMbaType(title) {
   return null;
 }
 
+// Среднее по массиву (нужно и buildRatings, и analyze).
+const avg = (arr) => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
+
+// ── Рейтинги за произвольный период ────────────────────────────
+// Продукты, источники, воронка источников, компании и MBA за [from, to]
+// включительно. Одна реализация на два вызова: годовой срез в analyze() и точный
+// период в эндпоинте дашборда «Рейтинги». Раньше рейтинги умели только целые
+// недели, поэтому «август» брался как W31-W36 (27.07-02.09) и не сходился с
+// управленческим дашбордом: 133 сделки против 111.
+export function buildRatings(ctx, from, to, curW) {
+  const { rows, leads, sourcesMap, companies, cc } = ctx;
+  const inR       = (d) => !!d && d >= from && d <= to;
+  const paidIn    = (r) => inR(getPayDate(r));
+  const createdIn = (r) => inR(dateOnly(r.DC));
+  const closedIn  = (r) => inR(dateOnly(r.CL));
+
+  // ── Источники ─────────────────────────────────────────────────────────────
+  const srcData={};
+  const getSrc=n=>{ if(!srcData[n]) srcData[n]={postupleniya:0,deals:0,mql:0,sql:0,postupleniya_week:0,leads:0,durs:[]}; return srcData[n]; };
+  for (const r of rows) if(r.IS_PRESALE&&createdIn(r)) getSrc(r.SRC).mql++;
+  for (const r of rows) if(r.IS_PRESALE&&r.SEM==='S'&&closedIn(r)) getSrc(r.SRC).sql++;
+  for (const r of rows) if(paidIn(r)&&!r.IS_KOM) {
+    const sd=getSrc(r.SRC); sd.postupleniya+=r.OPP; sd.deals++;
+    if(r.DC&&r.CL){const d=daysBetween(r.DC,r.CL);if(d>=0)sd.durs.push(d);}
+    const pdS=getPayDate(r); if(pdS&&isoEq(pdS,YEAR,curW)) sd.postupleniya_week+=r.OPP;
+  }
+  for (const l of leads) {
+    const d=parseDt(l.DATE_CREATE);
+    if(inR(d)) getSrc(sourcesMap[l.SOURCE_ID||'']||'—').leads++;
+  }
+
+  const srcItem=(name,d)=>({
+    name, postupleniya:d.postupleniya, deals:d.deals, mql:d.mql, sql:d.sql,
+    postupleniya_week:d.postupleniya_week, leads:d.leads,
+    avg_check:Math.round(d.deals?d.postupleniya/d.deals:0),
+    avg_won_days:Math.round(avg(d.durs)*10)/10,
+    conv_mql_sql:d.mql?Math.round(d.sql/d.mql*100*10)/10:0,
+    conv_sql_deals:d.sql?Math.round(d.deals/d.sql*100*10)/10:0,
+    conv_lead_deals:d.leads?Math.round(d.deals/d.leads*100*10)/10:0,
+  });
+
+  const srcList=Object.entries(srcData).map(([k,v])=>srcItem(k,v)).sort((a,b)=>b.postupleniya-a.postupleniya);
+  const allDurs=rows.filter(paidIn).filter(r=>r.DC&&r.CL).map(r=>{const d=daysBetween(r.DC,r.CL);return d>=0?d:null;}).filter(d=>d!==null);
+  const totalRow=srcItem('📊 ИТОГО',{
+    postupleniya:srcList.reduce((s,x)=>s+x.postupleniya,0),
+    deals:srcList.reduce((s,x)=>s+x.deals,0), mql:srcList.reduce((s,x)=>s+x.mql,0),
+    sql:srcList.reduce((s,x)=>s+x.sql,0), postupleniya_week:srcList.reduce((s,x)=>s+x.postupleniya_week,0),
+    leads:srcList.reduce((s,x)=>s+x.leads,0), durs:allDurs,
+  });
+  const srcRating=[totalRow,...srcList.slice(0,20)];
+
+  // ── Источники: полная воронка (без КОМ, как управленческий дашборд) ──────
+  // Зеркалит логику управленческого дашборда:
+  //   - Лиды: по ДАТЕ СОЗДАНИЯ (DC) в этом году
+  //   - MQL/SQL/Счёт/Сделки/Поступления: по ДАТЕ ОПЛАТЫ (payYtd) в этом году
+  const srcFunnel={};
+  const getF=n=>{if(!srcFunnel[n])srcFunnel[n]={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0,durs:[],type:''};return srcFunnel[n];};
+  const srcType={};  // srcName → 'internal'|'marketing' (по первому встреченному SRC_ID)
+  for(const r of rows){
+    if(r.IS_KOM) continue;
+    if(!VALID_CATS.has(r.CAT_ID)) continue;
+    const sn=r.SRC;
+    if(!srcType[sn]) srcType[sn]=isInternalSource(r.SRC_ID)?'internal':'marketing';
+    const sd=getF(sn); sd.type=srcType[sn];
+    // MQL/SQL/Счёт/Сделки/Поступления — только оплаченные в этом году (как в управленческом)
+    if(paidIn(r)){
+      if(isQualLeadW(r)) sd.mql++;
+      if(isSqlByCreate(r)) sd.sql++;
+      if(r.INV_DT) sd.invoice_cnt++;
+      sd.deals++;sd.postupleniya+=r.OPP;
+      if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)sd.durs.push(d);}
+    }
+  }
+  // Лиды — отдельным проходом по дате создания (как в управленческом)
+  for(const r of rows){
+    if(r.IS_KOM) continue;
+    if(!VALID_CATS.has(r.CAT_ID)) continue;
+    if(!createdIn(r)) continue;
+    const sn=r.SRC;
+    if(!srcType[sn]) srcType[sn]=isInternalSource(r.SRC_ID)?'internal':'marketing';
+    if(isAllLead(r)) getF(sn).leads++;
+  }
+  function sfItem(name,d){return{name,...d,avg_check:d.deals?Math.round(d.postupleniya/d.deals):0,avg_dur:avg(d.durs)}};
+  const srcFunnelList=Object.entries(srcFunnel).map(([n,d])=>sfItem(n,d)).sort((a,b)=>b.postupleniya-a.postupleniya);
+  const sfTop=srcFunnelList.slice(0,20);
+  const sfRest=srcFunnelList.slice(20);
+  const sfAgg=(list,withDurs)=>{const r={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0};for(const x of list){r.leads+=x.leads;r.mql+=x.mql;r.sql+=x.sql;r.invoice_cnt+=x.invoice_cnt;r.deals+=x.deals;r.postupleniya+=x.postupleniya;}r.avg_check=r.deals?Math.round(r.postupleniya/r.deals):0;if(withDurs&&list.length){const c=list.reduce((s,x)=>s+(x.avg_dur||0)*(x.deals||0),0);r.avg_dur=list.reduce((s,x)=>s+(x.deals||0),0)?c/list.reduce((s,x)=>s+(x.deals||0),0):0;}else r.avg_dur=0;return r;};
+  const sfTopTotal={name:'📊 ИТОГО (топ-20)',...sfAgg(sfTop,true),type:''};
+  const sfAllTotal={name:'📊 ИТОГО (все без КОМ)',...sfAgg(srcFunnelList,true),type:''};
+  let sfRestRow=null;
+  if(sfRest.length){
+    const rAgg=sfAgg(sfRest,false);
+    rAgg.avg_dur=0;
+    sfRestRow={name:`📦 Остальные (${sfRest.length} источников)`,...rAgg,type:''};
+  }
+  const srcFunnelRating=[sfTopTotal,...sfTop,sfRestRow,sfAllTotal].filter(Boolean);
+
+  // ── ТОП продуктов ─────────────────────────────────────────────────────────
+  const prodData={};
+  for (const r of rows) {
+    if (r.IS_KOM) continue;                          // всё корпоративное, не только FORMAT==='КОМ'
+    if (/\bILP\b/i.test(r.TITLE||'')) continue;      // конструктор (ILP где угодно в названии) — по просьбе Насти Ш.
+    const key=r.PRODUCT.slice(0,90);
+    if (!prodData[key]) prodData[key]={deals:0,sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
+    if (paidIn(r)) {
+      prodData[key].deals++; prodData[key].sum+=r.OPP;
+      if (r.FORMAT==='Очный') { prodData[key].fmt_ochn_cnt++; prodData[key].fmt_ochn_sum+=r.OPP; }
+      else if (r.FORMAT==='Онлайн') { prodData[key].fmt_om_cnt++; prodData[key].fmt_om_sum+=r.OPP; }
+      else { prodData[key].fmt_sdo_cnt++; prodData[key].fmt_sdo_sum+=r.OPP; }
+      if (r.DC&&r.CL){const d=daysBetween(r.DC,r.CL);if(d>=0)prodData[key].durs.push(d);}
+    }
+  }
+  const prodList=Object.entries(prodData).map(([name,d])=>{
+    const avgC=d.deals?d.sum/d.deals:0, avgD=avg(d.durs);
+    return{name,deals:d.deals,sum:d.sum,avg_check:Math.round(avgC),avg_won_days:Math.round(avgD*10)/10,share:0,_durs:d.durs,fmt_ochn_cnt:d.fmt_ochn_cnt,fmt_ochn_sum:d.fmt_ochn_sum,fmt_om_cnt:d.fmt_om_cnt,fmt_om_sum:d.fmt_om_sum,fmt_sdo_cnt:d.fmt_sdo_cnt,fmt_sdo_sum:d.fmt_sdo_sum};
+  }).sort((a,b)=>b.sum-a.sum);
+  const totalNonKom=prodList.reduce((s,p)=>s+p.sum,0);
+  const TOP_N=20;
+  const selected=prodList.slice(0,TOP_N).map(p=>{ const {_durs,...rest}=p; rest.share=totalNonKom?Math.round(p.sum/totalNonKom*100*10)/10:0; return rest; });
+  const remaining=prodList.slice(TOP_N);
+  const remSum=remaining.reduce((s,p)=>s+p.sum,0), remDeals=remaining.reduce((s,p)=>s+p.deals,0);
+  const remDurs=remaining.flatMap(p=>p._durs);
+  const remOchnCnt=remaining.reduce((s,p)=>s+p.fmt_ochn_cnt,0), remOchnSum=remaining.reduce((s,p)=>s+p.fmt_ochn_sum,0);
+  const remOmCnt=remaining.reduce((s,p)=>s+p.fmt_om_cnt,0), remOmSum=remaining.reduce((s,p)=>s+p.fmt_om_sum,0);
+  const remSdoCnt=remaining.reduce((s,p)=>s+p.fmt_sdo_cnt,0), remSdoSum=remaining.reduce((s,p)=>s+p.fmt_sdo_sum,0);
+  const topProducts=[...selected,{
+    name:`📦 Остальные (${remaining.length} продуктов)`,deals:remDeals,sum:remSum,
+    avg_check:remDeals?Math.round(remSum/remDeals):0,avg_won_days:Math.round(avg(remDurs)*10)/10,
+    share:totalNonKom?Math.round(remSum/totalNonKom*100*10)/10:0,
+    fmt_ochn_cnt:remOchnCnt,fmt_ochn_sum:remOchnSum,
+    fmt_om_cnt:remOmCnt,fmt_om_sum:remOmSum,
+    fmt_sdo_cnt:remSdoCnt,fmt_sdo_sum:remSdoSum,
+  }];
+
+  // ── ТОП компаний ─────────────────────────────────────────────────────────
+  const companyAgg={};
+  for (const r of rows) {
+    if (!paidIn(r)) continue;
+    let cid=String(r.COMPANY_ID||'0');
+    if(cid==='0'&&cc[r.ID]) cid=String(cc[r.ID].COMPANY_ID||'0');
+    if(!cid||cid==='0') continue;
+    if(!companyAgg[cid]) companyAgg[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0};
+    const pd=getPayDate(r);
+    companyAgg[cid].sum+=r.OPP; companyAgg[cid].cnt++;
+    // ОМ = открытое обучение (все форматы, кроме КОМ) — как на управленческом
+    if(!r.IS_KOM){companyAgg[cid].om_cnt++;companyAgg[cid].om_sum+=r.OPP;}
+    else {companyAgg[cid].kom_cnt++;companyAgg[cid].kom_sum+=r.OPP;}
+    if(pd&&(!companyAgg[cid].last||pd>companyAgg[cid].last)) companyAgg[cid].last=pd;
+  }
+  const topCompanies=Object.entries(companyAgg).filter(([,d])=>d.sum>0).map(([cid,d])=>({
+    id:cid, name:(companies[cid]||'—').slice(0,100), sum:d.sum, cnt:d.cnt,
+    om_cnt:d.om_cnt, om_sum:d.om_sum, kom_cnt:d.kom_cnt, kom_sum:d.kom_sum,
+    last_date:d.last?`${fmt2(d.last.getDate())}.${fmt2(d.last.getMonth()+1)}.${d.last.getFullYear()}`:'—',
+    avg_check:d.cnt?Math.round(d.sum/d.cnt):0,
+  })).sort((a,b)=>b.sum-a.sum).slice(0,20);
+
+  const mbaMap={};
+  for (const r of rows) {
+    if (!paidIn(r)) continue;
+    const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE);
+    if (!isMba) continue;
+    const mt=detectMbaType(r.TITLE); if(!mt) continue;
+    if(!mbaMap[mt]) mbaMap[mt]={cnt:0,sum:0,deals:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
+    mbaMap[mt].cnt++; mbaMap[mt].sum+=r.OPP; mbaMap[mt].deals++;
+    if (r.FORMAT==='Очный') { mbaMap[mt].fmt_ochn_cnt++; mbaMap[mt].fmt_ochn_sum+=r.OPP; }
+    else if (r.FORMAT==='Онлайн') { mbaMap[mt].fmt_om_cnt++; mbaMap[mt].fmt_om_sum+=r.OPP; }
+    else { mbaMap[mt].fmt_sdo_cnt++; mbaMap[mt].fmt_sdo_sum+=r.OPP; }
+  }
+  const mbaRatingList=Object.entries(mbaMap).map(([type,v])=>({type,cnt:v.cnt,sum:v.sum,deals:v.deals,avg_check:v.cnt?Math.round(v.sum/v.cnt):0,fmt_ochn_cnt:v.fmt_ochn_cnt,fmt_ochn_sum:v.fmt_ochn_sum,fmt_om_cnt:v.fmt_om_cnt,fmt_om_sum:v.fmt_om_sum,fmt_sdo_cnt:v.fmt_sdo_cnt,fmt_sdo_sum:v.fmt_sdo_sum})).sort((a,b)=>b.sum-a.sum);
+
+  return { srcRating, srcFunnelRating, topProducts, topCompanies, mbaRatingList };
+}
+
 // ── Главная функция ───────────────────────────────────────────────────────────
 
 export async function analyze(onProgress) {
@@ -587,7 +760,6 @@ export async function analyze(onProgress) {
   }
 
   // Финализация недель
-  const avg = (arr) => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
   const med = (arr) => { const s=[...arr].sort((a,b)=>a-b); return s.length?s[Math.floor(s.length/2)]:0; };
   for (const wd of Object.values(weekly)) {
     wd.avg_check        = wd.won_cnt      ? wd.postupleniya/wd.won_cnt : 0;
@@ -794,86 +966,13 @@ export async function analyze(onProgress) {
     delete md.durs; delete md.chks;
   }
 
-  // ── Источники ─────────────────────────────────────────────────────────────
-  const srcData={};
-  const getSrc=n=>{ if(!srcData[n]) srcData[n]={postupleniya:0,deals:0,mql:0,sql:0,postupleniya_week:0,leads:0,durs:[]}; return srcData[n]; };
-  for (const r of rows) if(r.IS_PRESALE&&r.DC&&r.DC.getFullYear()===YEAR) getSrc(r.SRC).mql++;
-  for (const r of rows) if(r.IS_PRESALE&&r.SEM==='S'&&r.CL&&r.CL.getFullYear()===YEAR) getSrc(r.SRC).sql++;
-  for (const r of rows) if(payYtd(r)&&!r.IS_KOM) {
-    const sd=getSrc(r.SRC); sd.postupleniya+=r.OPP; sd.deals++;
-    if(r.DC&&r.CL){const d=daysBetween(r.DC,r.CL);if(d>=0)sd.durs.push(d);}
-    const pdS=getPayDate(r); if(pdS&&isoEq(pdS,YEAR,curW)) sd.postupleniya_week+=r.OPP;
-  }
-  for (const l of leads) {
-    const d=parseDt(l.DATE_CREATE);
-    if(d&&d.getFullYear()===YEAR) getSrc(sourcesMap[l.SOURCE_ID||'']||'—').leads++;
-  }
+  // ── Рейтинги (продукты / источники / компании / MBA) ─────────────
+  // Годовой срез считается тем же buildRatings, что и произвольный период.
+  const { srcRating, srcFunnelRating, topProducts, topCompanies, mbaRatingList } =
+    buildRatings({ rows, leads, sourcesMap, companies, cc },
+      new Date(YEAR, 0, 1), new Date(YEAR, 11, 31), curW);
 
-  const srcItem=(name,d)=>({
-    name, postupleniya:d.postupleniya, deals:d.deals, mql:d.mql, sql:d.sql,
-    postupleniya_week:d.postupleniya_week, leads:d.leads,
-    avg_check:Math.round(d.deals?d.postupleniya/d.deals:0),
-    avg_won_days:Math.round(avg(d.durs)*10)/10,
-    conv_mql_sql:d.mql?Math.round(d.sql/d.mql*100*10)/10:0,
-    conv_sql_deals:d.sql?Math.round(d.deals/d.sql*100*10)/10:0,
-    conv_lead_deals:d.leads?Math.round(d.deals/d.leads*100*10)/10:0,
-  });
 
-  const srcList=Object.entries(srcData).map(([k,v])=>srcItem(k,v)).sort((a,b)=>b.postupleniya-a.postupleniya);
-  const allDurs=rows.filter(payYtd).filter(r=>r.DC&&r.CL).map(r=>{const d=daysBetween(r.DC,r.CL);return d>=0?d:null;}).filter(d=>d!==null);
-  const totalRow=srcItem('📊 ИТОГО',{
-    postupleniya:srcList.reduce((s,x)=>s+x.postupleniya,0),
-    deals:srcList.reduce((s,x)=>s+x.deals,0), mql:srcList.reduce((s,x)=>s+x.mql,0),
-    sql:srcList.reduce((s,x)=>s+x.sql,0), postupleniya_week:srcList.reduce((s,x)=>s+x.postupleniya_week,0),
-    leads:srcList.reduce((s,x)=>s+x.leads,0), durs:allDurs,
-  });
-  const srcRating=[totalRow,...srcList.slice(0,20)];
-
-  // ── Источники: полная воронка (без КОМ, как управленческий дашборд) ──────
-  // Зеркалит логику управленческого дашборда:
-  //   - Лиды: по ДАТЕ СОЗДАНИЯ (DC) в этом году
-  //   - MQL/SQL/Счёт/Сделки/Поступления: по ДАТЕ ОПЛАТЫ (payYtd) в этом году
-  const srcFunnel={};
-  const getF=n=>{if(!srcFunnel[n])srcFunnel[n]={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0,durs:[],type:''};return srcFunnel[n];};
-  const srcType={};  // srcName → 'internal'|'marketing' (по первому встреченному SRC_ID)
-  for(const r of rows){
-    if(r.IS_KOM) continue;
-    if(!VALID_CATS.has(r.CAT_ID)) continue;
-    const sn=r.SRC;
-    if(!srcType[sn]) srcType[sn]=isInternalSource(r.SRC_ID)?'internal':'marketing';
-    const sd=getF(sn); sd.type=srcType[sn];
-    // MQL/SQL/Счёт/Сделки/Поступления — только оплаченные в этом году (как в управленческом)
-    if(payYtd(r)){
-      if(isQualLeadW(r)) sd.mql++;
-      if(isSqlByCreate(r)) sd.sql++;
-      if(r.INV_DT) sd.invoice_cnt++;
-      sd.deals++;sd.postupleniya+=r.OPP;
-      if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)sd.durs.push(d);}
-    }
-  }
-  // Лиды — отдельным проходом по дате создания (как в управленческом)
-  for(const r of rows){
-    if(r.IS_KOM) continue;
-    if(!VALID_CATS.has(r.CAT_ID)) continue;
-    if(!r.DC||r.DC.getFullYear()!==YEAR) continue;
-    const sn=r.SRC;
-    if(!srcType[sn]) srcType[sn]=isInternalSource(r.SRC_ID)?'internal':'marketing';
-    if(isAllLead(r)) getF(sn).leads++;
-  }
-  function sfItem(name,d){return{name,...d,avg_check:d.deals?Math.round(d.postupleniya/d.deals):0,avg_dur:avg(d.durs)}};
-  const srcFunnelList=Object.entries(srcFunnel).map(([n,d])=>sfItem(n,d)).sort((a,b)=>b.postupleniya-a.postupleniya);
-  const sfTop=srcFunnelList.slice(0,20);
-  const sfRest=srcFunnelList.slice(20);
-  const sfAgg=(list,withDurs)=>{const r={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0};for(const x of list){r.leads+=x.leads;r.mql+=x.mql;r.sql+=x.sql;r.invoice_cnt+=x.invoice_cnt;r.deals+=x.deals;r.postupleniya+=x.postupleniya;}r.avg_check=r.deals?Math.round(r.postupleniya/r.deals):0;if(withDurs&&list.length){const c=list.reduce((s,x)=>s+(x.avg_dur||0)*(x.deals||0),0);r.avg_dur=list.reduce((s,x)=>s+(x.deals||0),0)?c/list.reduce((s,x)=>s+(x.deals||0),0):0;}else r.avg_dur=0;return r;};
-  const sfTopTotal={name:'📊 ИТОГО (топ-20)',...sfAgg(sfTop,true),type:''};
-  const sfAllTotal={name:'📊 ИТОГО (все без КОМ)',...sfAgg(srcFunnelList,true),type:''};
-  let sfRestRow=null;
-  if(sfRest.length){
-    const rAgg=sfAgg(sfRest,false);
-    rAgg.avg_dur=0;
-    sfRestRow={name:`📦 Остальные (${sfRest.length} источников)`,...rAgg,type:''};
-  }
-  const srcFunnelRating=[sfTopTotal,...sfTop,sfRestRow,sfAllTotal].filter(Boolean);
 
   // ── B2B/B2C ───────────────────────────────────────────────────────────────
   const bsplit=(subset,period)=>{ const g={}; for(const r of subset) if(isPaid(r)){if(!g[r.BTYPE])g[r.BTYPE]={cnt:0,sum:0};g[r.BTYPE].cnt++;g[r.BTYPE].sum+=r.OPP;} return{period,...g}; };
@@ -903,42 +1002,7 @@ export async function analyze(onProgress) {
   const regYtd=calcRegFunnel(regRows.filter(r=>r.DC&&r.DC.getFullYear()===YEAR));
   const regAll=calcRegFunnel(regRows);
 
-  // ── ТОП продуктов ─────────────────────────────────────────────────────────
-  const prodData={};
-  for (const r of rows) {
-    if (r.IS_KOM) continue;                          // всё корпоративное, не только FORMAT==='КОМ'
-    if (/\bILP\b/i.test(r.TITLE||'')) continue;      // конструктор (ILP где угодно в названии) — по просьбе Насти Ш.
-    const key=r.PRODUCT.slice(0,90);
-    if (!prodData[key]) prodData[key]={deals:0,sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
-    if (payYtd(r)) {
-      prodData[key].deals++; prodData[key].sum+=r.OPP;
-      if (r.FORMAT==='Очный') { prodData[key].fmt_ochn_cnt++; prodData[key].fmt_ochn_sum+=r.OPP; }
-      else if (r.FORMAT==='Онлайн') { prodData[key].fmt_om_cnt++; prodData[key].fmt_om_sum+=r.OPP; }
-      else { prodData[key].fmt_sdo_cnt++; prodData[key].fmt_sdo_sum+=r.OPP; }
-      if (r.DC&&r.CL){const d=daysBetween(r.DC,r.CL);if(d>=0)prodData[key].durs.push(d);}
-    }
-  }
-  const prodList=Object.entries(prodData).map(([name,d])=>{
-    const avgC=d.deals?d.sum/d.deals:0, avgD=avg(d.durs);
-    return{name,deals:d.deals,sum:d.sum,avg_check:Math.round(avgC),avg_won_days:Math.round(avgD*10)/10,share:0,_durs:d.durs,fmt_ochn_cnt:d.fmt_ochn_cnt,fmt_ochn_sum:d.fmt_ochn_sum,fmt_om_cnt:d.fmt_om_cnt,fmt_om_sum:d.fmt_om_sum,fmt_sdo_cnt:d.fmt_sdo_cnt,fmt_sdo_sum:d.fmt_sdo_sum};
-  }).sort((a,b)=>b.sum-a.sum);
-  const totalNonKom=prodList.reduce((s,p)=>s+p.sum,0);
-  const TOP_N=20;
-  const selected=prodList.slice(0,TOP_N).map(p=>{ const {_durs,...rest}=p; rest.share=totalNonKom?Math.round(p.sum/totalNonKom*100*10)/10:0; return rest; });
-  const remaining=prodList.slice(TOP_N);
-  const remSum=remaining.reduce((s,p)=>s+p.sum,0), remDeals=remaining.reduce((s,p)=>s+p.deals,0);
-  const remDurs=remaining.flatMap(p=>p._durs);
-  const remOchnCnt=remaining.reduce((s,p)=>s+p.fmt_ochn_cnt,0), remOchnSum=remaining.reduce((s,p)=>s+p.fmt_ochn_sum,0);
-  const remOmCnt=remaining.reduce((s,p)=>s+p.fmt_om_cnt,0), remOmSum=remaining.reduce((s,p)=>s+p.fmt_om_sum,0);
-  const remSdoCnt=remaining.reduce((s,p)=>s+p.fmt_sdo_cnt,0), remSdoSum=remaining.reduce((s,p)=>s+p.fmt_sdo_sum,0);
-  const topProducts=[...selected,{
-    name:`📦 Остальные (${remaining.length} продуктов)`,deals:remDeals,sum:remSum,
-    avg_check:remDeals?Math.round(remSum/remDeals):0,avg_won_days:Math.round(avg(remDurs)*10)/10,
-    share:totalNonKom?Math.round(remSum/totalNonKom*100*10)/10:0,
-    fmt_ochn_cnt:remOchnCnt,fmt_ochn_sum:remOchnSum,
-    fmt_om_cnt:remOmCnt,fmt_om_sum:remOmSum,
-    fmt_sdo_cnt:remSdoCnt,fmt_sdo_sum:remSdoSum,
-  }];
+
 
   // ── Менеджеры ─────────────────────────────────────────────────────────────
   const mgrYtd={}, mgrPrev={}, catYtd={};
@@ -969,42 +1033,9 @@ export async function analyze(onProgress) {
   const mgrPrevTop=Object.entries(mgrPrev).map(([k,v])=>mgrRowFn(k,v,mgrLeadsPrev[k]||0)).sort((a,b)=>b.postupleniya-a.postupleniya).slice(0,5);
   const catTop=Object.entries(catYtd).map(([k,v])=>[k,v.cnt,v.sum]).sort((a,b)=>b[2]-a[2]);
 
-  // ── ТОП компаний ─────────────────────────────────────────────────────────
-  const companyAgg={};
-  for (const r of rows) {
-    if (!isPaid(r)||getPayYear(r)!==YEAR) continue;
-    let cid=String(r.COMPANY_ID||'0');
-    if(cid==='0'&&cc[r.ID]) cid=String(cc[r.ID].COMPANY_ID||'0');
-    if(!cid||cid==='0') continue;
-    if(!companyAgg[cid]) companyAgg[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0};
-    const pd=getPayDate(r);
-    companyAgg[cid].sum+=r.OPP; companyAgg[cid].cnt++;
-    // ОМ = открытое обучение (все форматы, кроме КОМ) — как на управленческом
-    if(!r.IS_KOM){companyAgg[cid].om_cnt++;companyAgg[cid].om_sum+=r.OPP;}
-    else {companyAgg[cid].kom_cnt++;companyAgg[cid].kom_sum+=r.OPP;}
-    if(pd&&(!companyAgg[cid].last||pd>companyAgg[cid].last)) companyAgg[cid].last=pd;
-  }
-  const topCompanies=Object.entries(companyAgg).filter(([,d])=>d.sum>0).map(([cid,d])=>({
-    id:cid, name:(companies[cid]||'—').slice(0,100), sum:d.sum, cnt:d.cnt,
-    om_cnt:d.om_cnt, om_sum:d.om_sum, kom_cnt:d.kom_cnt, kom_sum:d.kom_sum,
-    last_date:d.last?`${fmt2(d.last.getDate())}.${fmt2(d.last.getMonth()+1)}.${d.last.getFullYear()}`:'—',
-    avg_check:d.cnt?Math.round(d.sum/d.cnt):0,
-  })).sort((a,b)=>b.sum-a.sum).slice(0,20);
 
-  // ── MBA ───────────────────────────────────────────────────────────────────
-  const mbaMap={};
-  for (const r of rows) {
-    if (!isPaid(r)||getPayYear(r)!==YEAR) continue;
-    const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE);
-    if (!isMba) continue;
-    const mt=detectMbaType(r.TITLE); if(!mt) continue;
-    if(!mbaMap[mt]) mbaMap[mt]={cnt:0,sum:0,deals:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
-    mbaMap[mt].cnt++; mbaMap[mt].sum+=r.OPP; mbaMap[mt].deals++;
-    if (r.FORMAT==='Очный') { mbaMap[mt].fmt_ochn_cnt++; mbaMap[mt].fmt_ochn_sum+=r.OPP; }
-    else if (r.FORMAT==='Онлайн') { mbaMap[mt].fmt_om_cnt++; mbaMap[mt].fmt_om_sum+=r.OPP; }
-    else { mbaMap[mt].fmt_sdo_cnt++; mbaMap[mt].fmt_sdo_sum+=r.OPP; }
-  }
-  const mbaRatingList=Object.entries(mbaMap).map(([type,v])=>({type,cnt:v.cnt,sum:v.sum,deals:v.deals,avg_check:v.cnt?Math.round(v.sum/v.cnt):0,fmt_ochn_cnt:v.fmt_ochn_cnt,fmt_ochn_sum:v.fmt_ochn_sum,fmt_om_cnt:v.fmt_om_cnt,fmt_om_sum:v.fmt_om_sum,fmt_sdo_cnt:v.fmt_sdo_cnt,fmt_sdo_sum:v.fmt_sdo_sum})).sort((a,b)=>b.sum-a.sum);
+
+
 
   // ── Созданные по категориям ───────────────────────────────────────────────
   const createdByCat={};
