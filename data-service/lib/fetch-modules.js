@@ -13,11 +13,13 @@
  * ЧТО ДЕЛАЕТ:
  *   1. Из deals выбирает активные сделки воронки 0 (стадии WON, PROPOSAL, 2, 6 и их C0:-варианты)
  *   2. Для каждой сделки запрашивает Export API с WITH_PRODUCTS=Y
- *   3. Из ответа извлекает MODULES[] → свойство 223 (дата начала) и 224 (дата конца модуля)
+ *   3. Из ответа извлекает MODULES[] → свойство 223 (дата начала), 224 (дата конца модуля)
+ *      и DIRECTIONS / 851 («Направления» — направление недели, множественное)
  *      Инфоблок 52 в Б24, поля: PROPERTY_MODULE_DATE_START_VALUE, PROPERTY_MODULE_DATE_END_VALUE
  *   4. Конвертирует даты из DD.MM.YYYY → YYYY-MM-DD
  *
- * РЕЗУЛЬТАТ: { dealId: [{ product_id, product_name, original_name, date_start, date_end }] }
+ * РЕЗУЛЬТАТ: { dealId: [{ product_id, product_name, original_name, date_start, date_end,
+ *                          directions }] }  — directions: ID элементов свойства DIRECTIONS (851)
  *   Сохраняется в dashboards/participants-dashboard/cache/modules.json
  *
  * ПРОИЗВОДИТЕЛЬНОСТЬ: ~7 680 сделок батчами по 10 → ~768 запросов × 200мс ≈ 3 минуты.
@@ -56,6 +58,16 @@ function extractDate(mod, propId, ...codes) {
   return null;
 }
 
+// «Направление недели» с карточки модуля: инфоблок 52, свойство DIRECTIONS (ID 851),
+// привязка к элементу, множественное. API отдаёт МАССИВ ID элементов без названий
+// (в отличие от HNDBK-свойств, для которых приходит *_NAME), поэтому сохраняем ID
+// как есть — расшифровка в названия делается на стороне дашборда по справочнику.
+function extractDirections(mod) {
+  const v = mod.PROPERTY_DIRECTIONS_VALUE ?? mod.PROPERTY_851_VALUE;
+  const arr = Array.isArray(v) ? v : (v ? [v] : []);
+  return arr.filter(Boolean).map(String);
+}
+
 function parseModules(deal) {
   if (!deal?.PRODUCTS) return [];
   const { products = [], MODULES = [] } = deal.PRODUCTS;
@@ -74,6 +86,7 @@ function parseModules(deal) {
         original_name: m.NAME || null,
         date_start:    dateStart,
         date_end:      dateEnd || dateStart,
+        directions:    extractDirections(m),
       });
     }
   }
