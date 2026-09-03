@@ -369,6 +369,11 @@ export function buildRangeBuckets(ctx, from, to) {
   const createdIn = (r) => inR(dateOnly(r.DC));
 
   const by_prod = {}, by_src = {}, by_company = {}, by_mba = {};
+  // Скалярные поля недели, которые читает фронт рейтингов (KPI-карточки).
+  let postupleniya = 0, oplata = 0, kom_postupleniya = 0, kom_won_cnt = 0, leads = 0;
+  const fmt = { fmt_oom:0, fmt_om:0, fmt_sdo:0, fmt_kom:0,
+                fmt_oom_cnt:0, fmt_om_cnt:0, fmt_sdo_cnt:0, fmt_kom_cnt:0 };
+  const FMT_KEY = { 'Очный':'fmt_oom', 'Онлайн':'fmt_om', 'Видеокурс':'fmt_sdo', 'Корпоративное обучение':'fmt_kom' };
   const newProd = (r) => ({ deals:0, sum:0, mql:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[], dir:r.DIR });
   const newSrc  = ()  => ({ deals:0, sum:0, durs:[], mql:0, sql:0, invoice_cnt:0, leads:0 });
   const newMba  = ()  => ({ cnt:0, sum:0, mql:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[] });
@@ -386,6 +391,10 @@ export function buildRangeBuckets(ctx, from, to) {
 
     // Деньги — по ДАТЕ ОПЛАТЫ
     if (paidIn(r) && VALID_CATS.has(r.CAT_ID)) {
+      postupleniya += r.OPP; oplata++;
+      if (r.IS_KOM) { kom_postupleniya += r.OPP; kom_won_cnt++; }
+      const fk = FMT_KEY[r.FORMAT];
+      if (fk) { fmt[fk] += r.OPP; fmt[fk + '_cnt']++; }
       if (okProd(r)) { const p=getProd(r); p.deals++; p.sum+=r.OPP; addFmt(p,r); addDur(p,r); }
       if (okSrc(r))  { const s=getSrc(r);  s.deals++; s.sum+=r.OPP; addDur(s,r); }
       const cid=r.COMPANY_ID;
@@ -414,11 +423,15 @@ export function buildRangeBuckets(ctx, from, to) {
     // SQL — по ДАТЕ СОЗДАНИЯ
     if (isSqlByCreate(r) && createdIn(r) && okSrc(r)) getSrc(r).sql++;
 
-    // Лиды — по ДАТЕ СОЗДАНИЯ
-    if (createdIn(r) && isAllLead(r) && okSrc(r)) getSrc(r).leads++;
+    // Лиды — по ДАТЕ СОЗДАНИЯ (в скаляр — все, в by_src — без КОМ и фантомов,
+    // ровно как в недельном цикле)
+    if (createdIn(r) && isAllLead(r)) { leads++; if (okSrc(r)) getSrc(r).leads++; }
   }
 
-  return { by_prod, by_src, by_company, by_mba };
+  // Форма ответа = одна недельная корзина, чтобы клиент рейтингов скормил её
+  // своей существующей агрегации вместо списка недель.
+  return { postupleniya, oplata, leads, kom_postupleniya, kom_won_cnt, ...fmt,
+           by_prod, by_src, by_company, by_mba };
 }
 
 // ── Контекст для рейтингов ───────────────────────────────────

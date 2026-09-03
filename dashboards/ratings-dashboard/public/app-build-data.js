@@ -8,12 +8,17 @@
  * Вызывается из renderFilteredData() (app-core.js).
  */
 
-function buildFilteredData(orig, filteredWeeks) {
+function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   var out = JSON.parse(JSON.stringify(orig));
   out.weeks = filteredWeeks;
+  // Источник корзин и сумм периода: одна корзина за ТОЧНЫЕ даты, если сервер её
+  // прислал (/api/data/range), иначе — целые недели, как было раньше. Из-за
+  // недельной нарезки «август» превращался в W31-W36 (27.07-06.09) и не сходился
+  // с управленческим дашбордом: 133 сделки против 111.
+  var bucketWeeks = rangeBucket ? [rangeBucket] : filteredWeeks;
 
   function sumField(f) {
-    return filteredWeeks.reduce(function(s, w) { return s + (w[f] || 0); }, 0);
+    return bucketWeeks.reduce(function(s, w) { return s + (w[f] || 0); }, 0);
   }
 
   // Общий YTD
@@ -61,7 +66,7 @@ function buildFilteredData(orig, filteredWeeks) {
 
   // Форматы — из отфильтрованных недель
   var fmt_ytd = {};
-  filteredWeeks.forEach(function(w) {
+  bucketWeeks.forEach(function(w) {
     ['fmt_oom','fmt_om','fmt_sdo','fmt_kom'].forEach(function(f) {
       if (!fmt_ytd[f]) fmt_ytd[f] = { cnt: 0, sum: 0 };
       fmt_ytd[f].sum += w[f] || 0;
@@ -69,11 +74,11 @@ function buildFilteredData(orig, filteredWeeks) {
   });
   out.fmt_ytd = fmt_ytd;
 
-  // Агрегируем by_prod, by_src, by_mba из отфильтрованных недель
+  // Агрегируем by_prod, by_src, by_mba из корзин периода
   var prodAgg = {}, srcAgg = {}, mbaAgg = {};
   var avg = function(arr) { return arr.length ? arr.reduce(function(s,x){return s+x;},0)/arr.length : 0; };
 
-  filteredWeeks.forEach(function(w) {
+  bucketWeeks.forEach(function(w) {
     // by_prod
     Object.entries(w.by_prod || {}).forEach(function(e) {
       var name = e[0], v = e[1];
@@ -154,7 +159,7 @@ function buildFilteredData(orig, filteredWeeks) {
   var srcTotSql = srcList.reduce(function(s,x){return s+x.sql;},0);
   var srcTotDeals = srcList.reduce(function(s,x){return s+x.deals;},0);
   var srcTotSum = srcList.reduce(function(s,x){return s+x.postupleniya;},0);
-  var srcAllDurs = filteredWeeks.flatMap(function(w){return Object.values(w.by_src||{}).flatMap(function(v){return v.durs||[];});});
+  var srcAllDurs = bucketWeeks.flatMap(function(w){return Object.values(w.by_src||{}).flatMap(function(v){return v.durs||[];});});
   var srcTotal = {name:'📊 ИТОГО',
     postupleniya:srcTotSum, deals:srcTotDeals, mql:srcTotMql, sql:srcTotSql, leads:0,
     avg_check:srcTotDeals?Math.round(srcTotSum/srcTotDeals):0,
@@ -195,7 +200,7 @@ function buildFilteredData(orig, filteredWeeks) {
   // Дополнить из top_companies на случай если company_names отсутствует (старый кэш)
   (orig.top_companies || []).forEach(function(c) { if (!companyNames[c.id]) companyNames[c.id] = c.name; });
   var compAgg = {};
-  filteredWeeks.forEach(function(w) {
+  bucketWeeks.forEach(function(w) {
     Object.entries(w.by_company || {}).forEach(function(e) {
       var cid = e[0], v = e[1];
       if (!compAgg[cid]) compAgg[cid] = {sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0};
@@ -233,7 +238,7 @@ function buildFilteredData(orig, filteredWeeks) {
   (orig.src_funnel || []).forEach(function(f){ if(f.name&&f.type) origFunnelType[f.name]=f.type; });
   function isSrcInternal(name){ var n=(name||'').toLowerCase(); return ['аккаунтинг','repeat','upsale','реанимаци','холодн','accounting'].some(function(kw){return n.includes(kw);}); }
   var sfAgg={};
-  filteredWeeks.forEach(function(w){
+  bucketWeeks.forEach(function(w){
     Object.entries(w.by_src||{}).forEach(function(e){
       var sn=e[0], v=e[1];
       if(!sfAgg[sn]) sfAgg[sn]={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0,durs:[],type:''};

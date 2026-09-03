@@ -87,7 +87,7 @@ async function loadAll() {
   }
 }
 
-function renderFilteredData() {
+async function renderFilteredData() {
   var d = dataCache;
   if (!d) return;
   var dateFrom = document.getElementById('dateFrom').value;
@@ -102,12 +102,29 @@ function renderFilteredData() {
     filtered = weeksInRange(allWeeks, dateFrom, dateTo);
   }
 
-  // Пересчитываем KPI из отфильтрованных недель
-  var filteredData = buildFilteredData(d, filtered);
+  // Таблицы считаем за ТОЧНЫЕ даты: сервер отдаёт одну корзину за период
+  // (/api/data/range). Недели остаются только для сравнения «текущая/предыдущая»
+  // и для недельных графиков. Раньше «август» брался целыми неделями W31—W36,
+  // то есть 27.07—06.09, и не сходился с управленческим: 133 сделки против 111.
+  var rangeBucket = null;
+  if (dateFrom && dateTo) {
+    try {
+      var rb = await safeFetch((window.BASE_PATH || '') + '/api/data/range?from='
+        + encodeURIComponent(dateFrom) + '&to=' + encodeURIComponent(dateTo));
+      if (rb && !rb.error) rangeBucket = rb;
+    } catch (e) {
+      // Эндпоинт недоступен — молча падаем на прежний недельный расчёт
+      console.warn('range fallback:', e.message);
+    }
+  }
+
+  var filteredData = buildFilteredData(d, filtered, rangeBucket);
 
   // Обновляем info
   var infoEl = document.getElementById('filterInfo');
-  if (filtered.length === allWeeks.length) {
+  if (rangeBucket) {
+    infoEl.textContent = 'точные даты ' + dateFrom + ' — ' + dateTo;
+  } else if (filtered.length === allWeeks.length) {
     infoEl.textContent = 'все недели (' + allWeeks.length + ')';
   } else {
     infoEl.textContent = 'недели ' + String(filtered[0]?.week||'').padStart(2,'0') + '—' + String(filtered[filtered.length-1]?.week||'').padStart(2,'0') + ' (' + filtered.length + ' из ' + allWeeks.length + ')';

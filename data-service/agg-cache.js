@@ -22,7 +22,8 @@
  * TTL: 5 минут. После истечения следующий запрос к getAgg() запустит analyze() заново.
  */
 
-import { analyze } from './analyze.js';
+import { analyze, loadRatingsContext, buildRangeBuckets } from './analyze.js';
+export { buildRangeBuckets };
 import { getNpsAggFull } from './analyze-nps.js';
 import { YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
@@ -58,6 +59,32 @@ export async function getAgg() {
 }
 
 export function getCacheAt() { return aggCacheAt; }
+
+// Контекст рейтингов (обогащённые сделки) — нужен, чтобы считать корзины за
+// ТОЧНЫЕ даты в /api/data/range. Кэшируется отдельно от agg: analyze() строит
+// весь агрегат, а здесь достаточно только обогащённых строк.
+let ctxCache = null;
+let ctxCacheAt = 0;
+let ctxLoading = null;
+
+export async function getRatingsCtx() {
+  if (ctxCache && (Date.now() - ctxCacheAt) < CACHE_TTL_MS) return ctxCache;
+  if (ctxLoading) return ctxLoading;
+  ctxLoading = loadRatingsContext().then(result => {
+    ctxCache = result;
+    ctxCacheAt = Date.now();
+    ctxLoading = null;
+    return result;
+  }).catch(e => {
+    ctxLoading = null;
+    if (ctxCache) {
+      console.warn('[agg-cache] loadRatingsContext() failed, serving stale cache:', e.message);
+      return ctxCache;
+    }
+    throw e;
+  });
+  return ctxLoading;
+}
 
 /**
  * Возвращает агрегированные NPS-данные (с собственным in-memory кэшем).

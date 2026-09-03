@@ -20,7 +20,7 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
+import { getAgg, getCacheAt, getRatingsCtx, buildRangeBuckets } from '@rshu/data-service/agg-cache.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -50,6 +50,40 @@ app.get('/api/data/new', async (req, res) => {
     const data = await getAgg();
     res.json(Object.assign({}, data, { _loadedAt: data.fetched_at || new Date(getCacheAt()).toISOString() }));
   } catch (e) {
+    res.status(503).json({ error: e.message });
+  }
+});
+
+// Разбор даты YYYY-MM-DD в локальную полночь — как parseDt в analyze.js, иначе
+// границы периода разъедутся. Проверяет календарь: 2026-02-31 отвергается.
+function parseYmd(v) {
+  const p = String(v || '').split('-');
+  if (p.length !== 3 || p[0].length !== 4 || p[1].length !== 2 || p[2].length !== 2) return null;
+  const y = Number(p[0]), m = Number(p[1]), d = Number(p[2]);
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return null;
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return dt;
+}
+// Рейтинги за ТОЧНЫЕ даты. Клиент раньше суммировал целые НЕДЕЛИ, из-за чего
+// «август» превращался в W31-W36 (27.07-06.09) и не сходился с управленческим
+// дашбордом: 133 сделки против 111. Ответ имеет форму ОДНОЙ недельной корзины,
+// поэтому клиентская агрегация используется без изменений.
+app.get('/api/data/range', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const dFrom = parseYmd(from), dTo = parseYmd(to);
+    if (!dFrom || !dTo) {
+      return res.status(400).json({ error: 'from и to обязательны в формате YYYY-MM-DD' });
+    }
+    if (dFrom > dTo) {
+      return res.status(400).json({ error: 'некорректный диапазон дат: from позже to' });
+    }
+    const bucket = buildRangeBuckets(await getRatingsCtx(), dFrom, dTo);
+    res.json(Object.assign({ from, to, week: 0 }, bucket,
+      { _loadedAt: new Date(getCacheAt()).toISOString() }));
+  } catch (e) {
+    console.error('/api/data/range error:', e.message);
     res.status(503).json({ error: e.message });
   }
 });
