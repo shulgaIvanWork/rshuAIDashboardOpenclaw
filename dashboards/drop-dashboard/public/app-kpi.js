@@ -22,14 +22,18 @@ window.switchDashTab = function (tab) {
   var salesBar = document.getElementById('salesFilterBar');
   var sales = document.getElementById('contentAreaNew');
   var kpi = document.getElementById('kpiTab');
+  var funnel = document.getElementById('funnelTab');
   var showKpi = tab === 'kpi';
-  if (salesBar) salesBar.style.display = showKpi ? 'none' : '';
-  if (sales) sales.style.display = showKpi ? 'none' : '';
+  var showFunnel = tab === 'funnel';
+  if (salesBar) salesBar.style.display = (showKpi || showFunnel) ? 'none' : '';
+  if (sales) sales.style.display = (showKpi || showFunnel) ? 'none' : '';
   if (kpi) kpi.style.display = showKpi ? '' : 'none';
+  if (funnel) funnel.style.display = showFunnel ? '' : 'none';
   document.querySelectorAll('.kpi-tab').forEach(function (b) {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
   if (showKpi) loadKpi();
+  if (showFunnel && window.loadFunnelTab) loadFunnelTab();
 };
 
 // ── Дельта в том же стиле, что на вкладке «Продажи» (pctDelta в app-render.js):
