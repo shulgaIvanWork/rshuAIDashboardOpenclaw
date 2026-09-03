@@ -350,6 +350,142 @@ function detectMbaType(title) {
 // Среднее по массиву (нужно и buildRatings, и analyze).
 const avg = (arr) => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
 
+// ── Корзины рейтингов за произвольный период ─────────────────────────────────
+// Возвращает by_prod / by_src / by_company / by_mba в ТОЧНО ТОЙ ЖЕ форме, что и
+// одна недельная корзина, но за диапазон [from, to] включительно. Дашборд
+// «Рейтинги» строит свои таблицы именно из недельных корзин, суммируя их на
+// клиенте, поэтому «август» у него = целые недели W31-W36 (27.07-02.09) и не
+// сходится с управленческим: 133 сделки против 111. С этой функцией тот же
+// клиентский код получает одну корзину за точные даты.
+//
+// Правила бакетирования взяты из недельного цикла analyze() без изменений:
+//   деньги, чек, цикл — по дате оплаты;  MQL, SQL, лиды — по дате создания;
+//   счета — по дате счёта.  Везде отсекаются КОМ и фантомы IS_FULLYEAR,
+//   в продуктах дополнительно конструктор ILP.
+export function buildRangeBuckets(ctx, from, to) {
+  const { rows } = ctx;
+  const inR       = (d) => !!d && d >= from && d <= to;
+  const paidIn    = (r) => inR(getPayDate(r));
+  const createdIn = (r) => inR(dateOnly(r.DC));
+
+  const by_prod = {}, by_src = {}, by_company = {}, by_mba = {};
+  const newProd = (r) => ({ deals:0, sum:0, mql:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[], dir:r.DIR });
+  const newSrc  = ()  => ({ deals:0, sum:0, durs:[], mql:0, sql:0, invoice_cnt:0, leads:0 });
+  const newMba  = ()  => ({ cnt:0, sum:0, mql:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[] });
+  const okProd = (r) => !r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'');
+  const okSrc  = (r) => !r.IS_KOM && !r.IS_FULLYEAR;
+  const getProd = (r) => { const pk=r.PRODUCT.slice(0,90); const p=by_prod[pk]||(by_prod[pk]=newProd(r)); if(!p.dir||p.dir==='—') p.dir=r.DIR; return p; };
+  const getSrc  = (r) => by_src[r.SRC]||(by_src[r.SRC]=newSrc());
+  const mbaOf   = (r) => ((r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE)) ? detectMbaType(r.TITLE) : null);
+  const addFmt  = (o,r) => { if(r.FORMAT==='Очный'){o.fmt_ochn_cnt++;o.fmt_ochn_sum+=r.OPP;} else if(r.FORMAT==='Онлайн'){o.fmt_om_cnt++;o.fmt_om_sum+=r.OPP;} else {o.fmt_sdo_cnt++;o.fmt_sdo_sum+=r.OPP;} };
+  const addDur  = (o,r) => { if(r.DC&&r.PAY_DT){ const d=daysBetween(r.DC,r.PAY_DT); if(d>=0) o.durs.push(d); } };
+
+  for (const r of rows) {
+    // Счета — по ДАТЕ СЧЁТА
+    if (r.UF_CRM_1753272713011 && inR(parseDt(r.UF_CRM_1753272713011)) && okSrc(r)) getSrc(r).invoice_cnt++;
+
+    // Деньги — по ДАТЕ ОПЛАТЫ
+    if (paidIn(r) && VALID_CATS.has(r.CAT_ID)) {
+      if (okProd(r)) { const p=getProd(r); p.deals++; p.sum+=r.OPP; addFmt(p,r); addDur(p,r); }
+      if (okSrc(r))  { const s=getSrc(r);  s.deals++; s.sum+=r.OPP; addDur(s,r); }
+      const cid=r.COMPANY_ID;
+      if (cid && cid!=='0' && !r.IS_FULLYEAR) {
+        const c=by_company[cid]||(by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0});
+        c.sum+=r.OPP; c.cnt++;
+        if(!r.IS_KOM){c.om_cnt++;c.om_sum+=r.OPP;} else {c.kom_cnt++;c.kom_sum+=r.OPP;}
+        // Сравнение Date со строкой — как в недельном цикле. Из-за этого last
+        // фиксируется первой попавшейся оплатой и дальше не обновляется; поведение
+        // сохранено намеренно, чтобы корзины за период совпали с недельными.
+        const pd2=getPayDate(r);
+        if (pd2 && (!c.last || pd2 > c.last)) c.last = pd2.toISOString().slice(0,10);
+      }
+      const mt=mbaOf(r);
+      if (mt) { const m=by_mba[mt]||(by_mba[mt]=newMba()); m.cnt++; m.sum+=r.OPP; addFmt(m,r); addDur(m,r); }
+    }
+
+    // MQL — по ДАТЕ СОЗДАНИЯ
+    if (createdIn(r) && isQualLeadW(r)) {
+      if (okSrc(r))  getSrc(r).mql++;
+      if (okProd(r)) getProd(r).mql++;
+      const mt=mbaOf(r);
+      if (mt) (by_mba[mt]||(by_mba[mt]=newMba())).mql++;
+    }
+
+    // SQL — по ДАТЕ СОЗДАНИЯ
+    if (isSqlByCreate(r) && createdIn(r) && okSrc(r)) getSrc(r).sql++;
+
+    // Лиды — по ДАТЕ СОЗДАНИЯ
+    if (createdIn(r) && isAllLead(r) && okSrc(r)) getSrc(r).leads++;
+  }
+
+  return { by_prod, by_src, by_company, by_mba };
+}
+
+// ── Контекст для рейтингов ───────────────────────────────────
+// Загружает кэш и обогащает сделки. Раньше жило внутри analyze() и было
+// недоступно снаружи, поэтому buildRatings / buildRangeBuckets нельзя было
+// вызвать из эндпоинта за произвольный период.
+// leads и cc в analyze() никогда не заполнялись (ни одного push или
+// присваивания во всём файле) — отсюда нули в колонках mql/sql/leads
+// серверного src_rating. Оставлены пустыми, чтобы поведение не изменилось;
+// настоящие mql/sql/leads по источникам считает buildRangeBuckets.
+export async function loadRatingsContext() {
+  const dealsRaw = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'deals.json'), 'utf-8'));
+  const dicts    = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'dicts.json'), 'utf-8'));
+
+  let companies = {};
+  try {
+    companies = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'companies.json'), 'utf-8'));
+  } catch { /* companies.json не найден — топ компаний будет без названий */ }
+
+  const cats       = dicts.categories || {};
+  const usersMap   = dicts.users || {};
+  const sourcesMap = dicts.sources || {};
+  const directions = dicts.directions || {};
+
+  // Обогащение сделок
+  const rows = dealsRaw.map(x => {
+    const catId = parseInt(x.CATEGORY_ID||0);
+    const cat   = cats[String(catId)] || String(catId);
+    const isKom = isKomDeal(x);
+    let fmt = detectFormat(x.TITLE||'', x.UF_FORMAT);
+    if (String(x.ID)==='321458'||String(x.ID)==='321895') fmt='Видеокурс';
+    const dir = x.UF_CRM_1498466811||[];
+    const dirArr = Array.isArray(dir)?dir:(dir?[dir]:[]);
+    return {
+      DIR: dirArr.length ? (directions[String(dirArr[0])] || '—') : '—',
+      ID: x.ID, TITLE: x.TITLE||'',
+      OPP: parseFloat(x.OPPORTUNITY||0),
+      SEM: x.STAGE_SEMANTIC_ID||null, STAGE: x.STAGE_ID||'',
+      DC:  parseDt(x.DATE_CREATE), CL: parseDt(x.CLOSEDATE),
+      PAY_DT: parseDt(x.UF_DATE_PAY_1C), CLOSED: x.CLOSED,
+      MGR: usersMap[String(x.ASSIGNED_BY_ID||'')] || x.ASSIGNED_BY_ID||'',
+      MGR_ID: String(x.ASSIGNED_BY_ID||''),
+      CAT: cat, CAT_ID: catId,
+      SRC: sourcesMap[x.SOURCE_ID||''] || x.SOURCE_ID||'—',
+      SRC_ID: x.SOURCE_ID||'',
+      FORMAT: fmt, UF_FORMAT: String(x.UF_FORMAT||''),
+      COMPANY_ID: String(x.COMPANY_ID||'0'),
+      BTYPE: detectB2b(x),
+      PRODUCT: normalizeProduct(x.TITLE||''),
+      // «Фантом на весь год» (01.01–31.12): исключаем из рейтингов by_prod/by_src/by_company.
+      IS_FULLYEAR: isFullYearLearn(x),
+      IS_KOM: isKom, IS_OOM: !isKom,
+      IS_PRESALE: cat==='Pre Sale',
+      EDU_TYPE: String(x.UF_CRM_1765896709800||''),
+      INV_DT: parseDt(x.UF_CRM_1753272713011),
+      IS_INTERNAL_SRC: isInternalSource(x.SOURCE_ID||''),
+      UF_CRM_1753272713011: x.UF_CRM_1753272713011||'',
+      UF_CRM_5D133690E1: x.UF_CRM_5D133690E1||null,
+      MOVED_TIME: x.MOVED_TIME||null,
+      PREVIOUS_STAGE_ID: x.PREVIOUS_STAGE_ID||null,
+      UF_CRM_1498466811: Array.isArray(dir)?dir:(dir?[dir]:[]),
+    };
+  });
+
+  return { dicts, companies, cats, usersMap, sourcesMap, directions, rows, leads: [], cc: {} };
+}
+
 // ── Рейтинги за произвольный период ────────────────────────────
 // Продукты, источники, воронка источников, компании и MBA за [from, to]
 // включительно. Одна реализация на два вызова: годовой срез в analyze() и точный
@@ -529,9 +665,10 @@ export async function analyze(onProgress) {
 
   emit({ type: 'step_start', idx: 0 });
 
-  // Загрузка данных
-  const dealsRaw = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'deals.json'), 'utf-8'));
-  const dicts    = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'dicts.json'), 'utf-8'));
+  // Загрузка данных и обогащение сделок — общее с эндпоинтом точного периода
+  // дашборда «Рейтинги» (см. loadRatingsContext).
+  const { dicts, companies, cats, usersMap, sourcesMap, directions, rows, leads, cc } =
+    await loadRatingsContext();
 
   let fetchedAt = null;
   try {
@@ -546,62 +683,13 @@ export async function analyze(onProgress) {
     } catch { /* ignore */ }
   }
 
-  const cc = {};
-  const leads = [];
 
-  let companies = {};
-  try {
-    companies = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'companies.json'), 'utf-8'));
-  } catch { /* companies.json не найден — топ компаний будет без названий */ }
 
-  const cats       = dicts.categories || {};
-  const usersMap   = dicts.users || {};
-  const sourcesMap = dicts.sources || {};
-  const directions = dicts.directions || {};
 
   const TODAY = dateOnly(new Date());
   const [, curW] = isoCalendar(TODAY);
   const prevW = curW > 1 ? curW-1 : 1;
 
-  // Обогащение сделок
-  const rows = dealsRaw.map(x => {
-    const catId = parseInt(x.CATEGORY_ID||0);
-    const cat   = cats[String(catId)] || String(catId);
-    const isKom = isKomDeal(x);
-    let fmt = detectFormat(x.TITLE||'', x.UF_FORMAT);
-    if (String(x.ID)==='321458'||String(x.ID)==='321895') fmt='Видеокурс';
-    const dir = x.UF_CRM_1498466811||[];
-    const dirArr = Array.isArray(dir)?dir:(dir?[dir]:[]);
-    return {
-      DIR: dirArr.length ? (directions[String(dirArr[0])] || '—') : '—',
-      ID: x.ID, TITLE: x.TITLE||'',
-      OPP: parseFloat(x.OPPORTUNITY||0),
-      SEM: x.STAGE_SEMANTIC_ID||null, STAGE: x.STAGE_ID||'',
-      DC:  parseDt(x.DATE_CREATE), CL: parseDt(x.CLOSEDATE),
-      PAY_DT: parseDt(x.UF_DATE_PAY_1C), CLOSED: x.CLOSED,
-      MGR: usersMap[String(x.ASSIGNED_BY_ID||'')] || x.ASSIGNED_BY_ID||'',
-      MGR_ID: String(x.ASSIGNED_BY_ID||''),
-      CAT: cat, CAT_ID: catId,
-      SRC: sourcesMap[x.SOURCE_ID||''] || x.SOURCE_ID||'—',
-      SRC_ID: x.SOURCE_ID||'',
-      FORMAT: fmt, UF_FORMAT: String(x.UF_FORMAT||''),
-      COMPANY_ID: String(x.COMPANY_ID||'0'),
-      BTYPE: detectB2b(x),
-      PRODUCT: normalizeProduct(x.TITLE||''),
-      // «Фантом на весь год» (01.01–31.12): исключаем из рейтингов by_prod/by_src/by_company.
-      IS_FULLYEAR: isFullYearLearn(x),
-      IS_KOM: isKom, IS_OOM: !isKom,
-      IS_PRESALE: cat==='Pre Sale',
-      EDU_TYPE: String(x.UF_CRM_1765896709800||''),
-      INV_DT: parseDt(x.UF_CRM_1753272713011),
-      IS_INTERNAL_SRC: isInternalSource(x.SOURCE_ID||''),
-      UF_CRM_1753272713011: x.UF_CRM_1753272713011||'',
-      UF_CRM_5D133690E1: x.UF_CRM_5D133690E1||null,
-      MOVED_TIME: x.MOVED_TIME||null,
-      PREVIOUS_STAGE_ID: x.PREVIOUS_STAGE_ID||null,
-      UF_CRM_1498466811: Array.isArray(dir)?dir:(dir?[dir]:[]),
-    };
-  });
 
   emit({ type: 'deals_loaded', count: rows.length });
 
