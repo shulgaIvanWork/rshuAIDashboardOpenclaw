@@ -174,14 +174,36 @@ export function isInternalSource(srcId) {
 
 /**
  * Формат обучения: сначала по UF_FORMAT, потом эвристика по названию.
+ * known=false означает, что формат НЕ определён и подставлен по умолчанию.
+ * Это важно для разбивки по блокам: у 28% лидов поле формата пустое и в названии
+ * нет подсказок, поэтому они все попадают в «Онлайн» и раздувают открытое
+ * обучение за счёт СДО.
  */
-export function detectFormat(title, ufFormat) {
-  if (ufFormat && FORMAT_MAP[String(ufFormat)]) return FORMAT_MAP[String(ufFormat)];
+export function detectFormatEx(title, ufFormat) {
+  if (ufFormat && FORMAT_MAP[String(ufFormat)]) return { format: FORMAT_MAP[String(ufFormat)], known: true };
   const t = (title || '').toLowerCase();
-  if (t.includes('(сдо)') || t.includes(' сдо') || t.endsWith('сдо')) return 'Видеокурс';
-  if (t.includes('онлайн')) return 'Онлайн';
-  if (t.includes('в г.') || t.includes('москва')) return 'Очный';
-  return 'Онлайн';
+  if (t.includes('(сдо)') || t.includes(' сдо') || t.endsWith('сдо')) return { format: 'Видеокурс', known: true };
+  if (t.includes('онлайн')) return { format: 'Онлайн', known: true };
+  if (t.includes('в г.') || t.includes('москва')) return { format: 'Очный', known: true };
+  return { format: 'Онлайн', known: false };
+}
+
+/** Формат обучения (только значение). */
+export function detectFormat(title, ufFormat) {
+  return detectFormatEx(title, ufFormat).format;
+}
+
+/** Формат, которым считается СДО. Отдельного поля под СДО в CRM нет. */
+export const SDO_FORMAT = 'Видеокурс';
+
+/**
+ * Блок управленческого дашборда: kom | sdo | open.
+ * Открытое обучение — всё, что не КОМ и не СДО (сегодня это очный и онлайн).
+ * Так блоки в сумме всегда дают итог, даже если появится новый формат.
+ */
+export function dealBlock(isKom, format) {
+  if (isKom) return 'kom';
+  return format === SDO_FORMAT ? 'sdo' : 'open';
 }
 
 /** B2B/B2C: КОМ-воронка всегда B2B, иначе — по наличию компании. */

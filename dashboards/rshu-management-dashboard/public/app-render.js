@@ -15,7 +15,7 @@ async function renderPageMainNew(d) {
     if (!d || !d.ytd) { areaNew.innerHTML = '<div class="alert alert-danger">Нет данных</div>'; return; }
 
         function kpi(label, val, sub, cls) {
-      var kpiCls = cls === 'oom' ? 'kpi-oom' : (cls === 'kom' ? 'kpi-kom' : 'kpi-total');
+      var kpiCls = cls === 'oom' ? 'kpi-oom' : (cls === 'kom' ? 'kpi-kom' : (cls === 'sdo' ? 'kpi-sdo' : 'kpi-total'));
       return '<div class="kpi '+kpiCls+'"><div class="lbl">'+label+'</div><div class="val">'+val+'</div><div class="sub">'+(sub||'')+'</div></div>';
     }
     function delta(a,b) {
@@ -33,8 +33,8 @@ async function renderPageMainNew(d) {
       return ' <span class="'+cl+'">'+s+' '+Math.abs(p)+'%</span>';
     }
     function section(title, ytd, cur, prev, cls, leadsYtd, leadsCur, leadsPrev, qualLeads, mqlCur, mqlPrev, ppYtd, ppLeads, ppQual) {
-      var cc = cls==='kom'?'c-kom':(cls==='oom'?'c-oom':'c-total');
-      var kc = cls==='kom'?'kpi-kom':(cls==='oom'?'kpi-oom':'kpi-total');
+      var cc = cls==='kom'?'c-kom':(cls==='oom'?'c-oom':(cls==='sdo'?'c-sdo':'c-total'));
+      var kc = cls==='kom'?'kpi-kom':(cls==='oom'?'kpi-oom':(cls==='sdo'?'kpi-sdo':'kpi-total'));
       function pctDelta(a, b) {
         if (!b || b === 0) return '';
         var p = ((a - b) / b * 100).toFixed(1);
@@ -94,20 +94,32 @@ async function renderPageMainNew(d) {
     var wkPrevData = { postupleniya: wkPrev.postupleniya || 0, won_relevant_cnt: wkPrev.oplata || 0 };
     var wkCurLeads = wkCur.leads || 0;
     var wkPrevLeads = wkPrev.leads || 0;
-    var oomCurData = { postupleniya: wkCur.oom_postupleniya || 0, won_relevant_cnt: wkCur.oom_won_cnt || 0 };
-    var oomPrevData = { postupleniya: wkPrev.oom_postupleniya || 0, won_relevant_cnt: wkPrev.oom_won_cnt || 0 };
+    var oomCurData = { postupleniya: wkCur.open_postupleniya || 0, won_relevant_cnt: wkCur.open_won_cnt || 0 };
+    var oomPrevData = { postupleniya: wkPrev.open_postupleniya || 0, won_relevant_cnt: wkPrev.open_won_cnt || 0 };
     var komCurData = { postupleniya: wkCur.kom_postupleniya || 0, won_relevant_cnt: wkCur.kom_won_cnt || 0 };
     var komPrevData = { postupleniya: wkPrev.kom_postupleniya || 0, won_relevant_cnt: wkPrev.kom_won_cnt || 0 };
-    var oomMqlCur = wkCur.oom_mql || 0;
-    var oomMqlPrev = wkPrev.oom_mql || 0;
-    var komMqlCur = (wkCur.mql || 0) - oomMqlCur;
-    var komMqlPrev = (wkPrev.mql || 0) - oomMqlPrev;
+    var sdoCurData = { postupleniya: wkCur.sdo_postupleniya || 0, won_relevant_cnt: wkCur.sdo_won_cnt || 0 };
+    var sdoPrevData = { postupleniya: wkPrev.sdo_postupleniya || 0, won_relevant_cnt: wkPrev.sdo_won_cnt || 0 };
+    var oomMqlCur = wkCur.open_mql || 0;
+    var oomMqlPrev = wkPrev.open_mql || 0;
+    // КОМ раньше считался вычитанием (итог минус ООМ). После выделения СДО это
+    // сломалось бы, поэтому analyze.js теперь отдаёт kom_mql и kom_leads явно.
+    var komMqlCur = wkCur.kom_mql || 0;
+    var komMqlPrev = wkPrev.kom_mql || 0;
 
     var html = '';
     // KPI sections
     html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0, d.pp && d.pp.ytd, d.pp && d.pp.leads_ytd, d.pp && d.pp.qual_lead_ytd);
-    html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev, d.pp && d.pp.oom_ytd, d.pp && d.pp.oom_leads_ytd, d.pp && d.pp.oom_qual_lead_ytd);
-    html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
+    html += section('Открытое обучение (очное и онлайн)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.open_leads || 0, wkPrev.open_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev, d.pp && d.pp.oom_ytd, d.pp && d.pp.oom_leads_ytd, d.pp && d.pp.oom_qual_lead_ytd);
+    html += section('СДО (видеокурсы)', d.sdo_ytd, sdoCurData, sdoPrevData, 'sdo', d.sdo_leads_ytd, wkCur.sdo_leads || 0, wkPrev.sdo_leads || 0, d.sdo_qual_lead_ytd, wkCur.sdo_mql || 0, wkPrev.sdo_mql || 0, d.pp && d.pp.sdo_ytd, d.pp && d.pp.sdo_leads_ytd, d.pp && d.pp.sdo_qual_lead_ytd);
+    html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, wkCur.kom_leads || 0, wkPrev.kom_leads || 0, d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
+    // Оговорка к разбивке лидов: у части лидов формат не указан, и они попадают
+    // в «Открытое» по умолчанию, занижая его конверсию и завышая долю СДО.
+    if (d.leads_without_format) {
+      html += '<div style="margin:2px 0 8px;font-size:12px;color:#475569">Из лидов периода у <b>'
+        + d.leads_without_format + '</b> формат не указан — они отнесены к «Открытому обучению» по умолчанию, '
+        + 'поэтому его конверсия занижена, а доля СДО по лидам занижена тем же числом.</div>';
+    }
     // Поступления по неделям/месяцам (на всю ширину) + переключатель
     html += '<div class="card" style="margin-top:8px"><h2>Поступления '+(isMonths('pos')?'по месяцам':'по неделям')+perToggle('pos')+'</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
     // Форматы + Тип обучения
@@ -365,7 +377,7 @@ async function renderPageMainNew(d) {
           if (document.getElementById('newChConv')) new Chart(document.getElementById('newChConv'), {type:'line', data:{labels:labels,datasets:[{label:'Лиды\u2192MQL %',data:weeks.map(function(w){return w.conv_lead_mql||0;}),borderColor:'#B0BEC5',tension:0.3,fill:false},{label:'MQL\u2192SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL\u2192Счёт %',data:weeks.map(function(w){return w.conv_sql_invoice||0;}),borderColor:'#43A047',tension:0.3,fill:false},{label:'Счёт\u2192Сделка %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
         } catch(e){}
         try {
-          if (document.getElementById('newChPos')) new Chart(document.getElementById('newChPos'), {type:'bar', data:{labels:posLabels,datasets:[{label:'ООМ',data:posBuckets.map(function(w){return w.oom_postupleniya||0;}),backgroundColor:'#00bcd4',borderRadius:4},{label:'КОМ',data:posBuckets.map(function(w){return w.kom_postupleniya||0;}),backgroundColor:'#9C27B0',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{display:false},tooltip:{callbacks:{label:function(ctx){var i=ctx.dataIndex;var v=ctx.raw||0;var oom=posBuckets[i].oom_postupleniya||0;var kom=posBuckets[i].kom_postupleniya||0;var tot=oom+kom;if(ctx.datasetIndex===0) return ctx.dataset.label+': '+v.toLocaleString('ru-RU')+' ₽ из '+tot.toLocaleString('ru-RU')+' ₽';if(ctx.datasetIndex===1) return ctx.dataset.label+': '+v.toLocaleString('ru-RU')+' ₽ из '+tot.toLocaleString('ru-RU')+' ₽';return ctx.dataset.label+': '+v.toLocaleString('ru-RU')+' ₽';}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
+          if (document.getElementById('newChPos')) new Chart(document.getElementById('newChPos'), {type:'bar', data:{labels:posLabels,datasets:[{label:'Открытое',data:posBuckets.map(function(w){return w.open_postupleniya||0;}),backgroundColor:'#00bcd4',borderRadius:4},{label:'СДО',data:posBuckets.map(function(w){return w.sdo_postupleniya||0;}),backgroundColor:'#96B833',borderRadius:4},{label:'КОМ',data:posBuckets.map(function(w){return w.kom_postupleniya||0;}),backgroundColor:'#9C27B0',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10}}},datalabels:{display:false},tooltip:{callbacks:{label:function(ctx){var i=ctx.dataIndex;var v=ctx.raw||0;var b=posBuckets[i];var tot=(b.open_postupleniya||0)+(b.sdo_postupleniya||0)+(b.kom_postupleniya||0);return ctx.dataset.label+': '+v.toLocaleString('ru-RU')+' ₽ из '+tot.toLocaleString('ru-RU')+' ₽';}}}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
           // qual funnel
           if (document.getElementById('ch_funnel_new_qual')) new Chart(document.getElementById('ch_funnel_new_qual'), {type:'bar', data:{labels:labels,datasets:[{label:'MQL',data:weeks.map(function(w){return w.mql||0;}),backgroundColor:'#3079D2',borderRadius:4},{label:'SQL',data:weeks.map(function(w){return w.sql||0;}),backgroundColor:'#9A7B3F',borderRadius:4},{label:'Оплачено',data:weeks.map(function(w){return w.oplata||0;}),backgroundColor:'#2E7D32',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true}}}});
           if (document.getElementById('ch_conv_new_qual')) new Chart(document.getElementById('ch_conv_new_qual'), {type:'line', data:{labels:labels,datasets:[{label:'MQL→SQL %',data:weeks.map(function(w){return w.conv_mql_sql||0;}),borderColor:'#3079D2',tension:0.3,fill:false},{label:'SQL→Сделки %',data:weeks.map(function(w){return w.conv_sql_oplata||0;}),borderColor:'#2E7D32',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});

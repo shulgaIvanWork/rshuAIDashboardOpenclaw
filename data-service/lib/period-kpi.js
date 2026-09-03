@@ -11,7 +11,7 @@
  */
 import {
   MIN_OPP, VALID_CATS, MQL_SALE_STAGES, NOT_MQL_SALE, EDU_TYPE_MAP,
-  isKomDeal, isInternalSource, detectFormat, detectB2b,
+  isKomDeal, isInternalSource, detectFormatEx, detectB2b, dealBlock,
 } from './deal-rules.js';
 
 function parseDt(s) {
@@ -25,6 +25,7 @@ export function enrichForKpi(dealsRaw) {
   return dealsRaw.map(x => {
     const catId = parseInt(x.CATEGORY_ID || 0);
     const isKom = isKomDeal(x);
+    const fmt = detectFormatEx(x.TITLE || '', x.UF_FORMAT);
     return {
       OPP: parseFloat(x.OPPORTUNITY || 0),
       SEM: x.STAGE_SEMANTIC_ID || null,
@@ -33,7 +34,11 @@ export function enrichForKpi(dealsRaw) {
       DC: parseDt(x.DATE_CREATE),
       PAY_DT: parseDt(x.UF_DATE_PAY_1C),
       IS_KOM: isKom, IS_OOM: !isKom,
-      FORMAT: detectFormat(x.TITLE || '', x.UF_FORMAT),
+      FORMAT: fmt.format,
+      // known=false — формат не задан и подставлен по умолчанию (см. detectFormatEx)
+      FMT_KNOWN: fmt.known,
+      // Блок управленческого дашборда: open | sdo | kom
+      BLOCK: dealBlock(isKom, fmt.format),
       EDU_TYPE: String(x.UF_CRM_1765896709800 || ''),
       BTYPE: detectB2b(x),
       IS_INTERNAL_SRC: isInternalSource(x.SOURCE_ID || ''),
@@ -114,11 +119,31 @@ function splits(rows, from, to) {
  * KPI за период [from, to] (Date, включительно) + разбивки.
  * rows — результат enrichForKpi().
  */
+// Лиды, у которых формат не определён: поле пустое и в названии нет подсказок,
+// поэтому detectFormat подставил «Онлайн» и лид попал в открытое обучение.
+// Их около 28%, поэтому конверсия «Открытого» без этой оговорки занижена почти
+// вдвое. Выводится отдельной строкой под блоками.
+function countLeadsWithoutFormat(rows, from, to) {
+  let n = 0;
+  for (const r of rows) {
+    if (r.BLOCK === 'kom') continue;
+    if (!r.DC || r.DC < from || r.DC > to) continue;
+    if (!isAllLead(r) || r.FMT_KNOWN) continue;
+    n++;
+  }
+  return n;
+}
+
 export function calcPeriodKpi(rows, from, to) {
   return {
     total: blockMetrics(rows, from, to, null),
-    oom:   blockMetrics(rows, from, to, r => r.IS_OOM),
-    kom:   blockMetrics(rows, from, to, r => r.IS_KOM),
+    // oom сохраняет прежний смысл «всё, что не КОМ» — его читают другие дашборды.
+    // Разбивка для управленческого: open (очный+онлайн) + sdo (видеокурсы) = oom.
+    oom:   blockMetrics(rows, from, to, r => r.BLOCK !== 'kom'),
+    open:  blockMetrics(rows, from, to, r => r.BLOCK === 'open'),
+    sdo:   blockMetrics(rows, from, to, r => r.BLOCK === 'sdo'),
+    kom:   blockMetrics(rows, from, to, r => r.BLOCK === 'kom'),
+    leads_without_format: countLeadsWithoutFormat(rows, from, to),
     splits: splits(rows, from, to),
   };
 }

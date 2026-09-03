@@ -88,10 +88,12 @@ th.sort.desc::after { content: ' ▼'; opacity: 1; }
 .kpi-total { background-color: rgba(31,42,68,.08) !important; }
 .kpi-oom   { background-color: rgba(0,188,212,.12) !important; }
 .kpi-kom   { background-color: rgba(156,39,176,.12) !important; }
+.kpi-sdo   { background-color: rgba(150,184,51,.14) !important; }
 .kpi-reg   { background-color: rgba(76,175,80,.12) !important; }
 .c-total { color: #1f2a44 !important; }
 .c-oom   { color: #00bcd4 !important; }
 .c-kom   { color: #9C27B0 !important; }
+.c-sdo   { color: #7a9628 !important; }
 .c-reg   { color: #4CAF50 !important; }
 
 /* Delta badges */

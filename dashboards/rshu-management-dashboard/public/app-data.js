@@ -134,17 +134,23 @@ function applyPeriodKpi(out, kpi) {
     };
   }
   out.ytd     = Object.assign({}, out.ytd,     block(c.total));
-  out.oom_ytd = Object.assign({}, out.oom_ytd, block(c.oom));
+  out.oom_ytd = Object.assign({}, out.oom_ytd, block(c.open));
+  out.sdo_ytd = Object.assign({}, out.sdo_ytd, block(c.sdo));
   out.kom_ytd = Object.assign({}, out.kom_ytd, block(c.kom));
   out.leads_ytd = c.total.leads;   out.qual_lead_ytd = c.total.mql;
-  out.oom_leads_ytd = c.oom.leads; out.oom_qual_lead_ytd = c.oom.mql;
+  out.oom_leads_ytd = c.open.leads; out.oom_qual_lead_ytd = c.open.mql;
+  out.sdo_leads_ytd = c.sdo.leads; out.sdo_qual_lead_ytd = c.sdo.mql;
   out.kom_leads_ytd = c.kom.leads; out.kom_qual_lead_ytd = c.kom.mql;
+  // Лиды без указанного формата: делятся между «Открытым» и СДО вслепую, потому
+  // что поле формата у них пустое. Выводим числом, чтобы конверсия читалась честно.
+  out.leads_without_format = c.leads_without_format || 0;
 
   function fmtD(s) { var p = s.split('-'); return p[2] + '.' + p[1] + '.' + p[0]; }
   out.pp = {
-    ytd: block(p.total), oom_ytd: block(p.oom), kom_ytd: block(p.kom),
+    ytd: block(p.total), oom_ytd: block(p.open), sdo_ytd: block(p.sdo), kom_ytd: block(p.kom),
     leads_ytd: p.total.leads, qual_lead_ytd: p.total.mql,
-    oom_leads_ytd: p.oom.leads, oom_qual_lead_ytd: p.oom.mql,
+    oom_leads_ytd: p.open.leads, oom_qual_lead_ytd: p.open.mql,
+    sdo_leads_ytd: p.sdo.leads, sdo_qual_lead_ytd: p.sdo.mql,
     kom_leads_ytd: p.kom.leads, kom_qual_lead_ytd: p.kom.mql,
     label: fmtD(kpi.prev_period.from) + ' — ' + fmtD(kpi.prev_period.to),
     splits: p.splits || {}
