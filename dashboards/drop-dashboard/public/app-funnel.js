@@ -150,8 +150,8 @@ function stageBar(st, cnt, prevCnt, total) {
   var convTot = total > 0 ? pct(cnt, total) : '—';
   return '<div class="funnel-stage st-' + st.key + '">'
     + '<div class="fstage-head"><b>' + st.label + '</b>'
-    + '<span class="fstage-num">' + fmt(cnt) + '</span></div>'
-    + '<div class="fbar"><div class="fbar-fill st-' + st.key + '" style="width:' + w + '%"></div></div>'
+    + '<span class="fstage-num" style="color:' + st.color + '">' + fmt(cnt) + '</span></div>'
+    + '<div class="fbar"><div class="fbar-fill st-' + st.key + '" style="width:' + w + '%;background:' + st.color + '"></div></div>'
     + '<div class="fstage-meta">от предыдущего: <b>' + convPrev + '</b> · от «Создано»: <b>' + convTot + '</b></div>'
     + '</div>';
 }
@@ -229,7 +229,7 @@ function cellHtml(st, cnt, prevCnt) {
 function thHtml(keys, lastLabel) {
   var h = '<tr><th style="min-width:150px">Менеджер</th>';
   keys.forEach(function (k) {
-    h += '<th><span class="dot-st st-' + k.key + '"></span>' + k.label + '</th>';
+    h += '<th><span class="dot-st st-' + k.key + '" style="background:' + k.color + '"></span>' + k.label + '</th>';
   });
   h += '<th>Общая конв.</th></tr>';
   return h;

@@ -126,7 +126,9 @@ function loadKpi() {
   });
   // 4 среза: покрытие / недели / менеджеры / календарь
   var slicesEl = document.getElementById('kpiSlices');
-  slicesEl.innerHTML = '<div class="text-center text-secondary py-4"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка срезов…</div></div>';
+  // Спиннер на весь экран КПЭ один — он выше, в блоке карточек. Второй здесь
+  // показывался одновременно с ним и читался как два лоадера подряд.
+  slicesEl.innerHTML = '';
   api('/api/kpi-slices?month=' + sel.value + '&mgr=' + encodeURIComponent(mgr)).then(function (d) {
     renderSlices(d, isPersonal);
   }).catch(function (e) {
@@ -266,6 +268,31 @@ function kpiChartDestroy(id) {
   if (kpiChartInstances[id]) { kpiChartInstances[id].destroy(); delete kpiChartInstances[id]; }
 }
 
+// Сноска под «План-факт по неделям». В столбцы попадают только ожидания с датой
+// в будущем: просроченные раскладывать по неделям не по чему, поэтому сумма
+// столбцов меньше карточки «Прогноз» ровно на них — об этом и предупреждаем.
+function weeksNote(d) {
+  var ovd = d.expected_overdue || { sum: 0, cnt: 0 };
+  if (!ovd.cnt) return '';
+  return '<div style="font-size:12px;color:#475569;margin:-4px 0 10px;line-height:1.5">'
+    + 'В столбцах — только ожидания с датой в будущем. Просроченные ('
+    + ovd.cnt + ' шт · ' + fmt(ovd.sum) + ' ₽) по неделям не раскладываются, но входят '
+    + 'в карточки «Ожидания» и «Прогноз» — на эту сумму итог столбцов меньше прогноза месяца.'
+    + '</div>';
+}
+
+// Тело карточки календаря: график либо объяснение, почему дней нет. У закрытого
+// месяца оставшихся дней не бывает — раньше в этом случае рисовался пустой холст
+// без единой подписи, и это читалось как поломка дашборда.
+function calendarBody(d) {
+  if (!d.calendar.length) {
+    return '<div class="text-secondary" style="font-size:13px;padding:6px 0">'
+      + 'Месяц закрыт — оставшихся дней нет. Календарь показывает ожидаемые оплаты '
+      + 'от сегодняшнего дня до конца выбранного месяца.</div>';
+  }
+  return '<div style="height:320px;position:relative"><canvas id="kpiChCalendar"></canvas></div>';
+}
+
 function renderSlices(d, isPersonal) {
   var el = document.getElementById('kpiSlices');
   if (!el) return;
@@ -278,10 +305,10 @@ function renderSlices(d, isPersonal) {
   }
   el.innerHTML = ''
     + (hideCoverage ? '' : renderCoverage(d))
-    + '<div class="card" style="margin-top:14px"><h2>План-факт по неделям месяца</h2><div style="height:340px;position:relative"><canvas id="kpiChWeeks"></canvas></div></div>'
+    + '<div class="card" style="margin-top:14px"><h2>План-факт по неделям месяца</h2>' + weeksNote(d) + '<div style="height:340px;position:relative"><canvas id="kpiChWeeks"></canvas></div></div>'
     + (hideManagers ? '' : '<div class="card" style="margin-top:14px"><h2>Факт и ожидания по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(основные — персонально; автооплаты/ОЗК/bond/afanasyev — строками; «Артефакт» — уволенные и тех. аккаунты)</span></h2><div style="position:relative"><canvas id="kpiChManagers"></canvas></div><div id="mgrZeroDrill" style="display:none;margin-top:8px;font-size:12px;color:#475569"></div></div>')
     + renderOverdueBlock(d.overdue)
-    + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(оставшиеся рабочие дни)</span></h2><div style="height:320px;position:relative"><canvas id="kpiChCalendar"></canvas></div></div>';
+    + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(оставшиеся дни месяца)</span></h2>' + calendarBody(d) + '</div>';
 
   // Расшифровку заполняем ПОСЛЕ вставки разметки: раньше fillOverdueDrill вызывался
   // из renderOverdueBlock, то есть до innerHTML, и писал в ещё не созданный узел.
@@ -290,7 +317,7 @@ function renderSlices(d, isPersonal) {
   kpiChartDestroy('weeks'); kpiChartDestroy('managers'); kpiChartDestroy('calendar');
   renderWeeksChart(d);
   if (!hideManagers) renderManagersChart(d);
-  renderCalendarChart(d);
+  if (d.calendar.length) renderCalendarChart(d);
 }
 
 // ── 1. Покрытие месячного плана (bullet chart на HTML: полный контроль маркера) ──
@@ -333,16 +360,21 @@ function renderWeeksChart(d) {
   kpiChartInstances.weeks = new Chart(ctx, {
     data: {
       labels: labels,
+      // order: Chart.js рисует датасеты от последнего к первому, поэтому линия плана
+      // с бо́льшим индексом уходила ПОД бары. Меньший order рисуется позже, то есть
+      // поверх: линия order 0, бары order 1.
       datasets: [
-        { type: 'bar', label: 'Факт', data: d.weeks.map(function (w) { return w.fact_sum; }), backgroundColor: KPI_COLORS.fact, stack: 's' },
-        { type: 'bar', label: 'Ожидания (актуальные)', data: d.weeks.map(function (w) { return w.expected_sum; }), backgroundColor: KPI_COLORS.actual, stack: 's' },
-        { type: 'line', label: 'План недели', data: d.weeks.map(function (w) { return w.plan_sum; }), borderColor: KPI_COLORS.plan, borderWidth: 2, pointRadius: 3, tension: 0 },
+        { type: 'bar', label: 'Факт', data: d.weeks.map(function (w) { return w.fact_sum; }), backgroundColor: KPI_COLORS.fact, stack: 's', order: 1 },
+        { type: 'bar', label: 'Ожидания (актуальные)', data: d.weeks.map(function (w) { return w.expected_sum; }), backgroundColor: KPI_COLORS.actual, stack: 's', order: 1 },
+        { type: 'line', label: 'План недели', data: d.weeks.map(function (w) { return w.plan_sum; }), borderColor: KPI_COLORS.plan, borderWidth: 2, pointRadius: 3, tension: 0, order: 0 },
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: { x: { stacked: true }, y: { stacked: true, ticks: { callback: function (v) { return fmt(v); } } } },
       plugins: {
+        // order выше меняет и порядок легенды — возвращаем исходный, по индексу датасета
+        legend: { labels: { sort: function (a, b) { return a.datasetIndex - b.datasetIndex; } } },
         tooltip: {
           callbacks: {
             label: function (c) {

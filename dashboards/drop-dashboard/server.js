@@ -497,13 +497,20 @@ function buildCalendar(dealsRaw, dicts, range, today) {
   }
   const days = [];
   const start = today > range.from ? today : range.from;
+  const DOW_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
   for (let d = new Date(start); d <= range.to; d.setUTCDate(d.getUTCDate() + 1)) {
     const dow = d.getUTCDay();
-    if (dow === 0 || dow === 6) continue;
     const key = d.toISOString().substring(0, 10);
     const b = byDay[key];
+    const weekend = dow === 0 || dow === 6;
+    // Суббота и воскресенье попадают в календарь только когда на них есть
+    // ожидания: раньше они отбрасывались всегда, и эти суммы пропадали из
+    // графика, оставаясь в карточке «Ожидания» (инвариант
+    // sum(calendar) + overdue = expected не выполнялся). Пустые выходные
+    // не показываем, чтобы не раздувать график нулевыми столбцами.
+    if (weekend && !b) continue;
     days.push({
-      date: key, label: fmtDate(d),
+      date: key, label: fmtDate(d) + (weekend ? ' ' + DOW_SHORT[dow] : ''), weekend,
       expected_sum: b ? Math.round(b.sum) : 0,
       expected_cnt: b ? b.cnt : 0,
       managers: b ? Object.entries(b.managers).map(([n, s]) => ({ name: n, sum: Math.round(s) })) : [],

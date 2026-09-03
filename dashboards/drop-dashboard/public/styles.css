@@ -75,22 +75,20 @@ body { padding: 0 !important; }
 .funnel-card h2.funnel-h { font-size: 20px; margin: 0 0 4px; }
 .funnel-sub { font-size: 13px; color: #888; font-weight: 400; }
 
-/* Цвета этапов (единые, без градиентов): */
-.st-created { background-color: #F968B6; }
-.st-mql     { background-color: #3F8BCD; }
-.st-sql     { background-color: #2E2D93; }
-.st-invoice { background-color: #B02FB0; }
-.st-paid    { background-color: #96B833; }
+/* Цвет этапа приходит из данных: поле color в STAGE_KEYS / QUAL_KEYS
+   (app-funnel.js) подставляется инлайном в .fbar-fill, .fstage-num и .dot-st.
+   Здесь правил по классам st-* нет намеренно. Раньше палитра дублировалась
+   в CSS, и это дало две поломки: безусловный .st-* { background-color } красил
+   строку .funnel-stage целиком (число этапа сливалось с фоном, а дорожка .fbar
+   читалась как пустая полоса поверх заливки), а ключи воронки PreSale
+   (work / warm / qualified / handoff) в CSS отсутствовали вовсе — их полосы
+   и точки оставались бесцветными. Классы st-* на элементах сохранены как
+   смысловые хуки. */
 
 .funnel-bars { display: flex; flex-direction: column; gap: 2px; }
 .fstage-head { display: flex; align-items: baseline; gap: 12px; }
 .fstage-head b { min-width: 150px; font-size: 16px; font-weight: 600; color: #1f2a44; }
 .fstage-num { font-size: 24px; font-weight: 700; }
-.funnel-stage.st-created .fstage-num { color: #F968B6; }
-.funnel-stage.st-mql     .fstage-num { color: #3F8BCD; }
-.funnel-stage.st-sql     .fstage-num { color: #2E2D93; }
-.funnel-stage.st-invoice .fstage-num { color: #B02FB0; }
-.funnel-stage.st-paid    .fstage-num { color: #96B833; }
 .fbar { height: 26px; background: #eef1f6; border-radius: 6px; margin: 6px 0 4px; overflow: hidden; }
 .fbar-fill { height: 100%; border-radius: 6px; min-width: 2px; transition: width .3s; }
 .fstage-meta { font-size: 14px; color: #475569; }
