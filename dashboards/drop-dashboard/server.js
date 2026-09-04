@@ -27,6 +27,8 @@ import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
 import { isKomDeal, isInternalSource, MIN_OPP, REG_SRC_ID, VALID_CATS, MQL_SALE_STAGES, NOT_MQL_SALE, YEAR, UF } from '@rshu/data-service/lib/deal-rules.js';
 import { enrichForKpi, calcPeriodKpi } from '@rshu/data-service/lib/period-kpi.js';
 import { computeSalesFunnel } from '@rshu/data-service/lib/sales-funnel.js';
+import { computePortfolioFlow } from '@rshu/data-service/lib/portfolio-flow.js';
+import { readSnapshot } from '@rshu/data-service/lib/snapshot.js';
 // Единый справочник групп менеджеров
 import { getMgrGroup, MGR_GROUP_LABELS } from '@rshu/data-service/lib/mgr-groups.js';
 // Полный расчёт KPI по менеджерам (Таблица 1/2, срезы) — общий с manager-report
@@ -58,6 +60,32 @@ app.get('/api/data', async (req, res) => {
 });
 
 // KPI за точный период дат + предыдущий период той же длины
+// ── Структура среднего чека: распределение оплаченных в периоде сделок по диапазонам ──
+// Диапазоны фиксированные; сумма сделки — OPPORTUNITY (как в поступлениях).
+function buildCheckDist(rows, from, to) {
+  const BUCKETS = [
+    { key: 'lt30',   label: 'до 30 000', min: 0, max: 30000 },
+    { key: '30_50',  label: '30 000–50 000', min: 30000, max: 50000 },
+    { key: '50_100', label: '50 000–100 000', min: 50000, max: 100000 },
+    { key: '100_300', label: '100 000–300 000', min: 100000, max: 300000 },
+    { key: 'gt300',  label: 'более 300 000', min: 300000, max: Infinity },
+  ];
+  const b = BUCKETS.map(function (x) { return { key: x.key, label: x.label, cnt: 0, sum: 0 }; });
+  let totalCnt = 0, totalSum = 0;
+  for (const r of rows) {
+    if (r.OPP < MIN_OPP || !r.PAY_DT) continue;
+    if (r.PAY_DT < from || r.PAY_DT > to) continue;
+    const idx = BUCKETS.findIndex(function (x) { return r.OPP >= x.min && r.OPP < x.max; });
+    if (idx < 0) continue;
+    b[idx].cnt++; b[idx].sum += r.OPP;
+    totalCnt++; totalSum += r.OPP;
+  }
+  return {
+    buckets: b.map(function (x) { return { key: x.key, label: x.label, cnt: x.cnt, sum: Math.round(x.sum) }; }),
+    total: { cnt: totalCnt, sum: Math.round(totalSum) },
+  };
+}
+
 app.get('/api/kpi', async (req, res) => {
   try {
     const { from, to, compare_from } = req.query;
@@ -88,6 +116,7 @@ app.get('/api/kpi', async (req, res) => {
       prev_period: { from: iso(ppFrom), to: iso(ppTo) },
       current:  calcPeriodKpi(rows, dtFrom, dtTo),
       previous: calcPeriodKpi(rows, ppFrom, ppTo),
+      check_dist: buildCheckDist(rows, dtFrom, dtTo), // структура среднего чека (текущий период)
     });
   } catch (e) {
     console.error('/api/kpi error:', e.message);
@@ -233,6 +262,46 @@ function calcExpectParts(dealsRaw, from, to, today) {
     if (ad >= from && ad <= to) { actSum += opp; actCnt++; }
   }
   return { actual: { sum: Math.round(actSum), cnt: actCnt }, overdue: { sum: Math.round(ovdSum), cnt: ovdCnt } };
+}
+
+// Распределение ожидаемых поступлений (срез КПЭ): текущие незакрытые сделки на
+// стадиях «Счёт отправлен»/«Частичная оплата»/«Постоплата» (PROPOSAL/6/2) без оплаты.
+// Сумма — полная OPPORTUNITY, ровно как в calcExpectParts (единая функция ожиданий,
+// чтобы цифры совпадали с карточкой «Ожидания»). Просроченные (согл. дата < today) —
+// отдельно; остальные сгруппированы по месяцам (текущий и будущие) и стадиям.
+const EXP_STAGE_KEY = { PROPOSAL: 'inv_proposal', 6: 'inv_partial', 2: 'inv_postpay' };
+function buildExpectDistribution(dealsRaw, today) {
+  const overdue = { sum: 0, cnt: 0 };
+  const zeroSt = () => ({ inv_proposal: { sum: 0, cnt: 0 }, inv_partial: { sum: 0, cnt: 0 }, inv_postpay: { sum: 0, cnt: 0 } });
+  const byMonth = {};
+  for (const x of dealsRaw) {
+    const st = String(x.STAGE_ID || '').replace(/^C\d+:/, '');
+    if (!EXP_STAGES.has(st)) continue;
+    if (x.STAGE_SEMANTIC_ID === 'F' || x.STAGE_SEMANTIC_ID === 'S') continue;
+    if (x.UF_DATE_PAY_1C) continue;
+    const opp = parseFloat(x.OPPORTUNITY || 0);
+    if (opp < MIN_OPP) continue;
+    const ad = parseDt(x[UF.AGREED_PAY_DATE]);
+    if (!ad) continue;
+    const key = EXP_STAGE_KEY[st] || 'inv_proposal';
+    if (ad < today) { overdue.sum += opp; overdue.cnt++; continue; }
+    const m = ad.toISOString().substring(0, 7);
+    const mm = byMonth[m] || (byMonth[m] = zeroSt());
+    mm[key].sum += opp; mm[key].cnt++;
+  }
+  const months = Object.keys(byMonth).sort().map((m) => {
+    const s = byMonth[m];
+    return {
+      m,
+      total: { sum: Math.round(s.inv_proposal.sum + s.inv_partial.sum + s.inv_postpay.sum), cnt: s.inv_proposal.cnt + s.inv_partial.cnt + s.inv_postpay.cnt },
+      stages: [
+        { key: 'inv_proposal', label: 'Счёт отправлен', sum: Math.round(s.inv_proposal.sum), cnt: s.inv_proposal.cnt },
+        { key: 'inv_partial', label: 'Частичная оплата', sum: Math.round(s.inv_partial.sum), cnt: s.inv_partial.cnt },
+        { key: 'inv_postpay', label: 'Постоплата', sum: Math.round(s.inv_postpay.sum), cnt: s.inv_postpay.cnt },
+      ].filter(x => x.cnt > 0),
+    };
+  });
+  return { overdue: { sum: Math.round(overdue.sum), cnt: overdue.cnt }, months };
 }
 
 // Потенциал — текущий срез воронки (на сегодня, не зависит от месяца):
@@ -592,6 +661,7 @@ app.get('/api/kpi-slices', async (req, res) => {
       managers: buildManagers(deals, dicts, range, mskToday),
       calendar: buildCalendar(deals, dicts, range, mskToday),
       overdue: { sum: parts.overdue.sum, cnt: parts.overdue.cnt, deals: buildOverdueList(deals, dicts, mskToday) },
+      expect_dist: buildExpectDistribution(deals, mskToday), // распределение ожиданий по месяцам/стадиям
       calculated_at: new Date(getCacheAt()).toISOString(),
     });
   } catch (e) {
@@ -645,7 +715,12 @@ app.get('/api/managers-sales', async (req, res) => {
       return { id, name, group: getMgrGroup(id),
         postupleniya: 0, won_cnt: 0, avg_check: 0, avg_close_days_won: 0,
         leads: 0, mql: 0, prev_postupleniya: 0, prev_won_cnt: 0,
-        delta_abs: 0, delta_pct: 0, share_pct: 0 };
+        delta_abs: 0, delta_pct: 0, share_pct: 0,
+        // Скидки (оплаченные в периоде): disc_* — со скидкой, nodisc_* — без
+        disc_cnt: 0, disc_sum: 0, disc_abs_sum: 0, disc_pct_sum: 0,
+        nodisc_cnt: 0, nodisc_sum: 0,
+        // Конверсия портфеля в оплату (кат.0, уникальные сделки)
+        pf_available: 0, pf_paid: 0 };
     }
     const curM = {}, prevM = {};
     const touch = (map, id, name) => { if (!map[id]) map[id] = emptyMgr(id, name); return map[id]; };
@@ -670,6 +745,65 @@ app.get('/api/managers-sales', async (req, res) => {
           if (isQualLead(r)) m.mql++;
         }
       }
+    }
+
+    // ── Скидки: отдельный проход по СЫРЫМ deals (enrichForKpi не переносит UF_DISCOUNT).
+    // Процент скидки = UF_DISCOUNT («Скидка (из счёта)», double, %); 0/пусто = без скидки.
+    // Сумма скидки ₽ = opp × pct/(100−pct); исходная стоимость = opp + скидка.
+    const discSeen = new Set();
+    for (const x of dealsRaw) {
+      const id = String(x.ID || '');
+      if (!id || discSeen.has(id)) continue;
+      discSeen.add(id);
+      const pay = parseDt(x.UF_DATE_PAY_1C);
+      if (!pay || pay < dtFrom || pay > dtTo) continue;
+      const opp = parseFloat(x.OPPORTUNITY || 0);
+      if (opp < MIN_OPP) continue;
+      const mgrId = String(x.ASSIGNED_BY_ID || '');
+      const m = touch(curM, mgrId, users[mgrId] || mgrId || '(без ответственного)');
+      const pct = parseFloat(x.UF_DISCOUNT || 0);
+      if (pct > 0 && pct < 100) {
+        m.disc_cnt++; m.disc_sum += opp; m.disc_pct_sum += pct;
+        m.disc_abs_sum += opp * pct / (100 - pct); // сумма скидки ₽
+      } else {
+        m.nodisc_cnt++; m.nodisc_sum += opp;
+      }
+    }
+
+    // ── Конверсия портфеля в оплату (операционная, по логике Sankey «Движение портфеля»):
+    // знаменатель = остаток в работе на начало + созданные в периоде + возвращённые в работу;
+    // числитель = фактически оплаченные в периоде. Уникальные сделки кат.0 одного менеджера.
+    const pfSeen = new Set();
+    const pfAsOf = todayMsk();
+    for (const x of dealsRaw) {
+      const id = String(x.ID || '');
+      if (!id || pfSeen.has(id)) continue;
+      pfSeen.add(id);
+      if (String(x.CATEGORY_ID || '') !== '0') continue;
+      const sem = x.STAGE_SEMANTIC_ID || '';
+      const opp = parseFloat(x.OPPORTUNITY || 0);
+      if (sem === 'S' && opp < MIN_OPP) continue;                 // тех. WON
+      const dc = parseDt(x.DATE_CREATE);
+      if (!dc) continue;
+      const pay = parseDt(x.UF_DATE_PAY_1C);
+      if (sem === 'S' && !pay) continue;                          // WON без 1С — вне портфеля
+      const ref = parseDt(x.UF_CRM_1753341391806);
+      const effRefuse = ref || (sem === 'F' ? parseDt(x.CLOSEDATE) : null);
+      if (sem === 'F' && effRefuse && effRefuse > pfAsOf) continue; // битая дата отказа (будущее)
+      const paidE = !!(pay && opp >= MIN_OPP && pay >= dtFrom && pay <= dtTo);
+      const refusedE = !!(sem === 'F' && effRefuse && effRefuse >= dtFrom && effRefuse <= dtTo);
+      const closedBeforeFrom = (pay && pay < dtFrom) || (effRefuse && effRefuse < dtFrom);
+      const inStart = dc < dtFrom && !closedBeforeFrom;           // остаток на начало
+      const inCreated = dc >= dtFrom && dc <= dtTo;               // созданные в периоде
+      let inPf = false;
+      if (inStart) inPf = true;
+      else if (inCreated) { if (closedBeforeFrom) continue; inPf = true; }
+      else if (paidE || refusedE) inPf = true;                    // возвращённые в работу
+      else continue;
+      const mgrId = String(x.ASSIGNED_BY_ID || '');
+      const m = touch(curM, mgrId, users[mgrId] || mgrId || '(без ответственного)');
+      m.pf_available++;
+      if (paidE) m.pf_paid++;
     }
 
     // Финальная сборка: доли, дельты, средние
@@ -938,6 +1072,48 @@ app.get('/api/funnel', async (req, res) => {
     res.json(Object.assign(out, { calculated_at: new Date(getCacheAt()).toISOString() }));
   } catch (e) {
     console.error('/api/funnel error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Sankey «Движение портфеля» ──────────────────────────────────────────────
+// Остаток на начало + Создано → Всего доступно → Оплачено/Отказано/Остаток на
+// конец (+ разбивка остатка по этапам, если to == дата выгрузки или есть снапшот).
+// Расчёт: data-service/lib/portfolio-flow.js. Кат. 0+19, PreSale не входит.
+app.get('/api/portfolio-flow', async (req, res) => {
+  try {
+    const { from, to, mgr } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from и to обязательны (YYYY-MM-DD)' });
+    const dtFrom = new Date(from + 'T00:00:00');
+    const dtTo   = new Date(to   + 'T00:00:00');
+    if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
+      return res.status(400).json({ error: 'некорректный диапазон дат' });
+    }
+    const dealsRaw = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
+    // Дата выгрузки кэша — из fetched_at.json (getCacheAt() — время analyze(),
+    // до первого getAgg() равен 0 и к дате выгрузки отношения не имеет)
+    let asOf = null;
+    try {
+      const fa = JSON.parse(await fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'fetched_at.json'), 'utf-8'));
+      const fd = new Date(fa.fetchedAt);
+      if (!isNaN(fd)) asOf = new Date(fd.getFullYear(), fd.getMonth(), fd.getDate());
+    } catch { /* fallback ниже */ }
+    if (!asOf) {
+      const fd = new Date(getCacheAt());
+      asOf = new Date(fd.getFullYear(), fd.getMonth(), fd.getDate());
+    }
+    // Снапшот на to (для прошлых дат) — берём только если to < даты выгрузки
+    let snapshot = null;
+    if (dtTo < asOf) snapshot = readSnapshot(to);
+    const out = computePortfolioFlow(dealsRaw, {
+      from: dtFrom, to: dtTo,
+      mgrId: mgr && mgr !== 'all' ? String(mgr) : null,
+      asOf,
+      snapshot,
+    });
+    res.json(Object.assign(out, { calculated_at: new Date(getCacheAt()).toISOString() }));
+  } catch (e) {
+    console.error('/api/portfolio-flow error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

@@ -34,6 +34,7 @@
     <button class="kpi-tab active" data-tab="sales" onclick="window.switchDashTab('sales')">📊 Продажи</button>
     <button class="kpi-tab" data-tab="kpi" onclick="window.switchDashTab('kpi')">🎯 КПЭ</button>
     <button class="kpi-tab" data-tab="funnel" onclick="window.switchDashTab('funnel')">🧲 Воронка продаж</button>
+    <button class="kpi-tab" data-tab="dev" onclick="window.switchDashTab('dev')">🧪 В разработке</button>
   </div>
   <div class="date-filter-bar" id="salesFilterBar">
     <div class="date-filter-group">
@@ -99,6 +100,10 @@
   </div>
   <div id="contentAreaNew">
     <div class="text-center text-secondary py-5" id="loadingStateNew"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка данных…</div></div>
+  </div>
+  <div id="devTab" style="display:none">
+    <div class="filter-info" style="margin:4px 0 10px">🧪 Вкладка в разработке: сюда переносятся блоки с «Продаж», которые не потеряем, но убрали из основного вида. Период и сравнение — как на вкладке «Продажи».</div>
+    <div id="devAreaNew"></div>
   </div>
 </div>
 </body>

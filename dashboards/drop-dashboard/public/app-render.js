@@ -114,23 +114,28 @@ window.setMgrReportFilter = function (kind, val) {
   var qs = [];
   if (from && to) qs.push('from=' + from, 'to=' + to);
   qs.push('form=' + window.mgrReportFilter.form, 'traffic=' + window.mgrReportFilter.traffic);
-  var wrap = document.getElementById('mgrReportBlock');
+  // Срезы живут на «Продажах» (#mgrReportSlices), таблицы 1/2 — на dev-вкладке (#mgrReportDevTables)
+  var wrap = document.getElementById('mgrReportSlices');
+  var wrapDev = document.getElementById('mgrReportDevTables');
   if (wrap) wrap.style.opacity = '0.5';
   api('/api/managers-report?' + qs.join('&')).then(function (rep) {
     if (lastRenderData) lastRenderData.mgr_report = rep;
     if (window.Chart && Chart.instances) {
       Object.keys(Chart.instances).forEach(function (k) { var c = Chart.instances[k]; if (c.canvas && wrap && wrap.contains(c.canvas)) c.destroy(); });
     }
-    if (wrap) wrap.outerHTML = renderMgrReportBlock(rep);
+    if (wrap) wrap.outerHTML = renderMgrReportBlock(rep, 'slices');
+    if (wrapDev) wrapDev.outerHTML = renderMgrReportBlock(rep, 'tables');
     initTableSort('mgrTab1'); initTableSort('mgrTab2');
     if (window.Chart) { try { initMgrReportCharts(rep, (lastRenderData && lastRenderData.weeks) || []); } catch (e) {} }
-  }).catch(function (e) { console.error('managers-report filter error:', e); var w = document.getElementById('mgrReportBlock'); if (w) w.style.opacity = '1'; });
+  }).catch(function (e) { console.error('managers-report filter error:', e); var w = document.getElementById('mgrReportSlices'); if (w) w.style.opacity = '1'; });
 };
 
-// ── Отчёт по менеджерам: Таблица 1 (показатели), Таблица 2 (конверсии), срезы, воронка ──
+// ── Отчёт по менеджерам: Таблицы 1/2 уехали на dev-вкладку, срезы остались на «Продажах».
+// renderMgrReportBlock(rep, mode): 'tables' → dev; 'slices' → «Продажи»; 'all' — целиком.
 // rep — ответ /api/managers-report: {managers:[...], period}. Менеджеры уже
 // сгруппированы (индивид. + Автооплаты/ОЗК/Прочие). Перенос из manager-report-dev.
-function renderMgrReportBlock(rep) {
+function renderMgrReportBlock(rep, mode) {
+  // mode: 'tables' (на dev-вкладку: Таблицы 1/2) | 'slices' (на «Продажи»: срезы) | 'all'
   var mgrs = (rep.managers || []).filter(function (m) { return m.paid || m.created || m.in_work_start; });
   if (!mgrs.length) return '';
 
@@ -224,18 +229,29 @@ function renderMgrReportBlock(rep) {
   t2 += '</tbody></table>';
 
   var h = '';
-  h += '<div class="card" style="margin-top:8px"><h2>Таблица 1: Основные показатели по менеджерам' + mgrReportFilterHtml() + '</h2><div class="scroll-x">' + t1 + '</div></div>';
-  h += '<div class="card" style="margin-top:8px"><h2>Таблица 2: Конверсии и отклонения от среднего' + mgrReportFilterHtml() + ' <span style="font-size:12px;color:#475569;font-weight:400">(цвет — отклонение от среднего по отделу)</span></h2><div class="scroll-x">' + t2 + '</div></div>';
-  // Срезы — горизонтальные stacked-полосы, сортировка по сумме (выше сумма — выше полоса)
-  var barH = Math.max(280, mgrs.length * 26 + 90);
-  h += '<div class="card" style="margin-top:8px"><h2>Срезы по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(горизонтальные полосы, сортировка по сумме)</span></h2>';
-  h += '<h3 style="font-size:13px;margin:8px 0;color:#1f2a44">B2B vs B2C</h3><div style="height:'+barH+'px;position:relative"><canvas id="mgrBarsB2b"></canvas></div>';
-  h += '<h3 style="font-size:13px;margin:20px 0 8px;color:#1f2a44">Источники (внутренняя база vs маркетинг)</h3><div style="height:'+barH+'px;position:relative"><canvas id="mgrBarsSrc"></canvas></div>';
-  h += '<h3 style="font-size:13px;margin:20px 0 8px;color:#1f2a44">Форматы обучения</h3><div style="height:'+barH+'px;position:relative"><canvas id="mgrBarsFmt"></canvas></div>';
-  h += '<h3 style="font-size:13px;margin:20px 0 8px;color:#1f2a44">Тип обучения</h3><div style="height:'+barH+'px;position:relative"><canvas id="mgrBarsEdu"></canvas></div>';
-  h += '</div>';
-  // Воронка (фиксация состояния) вынесена вниз — рядом с «Воронка по неделям» (см. renderPageMainNew).
-  return '<div id="mgrReportBlock">' + h + '</div>';
+  // Таблицы 1/2 — на dev-вкладку (если mode не 'slices')
+  if (mode !== 'slices') {
+    h += '<div class="card" style="margin-top:8px"><h2>Таблица 1: Основные показатели по менеджерам' + mgrReportFilterHtml() + '</h2><div class="scroll-x">' + t1 + '</div></div>';
+    h += '<div class="card" style="margin-top:8px"><h2>Таблица 2: Конверсии и отклонения от среднего' + mgrReportFilterHtml() + ' <span style="font-size:12px;color:#475569;font-weight:400">(цвет — отклонение от среднего по отделу)</span></h2><div class="scroll-x">' + t2 + '</div></div>';
+  }
+  // Срезы — остаются на «Продажах» (если mode не 'tables')
+  if (mode !== 'tables') {
+    // Компактная сетка 2×2 — все 4 среза помещаются на один экран десктопа
+    var barH = Math.max(210, mgrs.length * 15 + 70);
+    var slice = function (title, id) {
+      return '<div><h3 style="font-size:13px;margin:0 0 6px;color:#1f2a44">' + title + '</h3>'
+        + '<div style="height:' + barH + 'px;position:relative"><canvas id="' + id + '"></canvas></div></div>';
+    };
+    h += '<div class="card" style="margin-top:8px"><h2>Срезы по менеджерам' + mgrReportFilterHtml() + ' <span style="font-size:12px;color:#475569;font-weight:400">(горизонтальные полосы, сортировка по сумме)</span></h2>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px 22px">';
+    h += slice('B2B vs B2C', 'mgrBarsB2b');
+    h += slice('Источники (внутренняя база vs маркетинг)', 'mgrBarsSrc');
+    h += slice('Форматы обучения', 'mgrBarsFmt');
+    h += slice('Тип обучения', 'mgrBarsEdu');
+    h += '</div></div>';
+  }
+  var wrapId = mode === 'tables' ? 'mgrReportDevTables' : (mode === 'slices' ? 'mgrReportSlices' : 'mgrReportBlock');
+  return '<div id="' + wrapId + '">' + h + '</div>';
 }
 
 // Графики блока «Отчёт по менеджерам»: срезы (верт. stacked bar) + воронка (stack2 по неделям).
@@ -478,19 +494,21 @@ async function renderPageMainNew(d) {
     html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0, d.pp && d.pp.ytd, d.pp && d.pp.leads_ytd, d.pp && d.pp.qual_lead_ytd);
     html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev, d.pp && d.pp.oom_ytd, d.pp && d.pp.oom_leads_ytd, d.pp && d.pp.oom_qual_lead_ytd);
     html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
-    // 👥 Продажи по менеджерам — сравнение за выбранный период
+    // 👥 Продажи по менеджерам — сравнение за выбранный период (остаётся, не заменяется)
     if (d.mgr_sales) html += renderManagersBlock(d.mgr_sales);
-    // 📋 Отчёт по менеджерам: Таблица 1/2, срезы, воронка (перенос из manager-report-dev)
-    if (d.mgr_report) html += renderMgrReportBlock(d.mgr_report);
+    // Treemap «Вклад менеджеров» + лидеры периода + скидки (на данных managers-sales)
+    if (d.mgr_sales) {
+      html += renderContributionBarCard(d.mgr_sales);
+      html += renderLeadersCard(d.mgr_sales);
+    }
+    // Структура среднего чека (распределение оплат по диапазонам; данные /api/kpi → check_dist)
+    if (d.check_dist) html += renderCheckDistCard(d.check_dist);
+    if (d.mgr_sales) html += renderDiscountsCard(d.mgr_sales);
+    // 📋 Отчёт по менеджерам: на «Продажах» остаются СРЕЗЫ; Таблицы 1/2 и воронки — на dev-вкладке
+    if (d.mgr_report) html += renderMgrReportBlock(d.mgr_report, 'slices');
     // Поступления по неделям/месяцам (на всю ширину) + переключатель
     var posTitle = posMode==='days' ? 'по дням' : (isMonths('pos') ? 'по месяцам' : 'по неделям');
     html += '<div class="card" style="margin-top:8px"><h2>Поступления '+posTitle+perToggle('pos', true)+'</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
-    // Таблицы «Форматы / Тип обучения / B2B / Источники» удалены — заменены
-    // горизонтальными срезами по менеджерам (mgrBarsFmt/Edu/B2b/Src).
-    // Стеки воронок - на всю ширину, друг под другом
-    html += '<div class="card" style="margin-top:8px"><h2>Воронка '+(isMonths('funnel')?'по месяцам':'по неделям')+' <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии '+(isMonths('funnel')?'в том же месяце':'на той же неделе')+')</span>'+perToggle('funnel')+'</h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
-    // Воронка «фиксация состояния с учётом переходящего остатка» — перенесена сюда из блока отчёта по менеджерам
-    html += '<div class="card" style="margin-top:8px"><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учётом переходящего остатка)</span></h2><div style="height:600px;position:relative"><canvas id="mgrFunnelReport"></canvas></div></div>';
     // Конверсии
 
 
@@ -500,6 +518,18 @@ async function renderPageMainNew(d) {
     html += '<div class="kpis kpis-8" id="newRegKpis" style="margin-top:16px"></div>';
     html += '<div class="card"><h2>'+(isMonths('table')?'Таблица по месяцам':'Недельная таблица')+mgrWeekSelectHtml(d)+perToggle('table')+'</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
+    // ── Вкладка «🧪 В разработке»: перенесённые с «Продаж» блоки (не теряем):
+    //    Таблицы 1/2 (отчёт менеджеров) + 2 воронки. Период/сравнение — как у «Продаж». ──
+    var devEl = document.getElementById('devAreaNew');
+    if (devEl) {
+      var devHtml = '';
+      if (d.mgr_report) devHtml += renderMgrReportBlock(d.mgr_report, 'tables');
+      devHtml += '<div class="card" style="margin-top:8px"><h2>Воронка '+(isMonths('funnel')?'по месяцам':'по неделям')+' <span style="font-size:12px;color:#475569;font-weight:400">(созданные и зафиксированные на стадии '+(isMonths('funnel')?'в том же месяце':'на той же неделе')+')</span>'+perToggle('funnel')+'</h2><div style="height:600px;position:relative"><canvas id="newChFunnel2"></canvas></div></div>';
+      devHtml += '<div class="card" style="margin-top:8px"><h2>Воронка <span style="font-size:12px;color:#475569;font-weight:400">(фиксация состояния в периоде с учётом переходящего остатка)</span></h2><div style="height:600px;position:relative"><canvas id="mgrFunnelReport"></canvas></div></div>';
+      devEl.innerHTML = devHtml || '<div class="text-secondary" style="font-size:13px">Перенесённые блоки появятся после загрузки данных (вкладка «Продажи»)</div>';
+      if (d.mgr_report) { initTableSort('mgrTab1'); initTableSort('mgrTab2'); }
+    }
+
     // Блоки «Ключевые выводы» и «Артефакты данных» удалены. reg нужен ниже для KPI регистрации.
     var reg = d.reg_ytd || {};
 
@@ -508,7 +538,6 @@ async function renderPageMainNew(d) {
 
     // Сортировка таблицы блока «Продажи по менеджерам» (после вставки HTML)
     if (d.mgr_sales) initTableSort('mgrTableMain');
-    if (d.mgr_report) { initTableSort('mgrTab1'); initTableSort('mgrTab2'); }
 
 
     // Регистрации: KPI (reg уже объявлен выше, в «Ключевых выводах»).
@@ -587,6 +616,8 @@ async function renderPageMainNew(d) {
         try {
           if (document.getElementById('newChPreSale')) new Chart(document.getElementById('newChPreSale'),{type:'line',data:{labels:labels,datasets:[{label:'Pre Sale, дн.',data:weeks.map(function(w){return w.avg_presale_dur||0;}),borderColor:'#43A047',tension:0.3,fill:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{beginAtZero:true}}}});
         } catch(e){}
+        try { if (d.mgr_sales) renderDiscountsChart(d.mgr_sales); } catch (e) { console.error('discounts chart error:', e); }
+        try { if (d.check_dist) renderCheckDistChart(d.check_dist); } catch (e) { console.error('checkdist chart error:', e); }
       }
     }, 100);
 
@@ -594,4 +625,341 @@ async function renderPageMainNew(d) {
     areaNew.innerHTML = '<div class="alert alert-danger" style="cursor:pointer" onclick="this.style.display=\'none\'\">\u274c <b>Ошибка вкладки «Новая логика»</b><br>'+escapeHtml(e.message)+'<br><br><small style="color:#999">(нажмите чтобы закрыть, время: ' + new Date().toLocaleTimeString('ru-RU') + ')</small></div>';
     console.error('renderPageMainNew error:', e);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Обзорный экран «Продажи»: treemap «Вклад менеджеров», лидеры периода,
+// «Продажи со скидками». Данные — /api/managers-sales (период «Продаж»).
+// Цвета — из действующей палитры дашборда.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function fmtM(v) { v = v || 0; return v >= 1e6 ? (v / 1e6).toFixed(1) + ' млн' : v >= 1e3 ? Math.round(v / 1e3) + ' тыс' : fmt(v); }
+
+// Строки «вклад менеджеров»: действующие + агрегаты групп (Автооплаты/ОЗК/Прочее/Артефакт)
+function treemapEntries(mgr) {
+  var out = [];
+  (mgr.managers || []).forEach(function (m) {
+    out.push({ name: m.name, v: Math.round(m.postupleniya || 0), won: m.won_cnt || 0, check: m.avg_check || 0, color: '#3079D2' });
+  });
+  var g = mgr.groups || {};
+  function agg(label, color, arrs) {
+    var list = [];
+    arrs.forEach(function (a) { (a || []).forEach(function (m) { list.push(m); }); });
+    var sum = list.reduce(function (s, m) { return s + (m.postupleniya || 0); }, 0);
+    if (sum <= 0) return;
+    var won = list.reduce(function (s, m) { return s + (m.won_cnt || 0); }, 0);
+    out.push({ name: label, v: Math.round(sum), won: won, check: won ? Math.round(sum / won) : 0, color: color, group: true });
+  }
+  agg('Автооплаты', '#00897B', [g.autopay]);
+  agg('ОЗК', '#E65100', [g.ozk]);
+  agg('Прочее', '#7B1FA2', [g.other]);
+  agg('Артефакт', '#94A3B8', [g.bond, g.afanasyev, g.tech]);
+  return out.filter(function (e) { return e.v > 0; });
+}
+
+// ── Вклад менеджеров: 100% horizontal stacked bar (одна полоса = поступления отдела) ──
+// Сегменты = строки таблицы «Продажи по менеджерам» (main + Автооплаты/ОЗК/Прочее)
+// + Артефакт (bond/afanasyev/tech). Цвета из палитры дашборда.
+var CONTRIB_COLORS = ['#093EB4', '#3079D2', '#00bcd4', '#1565C0', '#5B21B6', '#7B1FA2', '#3F8BCD', '#2E2D93'];
+var CONTRIB_GROUP_COLORS = { autopay: '#00897B', ozk: '#E65100', other: '#F57C00', artifact: '#94A3B8' };
+
+function contributionSegments(mgr) {
+  var segs = [];
+  (mgr.managers || []).forEach(function (m) {
+    if ((m.postupleniya || 0) <= 0) return;
+    segs.push({ name: m.name, v: Math.round(m.postupleniya || 0), won: m.won_cnt || 0, check: m.avg_check || 0, color: CONTRIB_COLORS[segs.length % CONTRIB_COLORS.length] });
+  });
+  var g = mgr.groups || {};
+  function agg(label, color, arrs) {
+    var list = [];
+    arrs.forEach(function (a) { (a || []).forEach(function (m) { list.push(m); }); });
+    var sum = list.reduce(function (s, m) { return s + (m.postupleniya || 0); }, 0);
+    if (sum <= 0) return;
+    var won = list.reduce(function (s, m) { return s + (m.won_cnt || 0); }, 0);
+    segs.push({ name: label, v: Math.round(sum), won: won, check: won ? Math.round(sum / won) : 0, color: color, group: true });
+  }
+  agg('Автооплаты', CONTRIB_GROUP_COLORS.autopay, [g.autopay]);
+  agg('ОЗК', CONTRIB_GROUP_COLORS.ozk, [g.ozk]);
+  agg('Прочее', CONTRIB_GROUP_COLORS.other, [g.other]);
+  agg('Артефакт', CONTRIB_GROUP_COLORS.artifact, [g.bond, g.afanasyev, g.tech]);
+  return segs;
+}
+
+function renderContributionBarCard(mgr) {
+  var segs = contributionSegments(mgr);
+  if (!segs.length) return '';
+  var total = segs.reduce(function (s, e) { return s + e.v; }, 0);
+  var pct = function (v) { return total > 0 ? (v / total * 100) : 0; };
+  // Полоса: сегменты с % ширины; подпись — только в крупных (≥ 8% или ≥ 90px)
+  var bar = '<div style="display:flex;width:100%;height:56px;border-radius:8px;overflow:hidden;margin:10px 0 6px">';
+  segs.forEach(function (s) {
+    var w = pct(s.v);
+    if (w <= 0) return;
+    var tip = s.name + ': ' + s.v.toLocaleString('ru-RU') + ' ₽ (' + w.toFixed(1) + '%) · оплат: ' + s.won + ' · средний чек: ' + (s.check || 0).toLocaleString('ru-RU') + ' ₽';
+    var showTxt = w >= 8;
+    bar += '<div title="' + escapeHtml(tip) + '" style="width:' + w + '%;background:' + s.color + ';display:flex;align-items:center;justify-content:center;overflow:hidden;border-right:2px solid #fff;box-sizing:border-box">'
+      + (showTxt ? '<span style="color:#fff;font-size:11px;font-weight:700;white-space:nowrap;padding:0 4px">' + escapeHtml(s.name) + ' · ' + w.toFixed(1) + '%</span>' : '') + '</div>';
+  });
+  bar += '</div>';
+  // Легенда: менеджер — сумма — доля
+  var legend = segs.map(function (s) {
+    var w = pct(s.v);
+    return '<span style="display:inline-flex;align-items:center;gap:5px;margin:3px 12px 3px 0;font-size:12px">'
+      + '<span style="width:10px;height:10px;border-radius:2px;background:' + s.color + '"></span>'
+      + '<b>' + escapeHtml(s.name) + '</b> ' + s.v.toLocaleString('ru-RU') + ' ₽ · ' + w.toFixed(1) + '%</span>';
+  }).join('');
+  return '<div class="card" style="margin-top:8px"><h2>Вклад менеджеров <span style="font-size:12px;color:#475569;font-weight:400">(100% полоса: доля в поступлениях отдела за период · действующие поимённо, Автооплаты/ОЗК/Прочее/Артефакт — агрегатами · итог совпадает со строками таблицы)</span></h2>'
+    + bar
+    + '<div style="display:flex;flex-wrap:wrap;margin-bottom:4px">' + legend + '</div>'
+    + '<div class="filter-info">Итого по сегментам: ' + total.toLocaleString('ru-RU') + ' ₽ · ' + segs.reduce(function (s, e) { return s + e.won; }, 0) + ' оплат</div></div>';
+}
+
+function renderTreemapCard(mgr) {
+  if (!mgr || !mgr.managers || !mgr.managers.length) return '';
+  var tot = (mgr.total && mgr.total.postupleniya) || 0;
+  return '<div class="card" style="margin-top:8px"><h2>Вклад менеджеров <span style="font-size:12px;color:#475569;font-weight:400">(treemap · площадь = поступления за период · действующие — поимённо, группы — агрегатами · наведите на блок для деталей)</span></h2>'
+    + '<div id="mgrTreemap" style="position:relative;width:100%;height:420px;background:#EDEFF5;border-radius:8px;overflow:hidden"></div>'
+    + '<div class="filter-info">Итого поступлений за период: ' + fmt(tot) + ' ₽</div></div>';
+}
+
+// Раскладка treemap: бинарное деление области по сумме (slice-and-dice с балансом)
+function treemapLayout(areas, W, H) {
+  var res = [];
+  var sumOf = function (idxs) { return idxs.reduce(function (s, i) { return s + areas[i]; }, 0); };
+  function place(idxs, x, y, w, h) {
+    if (idxs.length === 1) { res[idxs[0]] = { x: x, y: y, w: w, h: h }; return; }
+    var total = sumOf(idxs);
+    // разрез, максимально близкий к половине суммы (по отсортированному списку)
+    var acc = 0, best = null;
+    for (var k = 0; k < idxs.length - 1; k++) {
+      acc += areas[idxs[k]];
+      var diff = Math.abs(total - 2 * acc);
+      if (!best || diff < best.diff) best = { k: k + 1, diff: diff };
+    }
+    var cut = best.k;
+    var left = idxs.slice(0, cut), right = idxs.slice(cut);
+    var lsum = sumOf(left);
+    if (w >= h) { // режем по вертикали
+      var lw = w * lsum / total;
+      place(left, x, y, lw, h);
+      place(right, x + lw, y, w - lw, h);
+    } else {
+      var lh = h * lsum / total;
+      place(left, x, y, w, lh);
+      place(right, x, y + lh, w, h - lh);
+    }
+  }
+  place(areas.map(function (_, i) { return i; }), 0, 0, W, H);
+  return res;
+}
+
+function renderTreemapTiles(mgr) {
+  var el = document.getElementById('mgrTreemap');
+  if (!el) return;
+  var entries = treemapEntries(mgr);
+  if (!entries.length) { el.innerHTML = '<div class="text-secondary" style="padding:12px">Нет поступлений за период</div>'; return; }
+  var W = el.clientWidth || 800, H = el.clientHeight || 420;
+  var total = entries.reduce(function (s, e) { return s + e.v; }, 0);
+  var areas = entries.map(function (e) { return e.v / total * (W * H); });
+  var rects = treemapLayout(areas, W, H);
+  var html = '';
+  entries.forEach(function (e, idx) {
+    var r = rects[idx];
+    if (!r) return;
+    var pct = total > 0 ? (e.v / total * 100) : 0;
+    var tip = e.name + ': ' + e.v.toLocaleString('ru-RU') + ' ₽ (' + pct.toFixed(1) + '%) · оплат: ' + e.won + ' · средний чек: ' + (e.check || 0).toLocaleString('ru-RU') + ' ₽';
+    var showTxt = r.w > 90 && r.h > 34;
+    var inner = showTxt
+      ? '<div style="padding:6px 8px;line-height:1.25"><div style="font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(e.name) + '</div>'
+        + '<div style="font-size:11px;color:rgba(255,255,255,.85)">' + fmtM(e.v) + ' ₽ · ' + pct.toFixed(1) + '%</div></div>'
+      : '';
+    html += '<div title="' + escapeHtml(tip) + '" style="position:absolute;left:' + Math.round(r.x + 2) + 'px;top:' + Math.round(r.y + 2) + 'px;width:' + Math.round(r.w - 4) + 'px;height:' + Math.round(r.h - 4) + 'px;background:' + e.color + ';border-radius:5px;overflow:hidden;box-sizing:border-box">' + inner + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// ── Лидеры периода: 4 компактные карточки ──
+function renderLeadersCard(mgr) {
+  var ms = (mgr.managers || []).filter(function (m) { return m.postupleniya > 0; });
+  if (!ms.length) return '';
+  var byPost = ms.slice().sort(function (a, b) { return b.postupleniya - a.postupleniya; })[0];
+  var byCnt = ms.slice().sort(function (a, b) { return (b.won_cnt || 0) - (a.won_cnt || 0); })[0];
+  var byCheck = ms.slice().filter(function (m) { return (m.won_cnt || 0) >= 5; }).sort(function (a, b) { return (b.avg_check || 0) - (a.avg_check || 0); })[0];
+  var byConv = ms.slice().filter(function (m) { return (m.pf_available || 0) > 0; }).sort(function (a, b) { return ((b.pf_paid || 0) / b.pf_available) - ((a.pf_paid || 0) / a.pf_available); })[0];
+  var card = function (label, val, name, sub) {
+    return '<div class="kpi kpi-total"><div class="lbl">' + label + '</div>'
+      + '<div class="val-big" style="font-size:19px">' + val + '</div>'
+      + '<div class="sub" style="font-size:12px;color:#0F172A;font-weight:600">' + escapeHtml(name || '—') + '</div>'
+      + (sub ? '<div class="pp-val" style="font-size:10px">' + sub + '</div>' : '') + '</div>';
+  };
+  var convName = byConv ? byConv.name : '';
+  var convSub = byConv ? 'оплаты ' + (byConv.pf_paid || 0) + ' ÷ портфель ' + byConv.pf_available : '';
+  return '<div class="card" style="margin-top:8px"><h2>Лидеры периода <span style="font-size:12px;color:#475569;font-weight:400">(действующие менеджеры · конверсия портфеля в оплату = оплаченные в периоде ÷ (остаток на начало + созданные + возвращённые в работу), логика портфеля кат. 0 — не путать с когортной конверсией воронки)</span></h2>'
+    + '<div class="kpis" style="grid-template-columns:repeat(4,1fr);margin:0">'
+    + card('Лидер по поступлениям', fmtM(byPost.postupleniya) + ' ₽', byPost.name)
+    + card('Лидер по количеству оплат', fmt(byCnt.won_cnt || 0), byCnt.name)
+    + card('Лидер по среднему чеку', byCheck ? fmtM(byCheck.avg_check) + ' ₽' : '—', byCheck ? byCheck.name : '')
+    + card('Лидер по конверсии портфеля', byConv ? (byConv.pf_paid / byConv.pf_available * 100).toFixed(1) + '%' : '—', convName, convSub)
+    + '</div></div>';
+}
+
+// ── Продажи со скидками: 100% stacked bar по менеджерам ──
+// Процент скидки = UF_DISCOUNT («Скидка (из счёта)»); 0/пусто = без скидки.
+// Сумма скидки ₽ = opp × pct/(100−pct) (расчёт на сервере, disc_abs_sum).
+function discountRows(mgr) {
+  var rows = [];
+  (mgr.managers || []).forEach(function (m) { if ((m.postupleniya || 0) > 0) rows.push({ name: m.name, m: m, group: false }); });
+  var g = mgr.groups || {};
+  function agg(label, arrs) {
+    var list = [];
+    arrs.forEach(function (a) { (a || []).forEach(function (m) { list.push(m); }); });
+    var sum = list.reduce(function (s, m) { return s + (m.postupleniya || 0); }, 0);
+    if (sum <= 0) return;
+    rows.push({ name: label, m: {
+      postupleniya: sum,
+      won_cnt: list.reduce(function (s, m) { return s + (m.won_cnt || 0); }, 0),
+      disc_cnt: list.reduce(function (s, m) { return s + (m.disc_cnt || 0); }, 0),
+      disc_sum: list.reduce(function (s, m) { return s + (m.disc_sum || 0); }, 0),
+      disc_abs_sum: list.reduce(function (s, m) { return s + (m.disc_abs_sum || 0); }, 0),
+      disc_pct_sum: list.reduce(function (s, m) { return s + (m.disc_pct_sum || 0); }, 0),
+      nodisc_cnt: list.reduce(function (s, m) { return s + (m.nodisc_cnt || 0); }, 0),
+      nodisc_sum: list.reduce(function (s, m) { return s + (m.nodisc_sum || 0); }, 0),
+    }, group: true });
+  }
+  agg('Автооплаты', [g.autopay]);
+  agg('ОЗК', [g.ozk]);
+  agg('Прочее', [g.other]);
+  agg('Артефакт', [g.bond, g.afanasyev, g.tech]);
+  return rows;
+}
+
+function renderDiscountsCard(mgr) {
+  var rows = discountRows(mgr).filter(function (r) { return (r.m.postupleniya || 0) > 0; });
+  if (!rows.length) return '';
+  var H = Math.max(220, rows.length * 30 + 60);
+  return '<div class="card" style="margin-top:8px"><h2>Продажи со скидками <span style="font-size:12px;color:#475569;font-weight:400">(100% stacked: доля поступлений без скидки | со скидкой · справа — доля сделок со скидкой и средний % скидки · скидка = UF_DISCOUNT «Скидка (из счёта)»)</span></h2>'
+    + '<div style="height:' + H + 'px;position:relative"><canvas id="mgrDiscChart"></canvas></div></div>';
+}
+
+function renderDiscountsChart(mgr) {
+  var ctx = document.getElementById('mgrDiscChart');
+  if (!ctx || !window.Chart) return;
+  var rows = discountRows(mgr).filter(function (r) { return (r.m.postupleniya || 0) > 0; });
+  if (!rows.length) return;
+  function share(r, k) { var t = (r.m.disc_sum || 0) + (r.m.nodisc_sum || 0); return t > 0 ? (r.m[k] / t * 100) : 0; }  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(function (r) { return r.name; }),
+      datasets: [
+        { label: 'Без скидки', data: rows.map(function (r) { return Math.round(share(r, 'nodisc_sum') * 10) / 10; }), backgroundColor: '#2E7D32', stack: 'd' },
+        { label: 'Со скидкой', data: rows.map(function (r) { return Math.round(share(r, 'disc_sum') * 10) / 10; }), backgroundColor: '#F57C00', stack: 'd' },
+      ]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true, max: 100, ticks: { callback: function (v) { return v + '%'; } } }, y: { stacked: true } },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: function (c) {
+              var r = rows[c.dataIndex];
+              if (c.datasetIndex === 1) {
+                var avg = r.m.disc_cnt ? r.m.disc_pct_sum / r.m.disc_cnt : 0;
+                return 'Со скидкой: ' + r.m.disc_cnt + ' сд. · ' + Math.round(r.m.disc_sum).toLocaleString('ru-RU') + ' ₽ · сумма скидок ' + Math.round(r.m.disc_abs_sum).toLocaleString('ru-RU') + ' ₽ (ср. ' + avg.toFixed(1) + '%)';
+              }
+              return 'Без скидки: ' + r.m.nodisc_cnt + ' сд. · ' + Math.round(r.m.nodisc_sum).toLocaleString('ru-RU') + ' ₽';
+            },
+            footer: function (items) {
+              var r = rows[items[0].dataIndex];
+              return 'Всего: ' + ((r.m.disc_cnt || 0) + (r.m.nodisc_cnt || 0)) + ' сд. · ' + Math.round((r.m.disc_sum || 0) + (r.m.nodisc_sum || 0)).toLocaleString('ru-RU') + ' ₽';
+            }
+          }
+        },
+        datalabels: {
+          display: function (c) { return c.datasetIndex === 1 && rows[c.dataIndex].m.disc_sum > 0; },
+          anchor: 'end', align: 'end',
+          color: '#0F172A', font: { weight: 600, size: 10 },
+          formatter: function (v, c) {
+            var r = rows[c.dataIndex];
+            var deals = ((r.m.disc_cnt || 0) / ((r.m.disc_cnt || 0) + (r.m.nodisc_cnt || 0)) * 100);
+            var avg = r.m.disc_cnt ? r.m.disc_pct_sum / r.m.disc_cnt : 0;
+            return 'доля сделок со скидкой ' + deals.toFixed(0) + '% · ср. скидка ' + avg.toFixed(1) + '%';
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Структура оплаченных сделок по размеру чека: два donut (кол-во | сумма) ──
+// Диапазоны фиксированные; один диапазон — один цвет в обоих графиках.
+var CHECK_BUCKET_COLORS = ['#9C27B0', '#00bcd4', '#F57C00', '#1565C0', '#2E7D32'];
+var CHECK_BUCKET_LABELS = ['до 30 000', '30 000–50 000', '50 000–100 000', '100 000–300 000', 'более 300 000'];
+
+function renderCheckDistCard(cd) {
+  if (!cd || !cd.buckets || !cd.buckets.length) return '';
+  var h = '<div class="card" style="margin-top:8px"><h2>Структура оплаченных сделок по размеру чека <span style="font-size:12px;color:#475569;font-weight:400">(' + fmt(cd.total.cnt) + ' оплат на ' + fmt(cd.total.sum) + ' ₽)</span></h2>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px">';
+  h += '<div><h3 style="font-size:13px;margin:4px 0;color:#1f2a44">По количеству оплаченных сделок</h3><div style="height:300px;position:relative"><canvas id="chCheckCnt"></canvas></div></div>';
+  h += '<div><h3 style="font-size:13px;margin:4px 0;color:#1f2a44">По сумме поступлений</h3><div style="height:300px;position:relative"><canvas id="chCheckSum"></canvas></div></div>';
+  h += '</div></div>';
+  return h;
+}
+
+// Плагин: текст в центре donut
+var centerTextPlugin = {
+  id: 'centerText',
+  afterDraw: function (chart) {
+    if (chart.config.options.centerText === false) return;
+    var lines = chart.config.options.centerText || [];
+    var ctx = chart.ctx;
+    var meta = chart.getDatasetMeta(0);
+    if (!meta || !meta.data || !meta.data.length) return;
+    var x = meta.data[0].x, y = meta.data[0].y;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#0F172A';
+    ctx.font = '700 16px -apple-system, Segoe UI, Roboto, sans-serif';
+    lines.forEach(function (line, i) {
+      ctx.fillText(line, x, y + (i - (lines.length - 1) / 2) * 18);
+    });
+    ctx.restore();
+  }
+};
+if (window.Chart && !Chart.registry.plugins.get('centerText')) Chart.register(centerTextPlugin);
+
+function renderCheckDistChart(cd) {
+  if (!window.Chart) return;
+  var totalSum = cd.total.sum || 1;
+  var tooltipCb = function (c) {
+    var b = cd.buckets[c.dataIndex];
+    var pCnt = cd.total.cnt > 0 ? (b.cnt / cd.total.cnt * 100).toFixed(1) : 0;
+    var pSum = totalSum > 0 ? (b.sum / totalSum * 100).toFixed(1) : 0;
+    return b.label + ' ₽: оплат ' + b.cnt + ' (' + pCnt + '%) · сумма ' + fmt(b.sum) + ' ₽ (' + pSum + '%)';
+  };
+  var doughnut = function (id, vals, center) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var totalV = vals.reduce(function (a, b) { return a + b; }, 0) || 1;
+    new Chart(el, {
+      type: 'doughnut',
+      data: {
+        labels: cd.buckets.map(function (b, i) { return CHECK_BUCKET_LABELS[i] + ' — ' + (vals[i] / totalV * 100).toFixed(1) + '%'; }),
+        datasets: [{ data: vals, backgroundColor: CHECK_BUCKET_COLORS.slice(0, vals.length), borderWidth: 2, borderColor: '#fff' }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        cutout: '58%',
+        centerText: center,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
+          tooltip: { callbacks: { label: tooltipCb } },
+          datalabels: { display: false }
+        }
+      }
+    });
+  };
+  doughnut('chCheckCnt', cd.buckets.map(function (b) { return b.cnt; }), [fmt(cd.total.cnt), 'оплат']);
+  doughnut('chCheckSum', cd.buckets.map(function (b) { return b.sum; }), [fmtM(cd.total.sum), '₽']);
 }

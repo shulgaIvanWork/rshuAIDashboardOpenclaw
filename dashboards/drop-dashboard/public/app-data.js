@@ -78,6 +78,7 @@ async function renderFilteredData() {
       if (compareFrom) kpiParams += '&compare_from=' + compareFrom;
       var kpi = await api(kpiParams);
       applyPeriodKpi(filteredData, kpi);
+      if (kpi && kpi.check_dist) filteredData.check_dist = kpi.check_dist; // структура среднего чека
     } catch (e) { console.error('/api/kpi error:', e); }
   }
 
