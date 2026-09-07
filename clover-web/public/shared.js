@@ -41,13 +41,13 @@ function fmt(n) {
   return Number(n).toLocaleString('ru-RU', { maximumFractionDigits: 0 });
 }
 
-// Короткая запись суммы для тесных мест: 84 857 143 -> «84.9 м», 614 550 -> «615 тыс».
+// Короткая запись суммы для тесных мест: 84 857 143 -> «84.9 м», 614 550 -> «615 т».
 // Нужна там, где полное число не влезает в узкую KPI-карточку и переносится.
 function fmtCompact(n) {
   var v = Number(n) || 0;
   var a = Math.abs(v);
   if (a >= 1e6) return (v / 1e6).toFixed(1) + ' м';
-  if (a >= 1e3) return Math.round(v / 1e3) + ' тыс';
+  if (a >= 1e3) return Math.round(v / 1e3) + ' т';
   return fmt(v);
 }
 function fmtPct(n) {
