@@ -113,16 +113,15 @@ function loadKpi() {
   api('/api/kpi-month?month=' + sel.value + '&mgr=' + encodeURIComponent(mgr)).then(function (d) {
     var calcTxt = d.calculated_at ? ' · данные от ' + d.calculated_at.substring(0, 16).replace('T', ' ') : '';
     info.textContent = 'рабочих дней в месяце: ' + d.workdays.total + ' · осталось: ' + d.workdays.left + calcTxt;
-    // Редактор плана: весь отдел → план отдела; персональный менеджер → личный план;
-    // группы (Автооплаты/ОЗК/…) — личных планов нет, редактор скрываем
+    // Редактор планов: виден только в режиме «Весь отдел» (общий план ООМ/КОМ +
+    // личные планы всех действующих менеджеров одним окном). В персональном
+    // режиме и для групп — скрыт (личные планы задаются в общем окне).
     var editor = document.getElementById('kpiPlanEditor');
     var isGroup = mgr && mgr.indexOf('group:') === 0;
+    var showEditor = kpiIsAdmin && !isPersonal && !isGroup;
     if (editor) {
-      editor.style.display = (kpiIsAdmin && !isGroup) ? '' : 'none';
-      if (!isGroup) {
-        document.getElementById('kpiPlanMonth').textContent = d.month + (isPersonal ? ' · личный план' : '');
-        document.getElementById('kpiPlanInput').value = d.plan || '';
-      }
+      editor.style.display = showEditor ? '' : 'none';
+      if (showEditor) loadPlanEditor(sel.value);
     }
     cards.innerHTML = renderKpiCards(d, isPersonal);
     loadArtifacts(mgr); // блок «Аномалии данных» (баги выбранного менеджера или отдела)
@@ -141,14 +140,54 @@ function loadKpi() {
   });
 }
 
+// ── Редактор планов (окно «Весь отдел») ────────────────────────────────────
+// Заполняет поля ООМ/КОМ и таблицу личных планов действующих менеджеров
+// из /api/plan-editor?month=YYYY-MM.
+function loadPlanEditor(month) {
+  api('/api/plan-editor?month=' + encodeURIComponent(month)).then(function (d) {
+    document.getElementById('kpiPlanMonth').textContent = d.month;
+    var oomEl = document.getElementById('kpiPlanOom');
+    var komEl = document.getElementById('kpiPlanKom');
+    oomEl.value = d.oom === null ? '' : d.oom;
+    komEl.value = d.kom === null ? '' : d.kom;
+    var hint = document.getElementById('kpiPlanTotalHint');
+    if (d.oom === null && d.kom === null && d.total > 0) {
+      hint.textContent = 'сейчас единый план ' + fmt(d.total) + ' ₽ (старый формат) — введите ООМ/КОМ, чтобы заменить';
+    } else {
+      var s = (d.oom || 0) + (d.kom || 0);
+      hint.textContent = s > 0 ? 'план отдела: ' + fmt(s) + ' ₽' : '';
+    }
+    var rows = (d.managers || []).map(function (m) {
+      return '<tr>'
+        + '<td style="padding:3px 12px 3px 0;font-size:13px">' + escapeHtml(m.name) + '</td>'
+        + '<td><input type="number" id="kpiPlanMgr_' + m.id + '" min="0" step="1000" placeholder="0" class="rc-input" style="width:190px" value="' + (m.plan || '') + '"></td>'
+        + '</tr>';
+    }).join('');
+    document.getElementById('kpiPlanMgrs').innerHTML =
+      '<div style="font-size:12px;color:#475569;margin-bottom:4px">Личные планы менеджеров (вводятся отдельно, в общий план не суммируются):</div>'
+      + '<table style="border-collapse:collapse"><tbody>' + rows + '</tbody></table>';
+  }).catch(function () {});
+}
+
+// Сохранить все планы одним запросом: общий (ООМ + КОМ) + личные планы менеджеров
 window.saveKpiPlan = function () {
   var sel = document.getElementById('kpiMonthSelect');
   var mgrSel = document.getElementById('kpiMgrSelect');
-  var input = document.getElementById('kpiPlanInput');
-  var v = input.value === '' ? 0 : parseFloat(input.value);
-  var body = { month: sel.value, value: v };
-  if (mgrSel && mgrSel.value && mgrSel.value !== 'all' && mgrSel.value.indexOf('group:') !== 0) body.mgr = mgrSel.value;
-  fetch((window.BASE_PATH || '') + '/api/plans', {
+  if (!sel || !mgrSel || mgrSel.value !== 'all') return;
+  var num = function (el) { return el && el.value !== '' ? parseFloat(el.value) : 0; };
+  var managers = {};
+  document.querySelectorAll('#kpiPlanMgrs input[id^="kpiPlanMgr_"]').forEach(function (inp) {
+    var id = inp.id.replace('kpiPlanMgr_', '');
+    var v = num(inp);
+    if (v > 0) managers[id] = v;
+  });
+  var body = {
+    month: sel.value,
+    oom: num(document.getElementById('kpiPlanOom')),
+    kom: num(document.getElementById('kpiPlanKom')),
+    managers: managers
+  };
+  fetch((window.BASE_PATH || '') + '/api/plans/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)

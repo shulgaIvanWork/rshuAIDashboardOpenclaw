@@ -30,7 +30,7 @@ import { computeSalesFunnel } from '@rshu/data-service/lib/sales-funnel.js';
 import { computePortfolioFlow } from '@rshu/data-service/lib/portfolio-flow.js';
 import { readSnapshot } from '@rshu/data-service/lib/snapshot.js';
 // Единый справочник групп менеджеров
-import { getMgrGroup, MGR_GROUP_LABELS } from '@rshu/data-service/lib/mgr-groups.js';
+import { getMgrGroup, MGR_GROUP_LABELS, MGR_GROUPS } from '@rshu/data-service/lib/mgr-groups.js';
 // Полный расчёт KPI по менеджерам (Таблица 1/2, срезы) — общий с manager-report
 import { calcManagers } from '@rshu/data-service/lib/managers-kpi.js';
 
@@ -127,15 +127,23 @@ app.get('/api/kpi', async (req, res) => {
 // ── КПЭ: планы поступлений (ввод админом, помесячно) ───────────────────────────
 const PLANS_FILE = path.join(__dirname, 'data', 'plans.json');
 
-// Планы: { месяц: { total: <число>, mgr: { <user_id>: <число> } } }.
-// Старый формат { месяц: <число> } нормализуется при чтении (total).
+// Планы: { месяц: { oom: <число>, kom: <число>, mgr: { <user_id>: <число> } } } — новый формат.
+// План отдела = oom + kom (ООМ и КОМ вводятся раздельно).
+// Legacy: { месяц: { total: <число>, mgr } } / { месяц: <число> } — нормализуются при чтении:
+// если разбивки oom/kom нет, план отдела берётся из total (fallback).
 async function readPlans() {
   try {
     const raw = JSON.parse(await fs.readFile(PLANS_FILE, 'utf-8'));
     for (const k of Object.keys(raw)) {
       const v = raw[k];
-      if (typeof v === 'number') raw[k] = { total: v, mgr: {} };
-      else raw[k] = { total: (v && v.total) || 0, mgr: (v && v.mgr) || {} };
+      if (typeof v === 'number') { raw[k] = { total: v }; continue; }
+      if (!v || typeof v !== 'object') { delete raw[k]; continue; }
+      const e = {};
+      if (Number.isFinite(v.oom)) e.oom = v.oom;
+      if (Number.isFinite(v.kom)) e.kom = v.kom;
+      if ((v.total || 0) > 0) e.total = v.total;
+      if (v.mgr && typeof v.mgr === 'object') e.mgr = v.mgr;
+      raw[k] = e;
     }
     return raw;
   } catch (e) { return {}; }
@@ -176,6 +184,79 @@ app.post('/api/plans', async (req, res) => {
   }
 });
 
+// ── Редактор планов (новый UI, вкладка КПЭ) ─────────────────────────────────
+// GET /api/plan-editor?month=YYYY-MM — всё для окна «Планы»:
+//   oom/kom — план отдела по направлениям (null, если месяц ещё в старом формате),
+//   total — legacy-план (если разбивки нет), managers — действующие менеджеры (main)
+//   из справочника mgr-groups.js с их личными планами на месяц.
+app.get('/api/plan-editor', async (req, res) => {
+  try {
+    const { month } = req.query;
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || '')) return res.status(400).json({ error: 'month в формате YYYY-MM' });
+    const [plans, dictsRaw] = await Promise.all([
+      readPlans(),
+      fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').catch(() => '{}'),
+    ]);
+    const users = (JSON.parse(dictsRaw).users) || {};
+    const entry = plans[month] || {};
+    const mgr = entry.mgr || {};
+    const hasSplit = Number.isFinite(entry.oom) || Number.isFinite(entry.kom);
+    const managers = Object.keys(MGR_GROUPS)
+      .filter(id => MGR_GROUPS[id] === 'main')
+      .map(id => ({ id, name: users[id] || id, plan: mgr[id] || 0 }));
+    res.json({
+      month,
+      oom: hasSplit ? (entry.oom || 0) : null,
+      kom: hasSplit ? (entry.kom || 0) : null,
+      total: hasSplit ? 0 : (entry.total || 0), // legacy-план отдела (для подсказки)
+      managers,
+    });
+  } catch (e) {
+    console.error('/api/plan-editor error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/plans/batch — сохранить план отдела (ООМ+КОМ) и личные планы всех
+// действующих менеджеров одним запросом. { month, oom, kom, managers: {id: сумма} }.
+// Личные планы (managers) не связываются с планом отдела.
+app.post('/api/plans/batch', async (req, res) => {
+  try {
+    if (!req.user || req.user.role !== 'admin') return res.status(403).json({ error: 'только для администраторов' });
+    const { month, oom, kom, managers } = req.body || {};
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || '')) return res.status(400).json({ error: 'month в формате YYYY-MM' });
+    const num = v => { const n = parseFloat(v); return isNaN(n) || n < 0 ? null : Math.round(n); };
+    const o = num(oom), k = num(kom);
+    if (o === null || k === null) return res.status(400).json({ error: 'oom/kom — неотрицательные числа' });
+    const mgr = {};
+    if (managers && typeof managers === 'object') {
+      for (const id of Object.keys(managers)) {
+        const n = num(managers[id]);
+        if (n === null) return res.status(400).json({ error: 'план менеджера — неотрицательное число' });
+        if (n > 0) mgr[id] = n;
+      }
+    }
+    const plans = await readPlans();
+    const prev = plans[month] || {};
+    const isLegacy = !Number.isFinite(prev.oom) && !Number.isFinite(prev.kom) && (prev.total || 0) > 0;
+    if (o > 0 || k > 0) {
+      // Переход на новый формат: разбивка ООМ/КОМ заменяет legacy total
+      plans[month] = { oom: o, kom: k, mgr };
+    } else if (isLegacy) {
+      // Пустые поля на legacy-месяце — не затираем старый план (защита от случайной потери)
+      plans[month] = { total: prev.total, mgr };
+    } else {
+      plans[month] = { oom: 0, kom: 0, mgr };
+    }
+    if (o === 0 && k === 0 && !Object.keys(mgr).length && !isLegacy) delete plans[month];
+    await writePlans(plans);
+    res.json(plans);
+  } catch (e) {
+    console.error('/api/plans/batch error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Фильтр по менеджеру для КПЭ: mgr=all | <user_id> | group:autopay|ozk|bond|afanasyev|artifact
 // Возвращает null (без фильтра) или функцию-предикат по сделке.
 function mgrFilter(mgrParam) {
@@ -192,12 +273,18 @@ function mgrFilter(mgrParam) {
   return x => String(x.ASSIGNED_BY_ID || '') === id;
 }
 
-// План для выбранного скоупа: total (весь отдел) или личный план менеджера.
+// План для выбранного скоупа: весь отдел (oom+kom, legacy-total как fallback) или личный план менеджера.
 function planForScope(plans, month, mgrParam) {
-  const entry = plans[month] || { total: 0, mgr: {} };
-  if (!mgrParam || mgrParam === 'all') return { plan: entry.total || 0, source: 'total' };
+  const entry = plans[month] || {};
+  if (!mgrParam || mgrParam === 'all') {
+    const hasSplit = Number.isFinite(entry.oom) || Number.isFinite(entry.kom);
+    const split = (entry.oom || 0) + (entry.kom || 0);
+    // Новый формат (ООМ/КОМ) приоритетен; legacy total — только если разбивки нет
+    const plan = hasSplit ? split : ((entry.total || 0) > 0 ? entry.total : 0);
+    return { plan, source: 'total' };
+  }
   if (mgrParam.startsWith('group:')) return { plan: 0, source: 'none' }; // личные планы только для персональных менеджеров
-  const v = entry.mgr[String(mgrParam)] || 0;
+  const v = (entry.mgr && entry.mgr[String(mgrParam)]) || 0;
   return v > 0 ? { plan: v, source: 'manager' } : { plan: 0, source: 'none' };
 }
 
@@ -1337,7 +1424,7 @@ app.use('/sessions', express.static(path.join(__dirname, 'sessions'), {
 
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, path) => {
-    if (path.endsWith('.html')) {
+    if (path.endsWith('.html') || path.endsWith('.js') || path.endsWith('.css')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
