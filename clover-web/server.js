@@ -100,7 +100,7 @@ app.use(session({
 app.use(express.static(path.join(__dirname, 'public'), {
   // no-cache для html/js/css — иначе браузеры кэшируют обновлённый фронт
   setHeaders: (res, filePath) => {
-    if (/\.(html|js|css)$/.test(filePath)) {
+    if (/\.(html|js|css|pdf)$/.test(filePath)) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');

@@ -349,7 +349,7 @@ router.get('/api/status', async (req, res) => {
 
 router.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
-    if (/\.(html|js|css)$/.test(filePath)) {
+    if (/\.(html|js|css|pdf)$/.test(filePath)) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
