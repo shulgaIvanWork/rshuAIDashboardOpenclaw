@@ -40,6 +40,7 @@ import { fetchContacts, fetchCompanies } from './lib/bitrix-contacts.js';
 import { fetchModules } from './lib/fetch-modules.js';
 import { fetchInvoices } from './lib/fetch-invoices.js';
 import { fetchPostSaleDeals } from './lib/bitrix-rest.js';
+import { saveDailySnapshot } from './lib/snapshot.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'cache');
@@ -185,6 +186,19 @@ try {
   console.error(`  Ошибка выгрузки PostSale: ${e.message}`);
 }
 progress({ type: 'step_done', idx: 6 });
+
+// --- Шаг 8: Ежедневный снапшот портфеля (для разбивки «Остатка на конец» по этапам
+// на прошлые даты — см. portfolio-flow.js). Дата = дата fetched_at (срез кэша). ---
+console.log('\n== Шаг 8/8: Снапшот портфеля ==');
+progress({ type: 'step_start', idx: 7 });
+try {
+  const snapDate = new Date().toISOString().slice(0, 10); // дата выгрузки (UTC, как fetched_at)
+  const n = saveDailySnapshot(deals, snapDate);
+  console.log(`  Сохранено: cache/snapshots/${snapDate}.json — ${n} сделок «в работе» (${elapsed()})`);
+} catch (e) {
+  console.error(`  Ошибка снапшота: ${e.message}`);
+}
+progress({ type: 'step_done', idx: 7 });
 
 // --- Готово ---
 progress({ type: 'all_done' });

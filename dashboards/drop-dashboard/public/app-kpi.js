@@ -19,16 +19,21 @@ var kpiIsAdmin = false;
 var kpiLastSlices = null;
 
 window.switchDashTab = function (tab) {
+  if (tab === 'dev' && !window.__isAdmin) tab = 'sales'; // вкладка «В разработке» — только админам
   var salesBar = document.getElementById('salesFilterBar');
   var sales = document.getElementById('contentAreaNew');
   var kpi = document.getElementById('kpiTab');
   var funnel = document.getElementById('funnelTab');
+  var dev = document.getElementById('devTab');
   var showKpi = tab === 'kpi';
   var showFunnel = tab === 'funnel';
+  var showDev = tab === 'dev';
+  // Фильтры периода «Продаж» общие для вкладок «Продажи» и «В разработке» (dev)
   if (salesBar) salesBar.style.display = (showKpi || showFunnel) ? 'none' : '';
   if (sales) sales.style.display = (showKpi || showFunnel) ? 'none' : '';
   if (kpi) kpi.style.display = showKpi ? '' : 'none';
   if (funnel) funnel.style.display = showFunnel ? '' : 'none';
+  if (dev) dev.style.display = showDev ? '' : 'none';
   document.querySelectorAll('.kpi-tab').forEach(function (b) {
     b.classList.toggle('active', b.dataset.tab === tab);
   });
@@ -299,7 +304,7 @@ function renderSlices(d, isPersonal) {
   kpiLastSlices = d;
   var hideCoverage = isPersonal && !d.plan_set; // без личного плана покрытие не считаем
   var hideManagers = isPersonal;                // в персональном режиме график менеджеров скрыт
-  if (d.weeks.length === 0 && d.managers.rows.length === 0 && d.calendar.length === 0) {
+  if (d.weeks.length === 0 && d.managers.rows.length === 0 && d.calendar.length === 0 && expectDistEmpty(d)) {
     el.innerHTML = '<div class="text-secondary" style="font-size:13px">Нет данных для срезов</div>';
     return;
   }
@@ -308,16 +313,18 @@ function renderSlices(d, isPersonal) {
     + '<div class="card" style="margin-top:14px"><h2>План-факт по неделям месяца</h2>' + weeksNote(d) + '<div style="height:340px;position:relative"><canvas id="kpiChWeeks"></canvas></div></div>'
     + (hideManagers ? '' : '<div class="card" style="margin-top:14px"><h2>Факт и ожидания по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(основные — персонально; автооплаты/ОЗК/bond/afanasyev — строками; «Артефакт» — уволенные и тех. аккаунты)</span></h2><div style="position:relative"><canvas id="kpiChManagers"></canvas></div><div id="mgrZeroDrill" style="display:none;margin-top:8px;font-size:12px;color:#475569"></div></div>')
     + renderOverdueBlock(d.overdue)
-    + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(оставшиеся дни месяца)</span></h2>' + calendarBody(d) + '</div>';
+    + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(оставшиеся дни месяца)</span></h2>' + calendarBody(d) + '</div>'
+    + renderExpectDistBlock(d);
 
   // Расшифровку заполняем ПОСЛЕ вставки разметки: раньше fillOverdueDrill вызывался
   // из renderOverdueBlock, то есть до innerHTML, и писал в ещё не созданный узел.
   if (window._overdueOpen && d.overdue && d.overdue.cnt) fillOverdueDrill(d.overdue);
 
-  kpiChartDestroy('weeks'); kpiChartDestroy('managers'); kpiChartDestroy('calendar');
+  kpiChartDestroy('weeks'); kpiChartDestroy('managers'); kpiChartDestroy('calendar'); kpiChartDestroy('expect');
   renderWeeksChart(d);
   if (!hideManagers) renderManagersChart(d);
   if (d.calendar.length) renderCalendarChart(d);
+  renderExpectDistChart(d);
 }
 
 // ── 1. Покрытие месячного плана (bullet chart на HTML: полный контроль маркера) ──
@@ -556,5 +563,112 @@ function renderCalendarChart(d) {
         }
       }
     }
+  });
+}
+
+// ── 5. Распределение ожидаемых поступлений (stacked по месяцам и стадиям) ──
+// Незакрытые сделки «Счёт отправлен»/«Частичная оплата»/«Постоплата» по согласованной
+// дате оплаты (от текущего месяца). Просроченные — блоком в начале. Суммы — полная
+// OPPORTUNITY, как в карточке «Ожидания» (единая функция calcExpectParts).
+var KPI_EXP_STAGES = [
+  { key: 'inv_proposal', label: 'Счёт отправлен', color: '#9C27B0' },
+  { key: 'inv_partial', label: 'Частичная оплата', color: '#E0A458' },
+  { key: 'inv_postpay', label: 'Постоплата', color: '#1B5E20' },
+];
+var KPI_EXP_MONTHS_RU = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
+function expectDistEmpty(d) {
+  var e = d.expect_dist;
+  return !e || (!e.overdue.cnt && !(e.months && e.months.length));
+}
+function expectMonthLabel(m) {
+  var p = String(m).split('-');
+  return KPI_EXP_MONTHS_RU[Number(p[1]) - 1] + ' ' + p[0];
+}
+function expectStageSum(m, key) {
+  var st = m.stages.find(function (s) { return s.key === key; });
+  return st ? st.sum : 0;
+}
+function expectStageCnt(m, key) {
+  var st = m.stages.find(function (s) { return s.key === key; });
+  return st ? st.cnt : 0;
+}
+
+// Карточка-блок (просроченные + stacked chart + контроль с карточкой «Ожидания»)
+function renderExpectDistBlock(d) {
+  var e = d.expect_dist;
+  if (!e) return '';
+  var h = '<div class="card" style="margin-top:14px"><h2>Распределение ожидаемых поступлений <span style="font-size:12px;color:#475569;font-weight:400">(незакрытые «Счёт отправлен»/«Частичная оплата»/«Постоплата» по согласованной дате · от текущего месяца · фильтры вкладки)</span></h2>';
+  if (expectDistEmpty(d)) return h + '<div class="text-secondary" style="font-size:14px">Нет ожидаемых поступлений</div></div>';
+  // Просроченные — в начале
+  if (e.overdue && e.overdue.cnt) {
+    h += '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin:10px 0 4px;padding:10px 14px;background:#FFF3E0;border:1px solid #FFE0B2;border-radius:8px">'
+      + '<span style="font-size:15px;font-weight:700;color:#E65100">⏰ Просроченные ожидания</span>'
+      + '<span style="font-size:14px">' + fmt(e.overdue.cnt) + ' сделок · <b>' + fmt(e.overdue.sum) + ' ₽</b></span>'
+      + '<span style="font-size:12px;color:#475569">согласованная дата уже прошла, оплаты нет — переходят между месяцами (детали — в блоке «Просроченные ожидания» выше)</span>'
+      + '</div>';
+  }
+  // Контроль: столбец текущего месяца + просроченные = карточка «Ожидания»
+  var months = e.months || [];
+  if (months.length && months[0].m === d.month && d.expected) {
+    var curSum = months[0].total.sum;
+    var ovdSum = e.overdue ? e.overdue.sum : 0;
+    var cardSum = d.expected.sum;
+    var ok = (curSum + ovdSum) === cardSum;
+    h += '<div style="margin:6px 2px 8px;font-size:13px;color:' + (ok ? '#2E7D32' : '#C62828') + '">'
+      + 'Контроль: столбец «' + expectMonthLabel(months[0].m) + '» (' + fmt(curSum) + ' ₽) + просроченные (' + fmt(ovdSum) + ' ₽) = карточка «Ожидания» (' + fmt(cardSum) + ' ₽) — '
+      + (ok ? '✅ сходится' : '⚠️ расхождение ' + fmt(cardSum - curSum - ovdSum) + ' ₽') + '</div>';
+  }
+  h += '<div style="height:320px;position:relative"><canvas id="kpiChExpect"></canvas></div>';
+  return h + '</div>';
+}
+
+function renderExpectDistChart(d) {
+  var ctx = document.getElementById('kpiChExpect');
+  if (!ctx) return;
+  var e = d.expect_dist || { months: [] };
+  var months = e.months || [];
+  if (!months.length) return;
+  var labels = months.map(function (m) { return expectMonthLabel(m.m); });
+  var byKey = function (m, key) {
+    var st = m.stages.find(function (s) { return s.key === key; });
+    return st ? st.sum : 0;
+  };
+  kpiChartInstances.expect = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: KPI_EXP_STAGES.map(function (s) {
+        return { label: s.label, data: months.map(function (m) { return byKey(m, s.key); }), backgroundColor: s.color, stack: 'x' };
+      }),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { callback: function (v) { return fmt(v); } } } },
+      plugins: {
+        legend: { position: 'bottom', labels: { sort: function (a, b) { return a.datasetIndex - b.datasetIndex; } } },
+        tooltip: {
+          callbacks: {
+            title: function (items) { return expectMonthLabel(months[items[0].dataIndex].m); },
+            label: function (c) {
+              var m = months[c.dataIndex];
+              var key = KPI_EXP_STAGES[c.datasetIndex].key;
+              return KPI_EXP_STAGES[c.datasetIndex].label + ': ' + fmt(expectStageSum(m, key)) + ' ₽ · ' + expectStageCnt(m, key) + ' сделок';
+            },
+            footer: function (items) {
+              var m = months[items[0].dataIndex];
+              return 'Итого месяц: ' + fmt(m.total.sum) + ' ₽ · ' + m.total.cnt + ' сделок';
+            },
+          },
+        },
+        datalabels: {
+          // Над столбцом — итог месяца (только у последнего датасета, иначе дубли)
+          display: function (c) { return c.datasetIndex === KPI_EXP_STAGES.length - 1; },
+          anchor: 'end', align: 'end',
+          formatter: function (v, c) { return fmt(months[c.dataIndex].total.sum); },
+          color: '#0F172A', font: { weight: 600, size: 10 },
+        },
+      },
+    },
   });
 }

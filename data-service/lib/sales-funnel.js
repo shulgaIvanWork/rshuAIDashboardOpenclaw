@@ -11,9 +11,16 @@
  *   - MQL/SQL восстанавливаются только по ТЕКУЩЕЙ стадии (открытые сделки — надёжно;
  *     закрытые WON — надёжно);
  *   - закрытые отказом (SEM=F) к MQL/SQL НЕ приписываются (стадия «LOSE» общая, пик
- *     неизвестен) — они остаются на «Создано» и считаются отдельно (lose_unknown);
+ *     неизвестен) — они остаются на «Создано»;
  *   - «технические» WON (успех с суммой < MIN_OPP, создаются ботом) исключаются
  *     из когорты полностью (tech_won).
+ *
+ * ОТКАЗЫ (для компактной строки на дашборде, без детализации):
+ *   - отказ = дата отказа UF_CRM_1753341391806 заполнена И стадия LOSE (SEM=F):
+ *     refuse — таких сделок в когорте; refuse_in_period — из них закрыты в самом
+ *     выбранном периоде (дата отказа ∈ [from,to]);
+ *   - дата отказа заполнена, но стадия НЕ LOSE — аномалия данных → artifacts.refuse_no_lose.
+ *   Детальная аналитика отказов — на отдельной вкладке, здесь не считается.
  *
  * НАКОПИТЕЛЬНОСТЬ (главный инвариант):
  *   Сделка, достигшая поздней ступени, учитывается во ВСЕХ предыдущих — перенос
@@ -39,8 +46,12 @@
  *             первая стадия КОМ = «Квалифицирован КОМ» — уже MQL); ИЛИ sql.
  *   Для SEM=F стадии MQL/SQL/Счёт по стадии НЕ присваиваются (только факты счёта/оплаты).
  *
- * ОТДЕЛЬНО — PreSale (кат.8): воронка «Квалификации» (до передачи в отдел продаж):
- *   Создано → Взят в работу → Тёплый лид → Квалификация → Передано в ОП.
+ * ОТДЕЛЬНО — PreSale (кат.8): распределение по текущему состоянию воронки
+ *   «Квалификации» (до передачи в отдел продаж). На дашборде показывается полосой:
+ *   warming «прогрев маркетингом» (исходные + взят в работу/просрочен) →
+ *   warm «тёплый лид» (PREPARATION) → qualified «на квалификации»
+ *   (PREPAYMENT_INVOICE) → handoff «передано в ОП» (WON) → lose «отказы» (LOSE).
+ *   Каждая сделка — ровно в одном сегменте (взаимоисключающе); created = сумма.
  *   PreSale НЕ входит в основную воронку продаж (это прогрев до ОП).
  */
 
@@ -104,6 +115,7 @@ export function computeSalesFunnel(dealsRaw, { from, to, mgrId = null, users = {
       dc,
       payDt: parseDt(x.UF_DATE_PAY_1C),
       invDt: parseDt(x.UF_CRM_1753272713011),
+      refuseDt: parseDt(x.UF_CRM_1753341391806),
       title: String(x.TITLE || ''),
     });
   }
@@ -112,9 +124,9 @@ export function computeSalesFunnel(dealsRaw, { from, to, mgrId = null, users = {
 
   // ── Основная воронка: кат.0 (Sale) + кат.19 (КОМ) ─────────────────────────
   const mainRows = cohort.filter(r => r.cat !== '8');
-  const zeroM = () => ({ created: 0, mql: 0, sql: 0, invoice: 0, paid: 0, lose_unknown: 0, tech_won: 0 });
+  const zeroM = () => ({ created: 0, mql: 0, sql: 0, invoice: 0, paid: 0, refuse: 0, refuse_in_period: 0, tech_won: 0 });
   const mgrM = {};
-  const stageTot = { created: 0, mql: 0, sql: 0, invoice: 0, paid: 0, lose_unknown: 0, tech_won: 0 };
+  const stageTot = { created: 0, mql: 0, sql: 0, invoice: 0, paid: 0, refuse: 0, refuse_in_period: 0, tech_won: 0 };
   const artifacts = {
     tech_won: { cnt: 0, sum: 0 },
     returns: { cnt: 0, sum: 0 },
@@ -122,12 +134,18 @@ export function computeSalesFunnel(dealsRaw, { from, to, mgrId = null, users = {
     paid_no_inv: { cnt: 0, sum: 0 },
     paid_in_progress: { cnt: 0, sum: 0 },
     neg_dur: { cnt: 0, sum: 0 },
-    lose_unknown: { cnt: 0 },
+    refuse_no_lose: { cnt: 0, sum: 0 },
   };
 
   for (const r of mainRows) {
     const paid = !!(r.payDt && r.opp >= MIN_OPP);
-    let loseUnknown = false;
+    const isLose = r.sem === 'F';
+    const refuseSet = !!r.refuseDt;
+
+    // Аномалия: дата отказа есть, а стадия не LOSE (реальная проблема данных)
+    if (refuseSet && !isLose) {
+      artifacts.refuse_no_lose.cnt++; artifacts.refuse_no_lose.sum += r.opp;
+    }
 
     // «Технический» WON (бот, нулевая сумма) — исключаем из воронки целиком
     if (r.sem === 'S' && r.opp < MIN_OPP) {
@@ -140,7 +158,7 @@ export function computeSalesFunnel(dealsRaw, { from, to, mgrId = null, users = {
 
     // Этап по стадии — только если сделка не закрыта отказом (у LOSE пик неизвестен)
     let mqlStage = false, sqlStage = false, invStage = false;
-    if (r.sem !== 'F') {
+    if (!isLose) {
       if (r.cat === '0') {
         invStage = SALE_INV_STAGES.has(r.stage);                 // PROPOSAL / 6 / 2
         sqlStage = SALE_SQL_STAGES.has(r.stage);                 // DETAILS + PROPOSAL + 6 + 2
@@ -161,18 +179,23 @@ export function computeSalesFunnel(dealsRaw, { from, to, mgrId = null, users = {
     const invF   = !!r.invDt || invStage || paidF;
     const sqlF   = sqlStage || invF;
     const mqlF   = mqlStage || sqlF;
-    if (r.sem === 'F') loseUnknown = !invF && !paidF; // нет счёта/оплаты → пик невосстановим
+
+    // Отказы: дата отказа заполнена И стадия LOSE (без детализации по пику)
+    let refuseF = false, refuseInPeriod = false;
+    if (isLose && refuseSet) {
+      refuseF = true;
+      if (from && to && r.refuseDt >= from && r.refuseDt <= to) refuseInPeriod = true;
+    }
 
     // Артефакты (по когорте, с учётом менеджера)
     if (paid) {
-      if (r.sem === 'F') { artifacts.returns.cnt++; artifacts.returns.sum += r.opp; }
+      if (isLose) { artifacts.returns.cnt++; artifacts.returns.sum += r.opp; }
       if (!r.invDt) { artifacts.paid_no_inv.cnt++; artifacts.paid_no_inv.sum += r.opp; }
       if (r.sem === 'P') { artifacts.paid_in_progress.cnt++; artifacts.paid_in_progress.sum += r.opp; }
       if (r.dc && r.payDt && r.payDt < r.dc) { artifacts.neg_dur.cnt++; artifacts.neg_dur.sum += r.opp; }
     } else if (r.sem === 'S' && r.cat === '0') {
       artifacts.won_no_pay.cnt++; artifacts.won_no_pay.sum += r.opp; // WON «Счёт оплачен» без даты 1С
     }
-    if (loseUnknown) artifacts.lose_unknown.cnt++;
 
     const m = mgrM[r.mgr] || (mgrM[r.mgr] = zeroM());
     m.created++; stageTot.created++;
@@ -180,7 +203,10 @@ export function computeSalesFunnel(dealsRaw, { from, to, mgrId = null, users = {
     if (sqlF) { m.sql++; stageTot.sql++; }
     if (invF) { m.invoice++; stageTot.invoice++; }
     if (paidF) { m.paid++; stageTot.paid++; }
-    if (loseUnknown) { m.lose_unknown++; stageTot.lose_unknown++; }
+    if (refuseF) {
+      m.refuse++; stageTot.refuse++;
+      if (refuseInPeriod) { m.refuse_in_period++; stageTot.refuse_in_period++; }
+    }
   }
 
   const byManager = Object.entries(mgrM)
@@ -189,31 +215,26 @@ export function computeSalesFunnel(dealsRaw, { from, to, mgrId = null, users = {
 
   // ── PreSale (кат.8): воронка «Квалификации» ────────────────────────────────
   const preRows = cohort.filter(r => r.cat === '8');
-  const zeroP = () => ({ created: 0, work: 0, warm: 0, qualified: 0, handoff: 0, lose_unknown: 0 });
+  // Сегменты по ТЕКУЩЕМУ состоянию сделки (взаимоисключающе): created = сумма сегментов
+  const zeroP = () => ({ created: 0, warming: 0, warm: 0, qualified: 0, handoff: 0, lose: 0 });
   const mgrP = {};
-  const preTot = { created: 0, work: 0, warm: 0, qualified: 0, handoff: 0, lose_unknown: 0 };
+  const preTot = { created: 0, warming: 0, warm: 0, qualified: 0, handoff: 0, lose: 0 };
+
+  const segOf = (r) => {
+    if (r.sem === 'F') return 'lose';                                  // закрыты отказом
+    if (r.sem === 'S') return 'handoff';                               // финал = передано в ОП
+    const idx = PRE_ORDER[r.stage] !== undefined ? PRE_ORDER[r.stage] : 0;
+    if (idx <= 1) return 'warming';                                    // исходные/прогрев + взят в работу/просрочен
+    if (idx === 2) return 'warm';                                      // PREPARATION — тёплый лид
+    if (idx === 3) return 'qualified';                                 // PREPAYMENT_INVOICE — квалификация
+    return 'handoff';                                                  // idx >= 4 (WON и т.п.)
+  };
 
   for (const r of preRows) {
-    let idx = 0, loseUnknown = false;
-    if (r.sem === 'F') {
-      loseUnknown = true; // стадия LOSE ничего не говорит о достигнутом в квалификации
-    } else {
-      idx = PRE_ORDER[r.stage] !== undefined ? PRE_ORDER[r.stage] : 0;
-      if (idx < 1 && r.sem === 'S') idx = 4; // страховка: WON-подобные финальные стадии
-    }
+    const seg = segOf(r);
     const p = mgrP[r.mgr] || (mgrP[r.mgr] = zeroP());
-    p.created++;
-    if (idx >= 1) p.work++;
-    if (idx >= 2) p.warm++;
-    if (idx >= 3) p.qualified++;
-    if (idx >= 4) p.handoff++;
-    if (loseUnknown) p.lose_unknown++;
-    preTot.created++;
-    if (idx >= 1) preTot.work++;
-    if (idx >= 2) preTot.warm++;
-    if (idx >= 3) preTot.qualified++;
-    if (idx >= 4) preTot.handoff++;
-    if (loseUnknown) preTot.lose_unknown++;
+    p.created++; p[seg]++;
+    preTot.created++; preTot[seg]++;
   }
   const qualByManager = Object.entries(mgrP)
     .map(([id, c]) => ({ id, name: name(id), group: getMgrGroup(id), ...c }))
@@ -222,8 +243,6 @@ export function computeSalesFunnel(dealsRaw, { from, to, mgrId = null, users = {
   // ── Список менеджеров для селекта (полный, без mgr-фильтра) ───────────────
   const managers = [...allMgrIds].map(id => ({ id, name: name(id) }))
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  artifacts.lose_unknown.cnt = stageTot.lose_unknown;
 
   return {
     period: { from: from ? iso(from) : null, to: to ? iso(to) : null },

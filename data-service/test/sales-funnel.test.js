@@ -5,12 +5,15 @@
  *
  * Проверяемые инварианты:
  *   - накопительность: created >= mql >= sql >= invoice >= paid (max-этап);
- *   - LOSE без счёта/оплаты НЕ приписывается к MQL (пик неизвестен → lose_unknown);
+ *   - LOSE без счёта/оплаты НЕ приписывается к MQL (пик неизвестен — остаётся на «Создано»);
+ *   - отказы: стадия LOSE + заполненная дата отказа (UF_CRM_1753341391806) → refuse,
+ *     из них закрытые в самом периоде → refuse_in_period; дата отказа без LOSE — аномалия;
  *   - «технические» WON (< MIN_OPP) исключены из когорты (tech_won);
  *   - возвраты (LOSE + оплата) достигают PAID;
  *   - ручной «перескок» (сразу в SQL / автооплата без счёта) не выкидывает сделку
  *     из предыдущих ступеней;
- *   - PreSale (кат.8) не попадает в основную воронку и считается в «Квалификации».
+ *   - PreSale (кат.8) не попадает в основную воронку и распределяется по сегментам
+ *     «Квалификации» (warming/warm/qualified/handoff/lose; created = сумма).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,6 +24,7 @@ const d = (id, over) => Object.assign({
   ID: id, TITLE: 'Сделка ' + id, CATEGORY_ID: '0', STAGE_ID: 'NEW',
   STAGE_SEMANTIC_ID: 'P', OPPORTUNITY: '100000', DATE_CREATE: '2026-03-10',
   ASSIGNED_BY_ID: '1', UF_DATE_PAY_1C: null, UF_CRM_1753272713011: null,
+  UF_CRM_1753341391806: null,
 }, over);
 const users = { '1': 'Иванов', '2': 'Петров' };
 
@@ -32,7 +36,7 @@ test('созданная сделка на NEW → только created', () => 
   const out = run([d(1)]);
   assert.equal(out.main.stages.created, 1);
   assert.equal(out.main.stages.mql, 0);
-  assert.equal(out.main.stages.lose_unknown, 0);
+  assert.equal(out.main.stages.refuse, 0);
 });
 
 test('MQL-стадия (UC_4RJOR4) → mql, но не sql', () => {
@@ -80,29 +84,65 @@ test('инвариант накопительности на смеси сдел
     { created: 5, mql: 4, sql: 3, invoice: 2, paid: 1 });
 });
 
-// ── LOSE: пик неизвестен ──────────────────────────────────────────────────────
+// ── LOSE и отказы ─────────────────────────────────────────────────────────────
 
-test('LOSE без счёта/оплаты → created + lose_unknown, НЕ mql', () => {
+test('LOSE без даты отказа → created, НЕ mql, refuse=0', () => {
   const out = run([d(20, { STAGE_ID: 'LOSE', STAGE_SEMANTIC_ID: 'F' })]);
   const s = out.main.stages;
   assert.equal(s.created, 1);
   assert.equal(s.mql, 0);
-  assert.equal(s.lose_unknown, 1);
+  assert.equal(s.refuse, 0);
+  assert.equal(s.refuse_in_period, 0);
 });
+
+test('отказ: LOSE + дата отказа в периоде → refuse=1, refuse_in_period=1', () => {
+  const out = run([d(23, { STAGE_ID: 'LOSE', STAGE_SEMANTIC_ID: 'F', UF_CRM_1753341391806: '2026-03-15' })]);
+  const s = out.main.stages;
+  assert.equal(s.created, 1);
+  assert.equal(s.refuse, 1);
+  assert.equal(s.refuse_in_period, 1);
+  assert.equal(s.mql, 0); // пик невосстановим — в этапы не приписан
+});
+
+test('отказ: LOSE + дата отказа вне периода → refuse=1, refuse_in_period=0', () => {
+  const out = run([d(24, { STAGE_ID: 'LOSE', STAGE_SEMANTIC_ID: 'F', UF_CRM_1753341391806: '2027-01-10' })]);
+  const s = out.main.stages;
+  assert.equal(s.refuse, 1);
+  assert.equal(s.refuse_in_period, 0);
+});
+
+test('аномалия: дата отказа есть, стадия НЕ LOSE → artifacts.refuse_no_lose, refuse=0', () => {
+  const out = run([d(25, { STAGE_ID: 'DETAILS', STAGE_SEMANTIC_ID: 'P', UF_CRM_1753341391806: '2026-03-15' })]);
+  assert.equal(out.main.stages.refuse, 0);
+  assert.equal(out.main.stages.sql, 1); // стадия SQL работает как обычно
+  assert.equal(out.artifacts.refuse_no_lose.cnt, 1);
+  assert.equal(out.artifacts.refuse_no_lose.sum, 100000);
+});
+
+// ── Возвраты и отказ после счёта ─────────────────────────────────────────────
 
 test('возврат (LOSE + оплата 1С) → достиг PAID, артефакт returns', () => {
   const out = run([d(21, { STAGE_ID: 'LOSE', STAGE_SEMANTIC_ID: 'F', UF_DATE_PAY_1C: '2026-06-01' })]);
   const s = out.main.stages;
   assert.equal(s.paid, 1);
-  assert.equal(s.lose_unknown, 0);
+  assert.equal(s.refuse, 0); // даты отказа нет — в отказы не входит
   assert.equal(out.artifacts.returns.cnt, 1);
 });
 
-test('отказ после счёта (LOSE + дата счёта) → invoice, не lose_unknown', () => {
+test('отказ после счёта (LOSE + дата счёта) → invoice, отказ только по дате отказа', () => {
   const out = run([d(22, { STAGE_ID: 'LOSE', STAGE_SEMANTIC_ID: 'F', UF_CRM_1753272713011: '2026-06-01' })]);
   const s = out.main.stages;
   assert.equal(s.invoice, 1);
-  assert.equal(s.lose_unknown, 0);
+  assert.equal(s.refuse, 0); // без UF_CRM_1753341391806 — в строку отказов не попадает
+});
+
+test('возврат с датой отказа → и в PAID, и в отказы, и в returns', () => {
+  const out = run([d(26, { STAGE_ID: 'LOSE', STAGE_SEMANTIC_ID: 'F', UF_DATE_PAY_1C: '2026-06-01', UF_CRM_1753341391806: '2026-06-15' })]);
+  const s = out.main.stages;
+  assert.equal(s.paid, 1);
+  assert.equal(s.refuse, 1);
+  assert.equal(s.refuse_in_period, 1);
+  assert.equal(out.artifacts.returns.cnt, 1);
 });
 
 // ── Технические WON ───────────────────────────────────────────────────────────
@@ -175,17 +215,21 @@ test('PreSale не попадает в основную воронку', () => {
   assert.equal(out.qual.stages.created, 1);
 });
 
-test('PreSale: стадии до «Взят в работу» → только created; PREPAYMENT_INVOICE → квалификация', () => {
+test('PreSale: сегменты по текущей стадии (warming/warm/qualified; created = сумма)', () => {
   const out = run([
-    d(51, { CATEGORY_ID: '8', STAGE_ID: 'C8:NEW' }),
-    d(52, { CATEGORY_ID: '8', STAGE_ID: 'C8:PREPAYMENT_INVOICE' }),
+    d(51, { CATEGORY_ID: '8', STAGE_ID: 'C8:NEW' }),              // прогрев маркетингом
+    d(55, { CATEGORY_ID: '8', STAGE_ID: 'C8:UC_AMKNXY' }),         // взят в работу → тоже прогрев
+    d(56, { CATEGORY_ID: '8', STAGE_ID: 'C8:PREPARATION' }),       // тёплый лид
+    d(52, { CATEGORY_ID: '8', STAGE_ID: 'C8:PREPAYMENT_INVOICE' }),// квалификация
   ]);
   const q = out.qual.stages;
-  assert.deepEqual({ created: q.created, work: q.work, warm: q.warm, qualified: q.qualified, handoff: q.handoff },
-    { created: 2, work: 1, warm: 1, qualified: 1, handoff: 0 });
+  assert.deepEqual(
+    { created: q.created, warming: q.warming, warm: q.warm, qualified: q.qualified, handoff: q.handoff, lose: q.lose },
+    { created: 4, warming: 2, warm: 1, qualified: 1, handoff: 0, lose: 0 });
+  assert.equal(q.warming + q.warm + q.qualified + q.handoff + q.lose, q.created);
 });
 
-test('PreSale: LOSE → lose_unknown; WON (Передано в ОП) → handoff', () => {
+test('PreSale: LOSE → lose; WON (Передано в ОП) → handoff', () => {
   const out = run([
     d(53, { CATEGORY_ID: '8', STAGE_ID: 'C8:LOSE', STAGE_SEMANTIC_ID: 'F' }),
     d(54, { CATEGORY_ID: '8', STAGE_ID: 'C8:WON', STAGE_SEMANTIC_ID: 'S' }),
@@ -193,7 +237,8 @@ test('PreSale: LOSE → lose_unknown; WON (Передано в ОП) → handoff
   const q = out.qual.stages;
   assert.equal(q.created, 2);
   assert.equal(q.handoff, 1);
-  assert.equal(q.lose_unknown, 1);
+  assert.equal(q.lose, 1);
+  assert.equal(q.warming + q.warm + q.qualified + q.handoff + q.lose, q.created);
 });
 
 // ── Дедуп, период, менеджер ───────────────────────────────────────────────────
@@ -250,12 +295,13 @@ test('контроль: сумма by_manager по этапам == итог во
   const s = out.main.stages;
   const sum = out.main.by_manager.reduce((acc, r) => {
     acc.created += r.created; acc.mql += r.mql; acc.sql += r.sql;
-    acc.invoice += r.invoice; acc.paid += r.paid; acc.lose_unknown += r.lose_unknown;
+    acc.invoice += r.invoice; acc.paid += r.paid;
+    acc.refuse += r.refuse; acc.refuse_in_period += r.refuse_in_period;
     return acc;
-  }, { created: 0, mql: 0, sql: 0, invoice: 0, paid: 0, lose_unknown: 0 });
+  }, { created: 0, mql: 0, sql: 0, invoice: 0, paid: 0, refuse: 0, refuse_in_period: 0 });
   assert.deepEqual(sum, {
     created: s.created, mql: s.mql, sql: s.sql,
-    invoice: s.invoice, paid: s.paid, lose_unknown: s.lose_unknown,
+    invoice: s.invoice, paid: s.paid, refuse: s.refuse, refuse_in_period: s.refuse_in_period,
   });
   // контроль-пример: ИТОГО = main + Автооплаты + ОЗК + Прочее(other+afanasyev+bond) + Артефакт(tech)
   const grp = g => out.main.by_manager.filter(r => r.group === g).reduce((a, r) => a + r.created, 0);

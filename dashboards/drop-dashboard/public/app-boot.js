@@ -5,6 +5,21 @@
 // Обработка выбора дат теперь внутри onApply у RangeCalendar (см. начало файла) —
 // отдельные change-слушатели больше не нужны.
 
+// Права: вкладка «🧪 В разработке» — только для админов
+window.__isAdmin = false;
+function applyAdminUi() {
+  var devBtn = document.querySelector('.kpi-tab[data-tab="dev"]');
+  if (devBtn) devBtn.style.display = window.__isAdmin ? '' : 'none';
+  // если гость уже «сидит» на dev — уводим на «Продажи»
+  if (!window.__isAdmin) {
+    var dev = document.getElementById('devTab');
+    if (dev && dev.style.display !== 'none') window.switchDashTab('sales');
+  }
+}
+api('/api/user').then(function (u) {
+  window.__isAdmin = !!(u && u.role === 'admin');
+  applyAdminUi();
+}).catch(function () { applyAdminUi(); });
 
 // --- Запуск при загрузке страницы ---
 

@@ -70,7 +70,7 @@ body { padding: 0 !important; }
 
 /* ── Вкладка «Воронка продаж» ─────────────────────────────────────────────── */
 /* Типографика: заголовки 20px · этап 16/600 · число этапа 24/700 ·
-   конверсии/потери 14px · таблица 14px · вторичный 12px · th 13/600 ·
+   конверсии 14px · таблица 14px · вторичный 12px · th 13/600 ·
    строка таблицы ≥48px · фильтры 14px */
 .funnel-card h2.funnel-h { font-size: 20px; margin: 0 0 4px; }
 .funnel-sub { font-size: 13px; color: #888; font-weight: 400; }
@@ -93,8 +93,6 @@ body { padding: 0 !important; }
 .fbar-fill { height: 100%; border-radius: 6px; min-width: 2px; transition: width .3s; }
 .fstage-meta { font-size: 14px; color: #475569; }
 .fstage-meta b { color: #1f2a44; }
-.funnel-loss { font-size: 14px; color: #C62828; font-weight: 600; margin: 2px 0 10px 2px; }
-.funnel-loss-detail { display: block; color: #E65100; font-weight: 400; margin-top: 1px; font-size: 12px; }
 .funnel-note { font-size: 12px; color: #64748B; margin-top: 6px; line-height: 1.5; }
 
 /* Таблицы воронки */
@@ -113,3 +111,21 @@ body { padding: 0 !important; }
 /* Блок артефактов */
 .funnel-artifacts { font-size: 14px; background: #F1F3F6; border-radius: 8px; padding: 12px; }
 .funnel-artifacts table td { height: auto; }
+
+/* Sankey: контрольный баланс и артефакты под блоком */
+.pf-balance {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  border: 1px solid #D1E7D6; background: #F3FAF4;
+  border-radius: 10px; padding: 12px 16px; margin: 10px 0 12px;
+  font-size: 14px; color: #1f2a44;
+}
+.pf-balance-side { display: flex; flex-direction: column; gap: 3px; font-weight: 600; }
+.pf-balance-num { font-size: 13px; font-weight: 400; color: #475569; }
+.pf-balance-sign { font-size: 22px; font-weight: 800; }
+.pf-artifact {
+  font-size: 13px; color: #475569; background: #FFF8E1;
+  border: 1px solid #FDE68A; border-radius: 8px; padding: 8px 12px;
+  margin-top: 10px; line-height: 1.5;
+}
+.pf-artifact b { color: #1f2a44; }
+.pf-note2 { font-size: 12.5px; color: #64748B; margin-top: 10px; line-height: 1.6; }
