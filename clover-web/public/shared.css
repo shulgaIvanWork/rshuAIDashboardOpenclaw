@@ -94,6 +94,9 @@ th.sort.desc::after { content: ' ▼'; opacity: 1; }
 .c-oom   { color: #00bcd4 !important; }
 .c-kom   { color: #9C27B0 !important; }
 .c-sdo   { color: #7a9628 !important; }
+
+/* Абсолютные числа под процентом в KPI-карточке («Оплаченные в периоде») */
+.kpi-abs { font-size: 12px; font-weight: 600; color: #0F172A; margin-top: 2px; }
 .c-reg   { color: #4CAF50 !important; }
 
 /* Delta badges */

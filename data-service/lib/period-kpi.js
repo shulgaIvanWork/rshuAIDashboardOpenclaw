@@ -64,7 +64,7 @@ function isQualLead(r) {
 
 function blockMetrics(rows, from, to, filterFn) {
   let sum = 0, cnt = 0, durSum = 0, durCnt = 0, leads = 0, mql = 0;
-  let createdInPeriod = 0, paidSameAsCreated = 0;
+  let createdInPeriod = 0, paidSameAsCreated = 0, paidSameAsCreatedSum = 0;
   for (const r of rows) {
     if (filterFn && !filterFn(r)) continue;
     if (isPaid(r) && r.PAY_DT >= from && r.PAY_DT <= to) {
@@ -80,7 +80,7 @@ function blockMetrics(rows, from, to, filterFn) {
       // Созданные в периоде сделки, которые тоже оплачены (по 1С) в этом же периоде
       if (VALID_CATS.has(r.CAT_ID)) {
         createdInPeriod++;
-        if (isPaid(r) && r.PAY_DT >= from && r.PAY_DT <= to) paidSameAsCreated++;
+        if (isPaid(r) && r.PAY_DT >= from && r.PAY_DT <= to) { paidSameAsCreated++; paidSameAsCreatedSum += r.OPP; }
       }
     }
   }
@@ -93,7 +93,10 @@ function blockMetrics(rows, from, to, filterFn) {
     created_in_period: createdInPeriod,
     paid_same_period: paidSameAsCreated,
     // Доля оплаченных сделок периода, которые и созданы в этом же периоде
-    // (карточка «Оплаченные в периоде» на управленческом дашборде)
+    // (карточка «Оплаченные в периоде» на управленческом дашборде). Рядом с долей
+    // выводятся абсолютные числа — сколько это сделок и на какую сумму, — иначе их
+    // приходится считать вручную из процента.
+    paid_same_period_sum: Math.round(paidSameAsCreatedSum),
     paid_created_same_pct: cnt ? Math.round(paidSameAsCreated / cnt * 1000) / 10 : 0,
   };
 }

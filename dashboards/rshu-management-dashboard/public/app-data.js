@@ -130,7 +130,9 @@ function applyPeriodKpi(out, kpi) {
     return {
       postupleniya: t.postupleniya, won_relevant_cnt: t.won_relevant_cnt,
       avg_check: t.avg_check, avg_close_days_won: t.avg_close_days_won,
-      paid_created_same_pct: t.paid_created_same_pct
+      paid_created_same_pct: t.paid_created_same_pct,
+      // Абсолютные числа под долей «Оплаченные в периоде», чтобы не считать их вручную
+      paid_same_period: t.paid_same_period, paid_same_period_sum: t.paid_same_period_sum
     };
   }
   out.ytd     = Object.assign({}, out.ytd,     block(c.total));
