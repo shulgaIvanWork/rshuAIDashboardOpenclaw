@@ -347,7 +347,15 @@ router.get('/api/status', async (req, res) => {
   });
 });
 
-router.use(express.static(path.join(__dirname, 'public')));
+router.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (/\.(html|js|css)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  },
+}));
 router.get(/(.*)/, (req, res) => { if (path.extname(req.path)) return res.status(404).end(); res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 
 export default router;

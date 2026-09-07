@@ -35,7 +35,15 @@ app.set('etag', false);
 app.use(express.json({ limit: '50mb' }));
 
 // Статика
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (/\.(html|js|css)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  },
+}));
 
 // API: NPS данные за год
 app.get('/api/data', async (req, res) => {

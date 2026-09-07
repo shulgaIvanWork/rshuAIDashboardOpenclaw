@@ -1618,7 +1618,15 @@ app.get('/api/product-ranking-year', async (req, res) => {
 
 
 // Статика
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (/\.(html|js|css)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  },
+}));
 
 // Запасной маршрут
 app.get(/(.*)/,  (req, res) => { if (path.extname(req.path)) return res.status(404).end(); res.sendFile(path.join(__dirname, 'public', 'index.html')); });

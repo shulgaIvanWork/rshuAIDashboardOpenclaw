@@ -228,9 +228,14 @@ app.get('/api/kom-extended', async (req, res) => {
 // ── Static ────────────────────────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public'), {
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    if (/\.(html|js|css)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
   },
 }));
+
 app.get(/(.*)/, (req, res) => { if (path.extname(req.path)) return res.status(404).end(); res.sendFile(path.join(__dirname, 'public', 'index.html')); });
 
 const PORT = process.env.PORT || 3007;

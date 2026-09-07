@@ -97,7 +97,16 @@ app.use(session({
   store: new FileStoreSession({ path: path.join(DATA_DIR, 'sessions'), logFn: () => {} }),
   cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
 }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  // no-cache для html/js/css — иначе браузеры кэшируют обновлённый фронт
+  setHeaders: (res, filePath) => {
+    if (/\.(html|js|css)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  },
+}));
 
 // Auth middleware
 function requireAuth(req, res, next) {
