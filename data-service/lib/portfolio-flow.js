@@ -91,10 +91,15 @@ export function classifyEndStage(cat, stage, sem) {
  * Главный расчёт движения портфеля.
  * dealsRaw — массив сделок из cache/deals.json.
  * opts: { from, to: Date; mgrId: string|null; asOf: Date|null (дата выгрузки);
- *        snapshot: array|null — записи снапшота на to (если to в прошлом) }
+ *        snapshot: array|null — записи снапшота на to (если to в прошлом);
+ *        byMgr: bool — дополнительно вернуть разрез по ответственным (см. byMgr
+ *        в результате): { [id]: { available, paid } }. Нужен карточке «конверсия
+ *        портфеля» в /api/managers-sales, чтобы знаменатель там считался ровно по
+ *        этим же правилам (включая исключение тех. зачисток), а не отдельной копией. }
  */
-export function computePortfolioFlow(dealsRaw, { from, to, mgrId = null, asOf = null, snapshot = null } = {}) {
+export function computePortfolioFlow(dealsRaw, { from, to, mgrId = null, asOf = null, snapshot = null, byMgr = false } = {}) {
   const seen = new Set();
+  const perMgr = byMgr ? {} : null;
   const meta = { tech_won: { cnt: 0 }, won_no_pay: { cnt: 0 }, ignored: { cnt: 0, sum: 0 }, tech_purge: { cnt: 0, sum: 0 } };
 
   // ── Тех. зачистки: пиковые дни массового закрытия LOSE по всей базе кат.0 ──
@@ -188,6 +193,12 @@ export function computePortfolioFlow(dealsRaw, { from, to, mgrId = null, asOf = 
 
     const b = nodes[bucket]; b.cnt++; b.sum += opp;
     const o = nodes[out]; o.cnt++; o.sum += opp;
+    if (perMgr) {
+      const g = String(x.ASSIGNED_BY_ID || '');
+      const pm = perMgr[g] || (perMgr[g] = { available: 0, paid: 0 });
+      pm.available++;
+      if (out === 'paid') pm.paid++;
+    }
     addFlow(bucket, 'available', 1, opp);
     addFlow('available', out, 1, opp);
     if (out === 'end') endIds.add(id);
@@ -266,6 +277,7 @@ export function computePortfolioFlow(dealsRaw, { from, to, mgrId = null, asOf = 
     }),
     endBreakdown,
     breakdownSource,
+    byMgr: perMgr,
     meta: {
       tech_won: meta.tech_won.cnt,
       won_no_pay: meta.won_no_pay.cnt,

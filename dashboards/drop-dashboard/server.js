@@ -770,40 +770,23 @@ app.get('/api/managers-sales', async (req, res) => {
       }
     }
 
-    // ── Конверсия портфеля в оплату (операционная, по логике Sankey «Движение портфеля»):
-    // знаменатель = остаток в работе на начало + созданные в периоде + возвращённые в работу;
-    // числитель = фактически оплаченные в периоде. Уникальные сделки кат.0 одного менеджера.
-    const pfSeen = new Set();
-    const pfAsOf = todayMsk();
-    for (const x of dealsRaw) {
-      const id = String(x.ID || '');
-      if (!id || pfSeen.has(id)) continue;
-      pfSeen.add(id);
-      if (String(x.CATEGORY_ID || '') !== '0') continue;
-      const sem = x.STAGE_SEMANTIC_ID || '';
-      const opp = parseFloat(x.OPPORTUNITY || 0);
-      if (sem === 'S' && opp < MIN_OPP) continue;                 // тех. WON
-      const dc = parseDt(x.DATE_CREATE);
-      if (!dc) continue;
-      const pay = parseDt(x.UF_DATE_PAY_1C);
-      if (sem === 'S' && !pay) continue;                          // WON без 1С — вне портфеля
-      const ref = parseDt(x.UF_CRM_1753341391806);
-      const effRefuse = ref || (sem === 'F' ? parseDt(x.CLOSEDATE) : null);
-      if (sem === 'F' && effRefuse && effRefuse > pfAsOf) continue; // битая дата отказа (будущее)
-      const paidE = !!(pay && opp >= MIN_OPP && pay >= dtFrom && pay <= dtTo);
-      const refusedE = !!(sem === 'F' && effRefuse && effRefuse >= dtFrom && effRefuse <= dtTo);
-      const closedBeforeFrom = (pay && pay < dtFrom) || (effRefuse && effRefuse < dtFrom);
-      const inStart = dc < dtFrom && !closedBeforeFrom;           // остаток на начало
-      const inCreated = dc >= dtFrom && dc <= dtTo;               // созданные в периоде
-      let inPf = false;
-      if (inStart) inPf = true;
-      else if (inCreated) { if (closedBeforeFrom) continue; inPf = true; }
-      else if (paidE || refusedE) inPf = true;                    // возвращённые в работу
-      else continue;
-      const mgrId = String(x.ASSIGNED_BY_ID || '');
+    // ── Конверсия портфеля в оплату — считаем ТЕМ ЖЕ кодом, что и Sankey
+    // «Движение портфеля» (portfolio-flow.js), разрезом по ответственным.
+    // Раньше здесь лежала копия той логики без фильтра технических зачисток,
+    // из-за чего знаменатель был завышен (август: 1367 вместо 1094) и рейтинг
+    // менеджеров по конверсии переворачивался.
+    // Границы строим ЛОКАЛЬНОЙ полночью: portfolio-flow.js парсит даты сделок
+    // локально, и обе стороны сравнения должны быть в одной базе (dtFrom/dtTo
+    // выше — UTC, как остальной дашборд, их сюда передавать нельзя).
+    const pfFrom = new Date(from + 'T00:00:00');
+    const pfTo   = new Date(to   + 'T00:00:00');
+    const nowMsk = new Date(Date.now() + MSK_OFFSET_MS);
+    const pfAsOf = new Date(nowMsk.getUTCFullYear(), nowMsk.getUTCMonth(), nowMsk.getUTCDate());
+    const pf = computePortfolioFlow(dealsRaw, { from: pfFrom, to: pfTo, asOf: pfAsOf, byMgr: true });
+    for (const [mgrId, v] of Object.entries(pf.byMgr)) {
       const m = touch(curM, mgrId, users[mgrId] || mgrId || '(без ответственного)');
-      m.pf_available++;
-      if (paidE) m.pf_paid++;
+      m.pf_available = v.available;
+      m.pf_paid = v.paid;
     }
 
     // Финальная сборка: доли, дельты, средние

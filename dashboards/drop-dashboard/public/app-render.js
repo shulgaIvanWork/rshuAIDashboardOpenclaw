@@ -785,7 +785,10 @@ function renderLeadersCard(mgr) {
   var byPost = ms.slice().sort(function (a, b) { return b.postupleniya - a.postupleniya; })[0];
   var byCnt = ms.slice().sort(function (a, b) { return (b.won_cnt || 0) - (a.won_cnt || 0); })[0];
   var byCheck = ms.slice().filter(function (m) { return (m.won_cnt || 0) >= 5; }).sort(function (a, b) { return (b.avg_check || 0) - (a.avg_check || 0); })[0];
-  var byConv = ms.slice().filter(function (m) { return (m.pf_available || 0) > 0; }).sort(function (a, b) { return ((b.pf_paid || 0) / b.pf_available) - ((a.pf_paid || 0) / a.pf_available); })[0];
+  // Порог портфеля: без него лидером становится менеджер с 3 сделками и 100%.
+  // 30 — разрыв в распределении: у действующих продавцов портфель 140+, у прочих <= 16.
+  var CONV_MIN_PORTFOLIO = 30;
+  var byConv = ms.slice().filter(function (m) { return (m.pf_available || 0) >= CONV_MIN_PORTFOLIO; }).sort(function (a, b) { return ((b.pf_paid || 0) / b.pf_available) - ((a.pf_paid || 0) / a.pf_available); })[0];
   var card = function (label, val, name, sub) {
     return '<div class="kpi kpi-total"><div class="lbl">' + label + '</div>'
       + '<div class="val-big" style="font-size:19px">' + val + '</div>'
@@ -793,8 +796,10 @@ function renderLeadersCard(mgr) {
       + (sub ? '<div class="pp-val" style="font-size:10px">' + sub + '</div>' : '') + '</div>';
   };
   var convName = byConv ? byConv.name : '';
-  var convSub = byConv ? 'оплаты ' + (byConv.pf_paid || 0) + ' ÷ портфель ' + byConv.pf_available : '';
-  return '<div class="card" style="margin-top:8px"><h2>Лидеры периода <span style="font-size:12px;color:#475569;font-weight:400">(действующие менеджеры · конверсия портфеля в оплату = оплаченные в периоде ÷ (остаток на начало + созданные + возвращённые в работу), логика портфеля кат. 0 — не путать с когортной конверсией воронки)</span></h2>'
+  var convSub = byConv
+    ? 'оплаты ' + (byConv.pf_paid || 0) + ' ÷ портфель ' + byConv.pf_available
+    : 'нет менеджеров с портфелем от ' + CONV_MIN_PORTFOLIO;
+  return '<div class="card" style="margin-top:8px"><h2>Лидеры периода <span style="font-size:12px;color:#475569;font-weight:400">(действующие менеджеры · конверсия портфеля в оплату = оплаченные в периоде ÷ (остаток на начало + созданные + возвращённые в работу), логика портфеля кат. 0 — не путать с когортной конверсией воронки; в зачёт идут менеджеры с портфелем от 30 сделок)</span></h2>'
     + '<div class="kpis" style="grid-template-columns:repeat(4,1fr);margin:0">'
     + card('Лидер по поступлениям', fmtM(byPost.postupleniya) + ' ₽', byPost.name)
     + card('Лидер по количеству оплат', fmt(byCnt.won_cnt || 0), byCnt.name)
