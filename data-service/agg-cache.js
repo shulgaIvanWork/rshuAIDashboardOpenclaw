@@ -60,6 +60,41 @@ export async function getAgg() {
 
 export function getCacheAt() { return aggCacheAt; }
 
+// ── Отфильтрованные агрегаты (направление ООМ/КОМ + трафик) ────────────────
+// Дашборд продаж (drop-dashboard) фильтрует весь лист по dir/traffic. Годовые
+// ряды (weeks/months и т.д.) пересчитываются analyze() по подмножеству сделок
+// (единая точка фильтрации в analyze.js). Кэш — отдельный, по ключу фильтра.
+const aggFilteredCache = new Map(); // ключ 'dir|traffic' → { result, at }
+const aggFilteredLoading = new Map();
+
+function aggFilterKey(filter) {
+  return (filter && filter.dir || 'all') + '|' + (filter && filter.traffic || 'all');
+}
+
+export async function getAggFiltered(filter) {
+  const key = aggFilterKey(filter);
+  const hit = aggFilteredCache.get(key);
+  if (hit && (Date.now() - hit.at) < CACHE_TTL_MS) return hit.result;
+  if (aggFilteredLoading.has(key)) return aggFilteredLoading.get(key);
+  const p = analyze(null, { filter: { dir: key.split('|')[0], traffic: key.split('|')[1] } })
+    .then(result => {
+      aggFilteredCache.set(key, { result, at: Date.now() });
+      aggFilteredLoading.delete(key);
+      return result;
+    })
+    .catch(e => {
+      aggFilteredLoading.delete(key);
+      const old = aggFilteredCache.get(key);
+      if (old) {
+        console.warn('[agg-cache] analyze(filtered) failed, serving stale cache:', e.message);
+        return old.result;
+      }
+      throw e;
+    });
+  aggFilteredLoading.set(key, p);
+  return p;
+}
+
 // Контекст рейтингов (обогащённые сделки) — нужен, чтобы считать корзины за
 // ТОЧНЫЕ даты в /api/data/range. Кэшируется отдельно от agg: analyze() строит
 // весь агрегат, а здесь достаточно только обогащённых строк.

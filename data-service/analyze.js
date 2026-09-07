@@ -676,7 +676,7 @@ export function buildRatings(ctx, from, to, curW) {
 
 // ── Главная функция ───────────────────────────────────────────────────────────
 
-export async function analyze(onProgress) {
+export async function analyze(onProgress, opts) {
   const emit = (msg) => {
     if (onProgress) onProgress(msg);
   };
@@ -685,8 +685,27 @@ export async function analyze(onProgress) {
 
   // Загрузка данных и обогащение сделок — общее с эндпоинтом точного периода
   // дашборда «Рейтинги» (см. loadRatingsContext).
-  const { dicts, companies, cats, usersMap, sourcesMap, directions, rows, leads, cc } =
+  let { dicts, companies, cats, usersMap, sourcesMap, directions, rows, leads, cc } =
     await loadRatingsContext();
+
+  // Фильтр по направлению (ООМ/КОМ) и трафику (внутренняя база/маркетинг) —
+  // единая точка фильтрации для дашборда продаж: весь последующий расчёт
+  // (YTD, недели, месяцы, рейтинги и т.д.) идёт по подмножеству сделок.
+  // Без фильтра (по умолчанию) поведение не меняется.
+  const fOpt = (opts && opts.filter) || {};
+  const fDir = fOpt.dir || 'all';
+  const fTr  = fOpt.traffic || 'all';
+  if (fDir !== 'all' || fTr !== 'all') {
+    const pred = (r) => {
+      if (fDir === 'oom' && !r.IS_OOM) return false;
+      if (fDir === 'kom' && !r.IS_KOM) return false;
+      if (fTr === 'internal' && !r.IS_INTERNAL_SRC) return false;
+      if (fTr === 'market' && r.IS_INTERNAL_SRC) return false;
+      return true;
+    };
+    rows = rows.filter(pred);
+    emit({ type: 'filtered', count: rows.length });
+  }
 
   let fetchedAt = null;
   try {

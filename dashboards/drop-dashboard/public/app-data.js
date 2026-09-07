@@ -12,7 +12,7 @@ async function loadAll() {
   if (!areaNew) return;
 
   try {
-    const d = await api('/api/data');
+    const d = await dashApi('/api/data');
     if (!d || !d.ytd) return;
     dataCache = d;
 
@@ -36,6 +36,19 @@ async function loadAll() {
   } catch (e) {
     console.error('loadAll error:', e);
     if (areaNew) areaNew.innerHTML = '<div class="alert alert-danger">❌ Ошибка загрузки: '+escapeHtml(e.message)+'</div>';
+  }
+}
+
+// Пересчёт данных после смены фильтров листа (направление/трафик): перезапрашиваем
+// /api/data под фильтром и перерисовываем текущие периодные блоки, не трогая период.
+async function reloadDataLayer() {
+  try {
+    const d = await dashApi('/api/data');
+    if (!d || !d.ytd) return;
+    dataCache = d;
+    renderFilteredData();
+  } catch (e) {
+    console.error('reloadDataLayer error:', e);
   }
 }
 
@@ -76,7 +89,7 @@ async function renderFilteredData() {
     try {
       var kpiParams = '/api/kpi?from=' + dateFrom + '&to=' + dateTo;
       if (compareFrom) kpiParams += '&compare_from=' + compareFrom;
-      var kpi = await api(kpiParams);
+      var kpi = await dashApi(kpiParams);
       applyPeriodKpi(filteredData, kpi);
       if (kpi && kpi.check_dist) filteredData.check_dist = kpi.check_dist; // структура среднего чека
     } catch (e) { console.error('/api/kpi error:', e); }
@@ -87,7 +100,7 @@ async function renderFilteredData() {
     var params = '';
     if (dateFrom) params += (params ? '&' : '?') + 'from=' + dateFrom;
     if (dateTo)   params += (params ? '&' : '?') + 'to='   + dateTo;
-    var regData = await api('/api/reg-funnel' + params);
+    var regData = await dashApi('/api/reg-funnel' + params);
     filteredData.reg_ytd = regData;
   } catch (e) { /* fallback: оставляем оригинальные данные */ }
 
@@ -106,7 +119,7 @@ async function renderFilteredData() {
       ppFrom = new Date(ppTo.getTime() - dur);
     }
     var ppRegParams = '?from=' + ppFrom.toISOString().substring(0,10) + '&to=' + ppTo.toISOString().substring(0,10);
-    var ppRegData = await api('/api/reg-funnel' + ppRegParams);
+    var ppRegData = await dashApi('/api/reg-funnel' + ppRegParams);
     ppRegData.avg_check  = ppRegData.total_paid > 0 ? Math.round(ppRegData.total_paid_sum / ppRegData.total_paid) : 0;
     ppRegData.conv       = ppRegData.total > 0 ? parseFloat((ppRegData.total_paid / ppRegData.total * 100).toFixed(1)) : 0;
     ppRegData.lose_pct   = ppRegData.total > 0 ? parseFloat((ppRegData.lose / ppRegData.total * 100).toFixed(1)) : 0;
@@ -123,14 +136,14 @@ async function renderFilteredData() {
   // Продажи по менеджерам — за выбранный период (сравнение + группы)
   try {
     var msParams = '?from=' + dateFrom + '&to=' + dateTo;
-    filteredData.mgr_sales = await api('/api/managers-sales' + msParams);
+    filteredData.mgr_sales = await dashApi('/api/managers-sales' + msParams);
   } catch (e) { console.error('/api/managers-sales error:', e); filteredData.mgr_sales = null; }
 
   // Полный отчёт по менеджерам (Таблица 1/2, срезы) — за выбранный период,
   // с учётом выбранных фильтров формы/трафика (сохраняются при смене периода).
   try {
     var mrf = window.mgrReportFilter || { form: 'all', traffic: 'all' };
-    filteredData.mgr_report = await api('/api/managers-report?from=' + dateFrom + '&to=' + dateTo
+    filteredData.mgr_report = await dashApi('/api/managers-report?from=' + dateFrom + '&to=' + dateTo
       + '&form=' + (mrf.form || 'all') + '&traffic=' + (mrf.traffic || 'all'));
   } catch (e) { console.error('/api/managers-report error:', e); filteredData.mgr_report = null; }
 

@@ -22,7 +22,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { getAgg, getCacheAt } from '@rshu/data-service/agg-cache.js';
+import { getAgg, getCacheAt, getAggFiltered } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила (isKomDeal, границы сумм, источник «Регистрация»)
 import { isKomDeal, isInternalSource, MIN_OPP, REG_SRC_ID, VALID_CATS, MQL_SALE_STAGES, NOT_MQL_SALE, YEAR, UF } from '@rshu/data-service/lib/deal-rules.js';
 import { enrichForKpi, calcPeriodKpi } from '@rshu/data-service/lib/period-kpi.js';
@@ -51,7 +51,13 @@ app.get('/api/user', (req, res) => {
 // Main data — всегда свежие, из общего кэша data-service
 app.get('/api/data', async (req, res) => {
   try {
-    const data = await getAgg();
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
+    // Годовые агрегаты под фильтр считаются analyze() по подмножеству сделок
+    // (единая точка фильтрации) и кэшируются отдельно от базовых
+    const data = (dir === 'all' && traffic === 'all')
+      ? await getAgg()
+      : await getAggFiltered({ dir, traffic });
     res.json(Object.assign({}, data, { _loadedAt: data.fetched_at || new Date(getCacheAt()).toISOString() }));
   } catch (e) {
     console.error('/api/data error:', e.message);
@@ -94,8 +100,11 @@ app.get('/api/kpi', async (req, res) => {
     if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
       return res.status(400).json({ error: 'некорректный диапазон дат' });
     }
-
-    const rows = enrichForKpi(JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8')));
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
+    const f = dirTrafficFilter(dir, traffic);
+    const dealsAll = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
+    const rows = enrichForKpi(f ? dealsAll.filter(f) : dealsAll);
 
     const lenMs = dtTo - dtFrom + 86400000;
     let ppFrom, ppTo;
@@ -273,12 +282,42 @@ function mgrFilter(mgrParam) {
   return x => String(x.ASSIGNED_BY_ID || '') === id;
 }
 
+// ── Фильтры всего листа: направление (ООМ/КОМ) и трафик (внутр. база/маркетинг) ──
+// Значения: dir = all|oom|kom, traffic = all|internal|market.
+// Предикат работает и с сырыми сделками, и с обогащёнными (enrichForKpi: IS_KOM/
+// IS_INTERNAL_SRC). Применяется к входному массиву сделок ДО расчётов — логика
+// метрик не переписывается (isKomDeal/isInternalSource из deal-rules).
+function parseDirTraffic(q) {
+  const dir = String(q.dir || 'all');
+  const traffic = String(q.traffic || 'all');
+  if (!['all', 'oom', 'kom'].includes(dir)) return { error: 'dir: all|oom|kom' };
+  if (!['all', 'internal', 'market'].includes(traffic)) return { error: 'traffic: all|internal|market' };
+  return { dir, traffic };
+}
+
+function dirTrafficFilter(dir, traffic) {
+  if (dir === 'all' && traffic === 'all') return null;
+  return (x) => {
+    const isKom = typeof x.IS_KOM === 'boolean' ? x.IS_KOM : isKomDeal(x);
+    const isInt = typeof x.IS_INTERNAL_SRC === 'boolean' ? x.IS_INTERNAL_SRC : isInternalSource(x.SOURCE_ID);
+    if (dir === 'oom' && isKom) return false;
+    if (dir === 'kom' && !isKom) return false;
+    if (traffic === 'internal' && !isInt) return false;
+    if (traffic === 'market' && isInt) return false;
+    return true;
+  };
+}
+
 // План для выбранного скоупа: весь отдел (oom+kom, legacy-total как fallback) или личный план менеджера.
-function planForScope(plans, month, mgrParam) {
+// dir: all|oom|kom — при выбранном направлении берётся план ЭТОГО направления (ООМ или КОМ),
+// при legacy-месяце без разбивки план направления = 0 (план ещё не разделён).
+function planForScope(plans, month, mgrParam, dir) {
   const entry = plans[month] || {};
   if (!mgrParam || mgrParam === 'all') {
     const hasSplit = Number.isFinite(entry.oom) || Number.isFinite(entry.kom);
     const split = (entry.oom || 0) + (entry.kom || 0);
+    if (dir === 'oom') return { plan: hasSplit ? (entry.oom || 0) : 0, source: 'oom' };
+    if (dir === 'kom') return { plan: hasSplit ? (entry.kom || 0) : 0, source: 'kom' };
     // Новый формат (ООМ/КОМ) приоритетен; legacy total — только если разбивки нет
     const plan = hasSplit ? split : ((entry.total || 0) > 0 ? entry.total : 0);
     return { plan, source: 'total' };
@@ -417,10 +456,13 @@ app.get('/api/kpi-month', async (req, res) => {
   try {
     const { month, mgr } = req.query;
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || '')) return res.status(400).json({ error: 'month в формате YYYY-MM' });
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
 
     const dealsAll = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
     const filter = mgrFilter(mgr);
-    const dealsRaw = filter ? dealsAll.filter(filter) : dealsAll;
+    const f = dirTrafficFilter(dir, traffic);
+    const dealsRaw = dealsAll.filter(x => (!filter || filter(x)) && (!f || f(x)));
     const rows = enrichForKpi(dealsRaw);
 
     const [y, m] = month.split('-').map(Number);
@@ -429,9 +471,9 @@ app.get('/api/kpi-month', async (req, res) => {
     const pRange = monthRange(prev);
 
     const plans = await readPlans();
-    const planScope = planForScope(plans, month, mgr);
+    const planScope = planForScope(plans, month, mgr, dir);
     const plan = planScope.plan;
-    const prevPlanScope = planForScope(plans, prev, mgr);
+    const prevPlanScope = planForScope(plans, prev, mgr, dir);
     const prevPlan = prevPlanScope.plan;
 
     const cur = calcPeriodKpi(rows, range.from, range.to);
@@ -710,6 +752,8 @@ app.get('/api/kpi-slices', async (req, res) => {
   try {
     const { month, mgr } = req.query;
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || '')) return res.status(400).json({ error: 'month в формате YYYY-MM' });
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
     const [dealsRaw, dictsRaw] = await Promise.all([
       fs.readFile(DEALS_PATH, 'utf-8'),
       fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').catch(() => '{}'),
@@ -719,14 +763,15 @@ app.get('/api/kpi-slices', async (req, res) => {
     // Дедупликация по ID сделки
     const seen = new Set();
     const dealsAllDedup = dealsAll.filter(x => (seen.has(x.ID) ? false : (seen.add(x.ID), true)));
-    // Фильтр по менеджеру — единый набор сделок для всех срезов
+    // Фильтр по менеджеру + направлению/трафику — единый набор сделок для всех срезов
     const filter = mgrFilter(mgr);
-    const deals = filter ? dealsAllDedup.filter(filter) : dealsAllDedup;
+    const f = dirTrafficFilter(dir, traffic);
+    const deals = dealsAllDedup.filter(x => (!filter || filter(x)) && (!f || f(x)));
     const rows = enrichForKpi(deals);
     const mskToday = todayMsk();
     const range = monthRange(month);
     const plans = await readPlans();
-    const planScope = planForScope(plans, month, mgr);
+    const planScope = planForScope(plans, month, mgr, dir);
     const plan = planScope.plan;
     const monthClosed = range.to < mskToday;
 
@@ -768,13 +813,19 @@ app.get('/api/managers-sales', async (req, res) => {
     if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
       return res.status(400).json({ error: 'некорректный диапазон дат' });
     }
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
 
     const [dealsRaw, dicts] = await Promise.all([
       fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
       fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').then(JSON.parse),
     ]);
     const users = (dicts && dicts.users) || {};
-    const rows = enrichForKpi(dealsRaw).map(r => ({
+    // Направление/трафик — единый набор сделок для всех проходов (осн. агрегация,
+    // скидки, конверсия портфеля)
+    const f = dirTrafficFilter(dir, traffic);
+    const dealsScoped = f ? dealsRaw.filter(f) : dealsRaw;
+    const rows = enrichForKpi(dealsScoped).map(r => ({
       ...r,
       MGR_NAME: users[r.MGR_ID] || r.MGR_ID || '(без ответственного)',
     }));
@@ -838,7 +889,7 @@ app.get('/api/managers-sales', async (req, res) => {
     // Процент скидки = UF_DISCOUNT («Скидка (из счёта)», double, %); 0/пусто = без скидки.
     // Сумма скидки ₽ = opp × pct/(100−pct); исходная стоимость = opp + скидка.
     const discSeen = new Set();
-    for (const x of dealsRaw) {
+    for (const x of dealsScoped) {
       const id = String(x.ID || '');
       if (!id || discSeen.has(id)) continue;
       discSeen.add(id);
@@ -869,7 +920,7 @@ app.get('/api/managers-sales', async (req, res) => {
     const pfTo   = new Date(to   + 'T00:00:00');
     const nowMsk = new Date(Date.now() + MSK_OFFSET_MS);
     const pfAsOf = new Date(nowMsk.getUTCFullYear(), nowMsk.getUTCMonth(), nowMsk.getUTCDate());
-    const pf = computePortfolioFlow(dealsRaw, { from: pfFrom, to: pfTo, asOf: pfAsOf, byMgr: true });
+    const pf = computePortfolioFlow(dealsScoped, { from: pfFrom, to: pfTo, asOf: pfAsOf, byMgr: true });
     for (const [mgrId, v] of Object.entries(pf.byMgr)) {
       const m = touch(curM, mgrId, users[mgrId] || mgrId || '(без ответственного)');
       m.pf_available = v.available;
@@ -933,10 +984,12 @@ app.get('/api/managers-sales', async (req, res) => {
 app.get('/api/managers-report', async (req, res) => {
   try {
     const { from, to } = req.query;
-    // Фильтры: форма обучения (all|oom|kom) и трафик (all|internal|market).
+    // Фильтры: направление/форма (all|oom|kom) и трафик (all|internal|market).
+    // Единые параметры листа dir/traffic — псевдонимы прежних form/traffic.
     // Фильтруем ВХОДНЫЕ сделки до calcManagers — метрики пересчитываются по подвыборке.
-    const form    = String(req.query.form || 'all');
-    const traffic = String(req.query.traffic || 'all');
+    const dirParam = String(req.query.dir || 'all');
+    const form     = String(req.query.form || (dirParam === 'kom' ? 'kom' : (dirParam === 'oom' ? 'oom' : 'all')));
+    const traffic  = String(req.query.traffic || 'all');
     const [dealsAll, dicts] = await Promise.all([
       fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
       fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').then(JSON.parse),
@@ -979,10 +1032,14 @@ app.get('/api/manager-weeks', async (req, res) => {
     const mgrId = String(req.query.mgr || '');
     if (!mgrId) return res.status(400).json({ error: 'mgr обязателен (id или all)' });
     const filterAll = mgrId === 'all';
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
     const [dealsRaw, agg] = await Promise.all([
       fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
       getAgg(),
     ]);
+    const f = dirTrafficFilter(dir, traffic);
+    const dealsScoped = f ? dealsRaw.filter(f) : dealsRaw;
 
     const parseDt = s => {
       if (!s) return null;
@@ -1019,7 +1076,7 @@ app.get('/api/manager-weeks', async (req, res) => {
     const eW = k => (wk[k] || (wk[k] = blank()));
     const eM = k => (mo[k] || (mo[k] = blank()));
 
-    for (const x of dealsRaw) {
+    for (const x of dealsScoped) {
       if (!filterAll && String(x.ASSIGNED_BY_ID || '') !== mgrId) continue;
       const r = {
         OPP: parseFloat(x.OPPORTUNITY || 0), SEM: x.STAGE_SEMANTIC_ID || null,
@@ -1081,7 +1138,11 @@ app.get('/api/manager-weeks', async (req, res) => {
 // Бакетируем по дате оплаты, непрерывный ряд от 1 января до сегодня (дни без оплат = 0).
 app.get('/api/day-series', async (req, res) => {
   try {
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
     const dealsRaw = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
+    const f = dirTrafficFilter(dir, traffic);
+    const dealsScoped = f ? dealsRaw.filter(f) : dealsRaw;
     const parseDt = s => {
       if (!s) return null;
       let m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1], +m[2]-1, +m[3]);
@@ -1090,7 +1151,7 @@ app.get('/api/day-series', async (req, res) => {
     };
     const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const bucket = {};
-    for (const x of dealsRaw) {
+    for (const x of dealsScoped) {
       const opp = parseFloat(x.OPPORTUNITY || 0);
       if (opp < MIN_OPP) continue;
       const pd = parseDt(x.UF_DATE_PAY_1C);
@@ -1128,13 +1189,25 @@ app.get('/api/funnel', async (req, res) => {
     if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
       return res.status(400).json({ error: 'некорректный диапазон дат' });
     }
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
     const [dealsRaw, dictsRaw] = await Promise.all([
       fs.readFile(DEALS_PATH, 'utf-8'),
       fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').catch(() => '{}'),
     ]);
     const dicts = JSON.parse(dictsRaw);
     const users = (dicts && dicts.users) || {};
-    const out = computeSalesFunnel(JSON.parse(dealsRaw), {
+    // Направление/трафик: общий предикат по сделкам. При выбранном направлении
+    // воронку считаем ТОЛЬКО по кат.0 (Sale) — кат.19 (КОМ-воронка) не применяем;
+    // PreSale (кат.8) — отдельная полоса, предикат к ней тоже применяется.
+    const f = dirTrafficFilter(dir, traffic);
+    const dealsParsed = JSON.parse(dealsRaw);
+    let dealsScoped = dealsParsed;
+    if (f) {
+      dealsScoped = dealsParsed.filter(f);
+      if (dir !== 'all') dealsScoped = dealsScoped.filter(x => ['0', '8'].includes(String(x.CATEGORY_ID || '')));
+    }
+    const out = computeSalesFunnel(dealsScoped, {
       from: dtFrom, to: dtTo,
       mgrId: mgr && mgr !== 'all' ? String(mgr) : null,
       users,
@@ -1159,7 +1232,11 @@ app.get('/api/portfolio-flow', async (req, res) => {
     if (isNaN(dtFrom) || isNaN(dtTo) || dtFrom > dtTo) {
       return res.status(400).json({ error: 'некорректный диапазон дат' });
     }
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
     const dealsRaw = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
+    const f = dirTrafficFilter(dir, traffic);
+    const dealsScoped = f ? dealsRaw.filter(f) : dealsRaw;
     // Дата выгрузки кэша — из fetched_at.json (getCacheAt() — время analyze(),
     // до первого getAgg() равен 0 и к дате выгрузки отношения не имеет)
     let asOf = null;
@@ -1175,7 +1252,7 @@ app.get('/api/portfolio-flow', async (req, res) => {
     // Снапшот на to (для прошлых дат) — берём только если to < даты выгрузки
     let snapshot = null;
     if (dtTo < asOf) snapshot = readSnapshot(to);
-    const out = computePortfolioFlow(dealsRaw, {
+    const out = computePortfolioFlow(dealsScoped, {
       from: dtFrom, to: dtTo,
       mgrId: mgr && mgr !== 'all' ? String(mgr) : null,
       asOf,
@@ -1192,6 +1269,9 @@ app.get('/api/portfolio-flow', async (req, res) => {
 app.get('/api/reg-funnel', async (req, res) => {
   try {
     const { from, to } = req.query;
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
+    const f = dirTrafficFilter(dir, traffic);
 
     const deals = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
 
@@ -1200,6 +1280,9 @@ app.get('/api/reg-funnel', async (req, res) => {
       if (!VALID_CATS.has(parseInt(d.CATEGORY_ID || 0))) return false;
       return true;
     });
+    // Направление/трафик: «Регистрация» — маркетинговый источник, поэтому при
+    // traffic=internal подвыборка станет пустой (блок на фронте скрывается)
+    if (f) subset = subset.filter(f);
 
     if (from || to) {
       const dtFrom = from ? new Date(from) : null;
@@ -1298,7 +1381,10 @@ app.get('/api/artifacts', async (req, res) => {
   try {
     const dealsAll = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
     const filter = mgrFilter(req.query.mgr);
-    const deals = filter ? dealsAll.filter(filter) : dealsAll;
+    const { dir, traffic } = parseDirTraffic(req.query);
+    if (dir && dir.error) return res.status(400).json({ error: dir.error });
+    const f = dirTrafficFilter(dir, traffic);
+    const deals = dealsAll.filter(x => (!filter || filter(x)) && (!f || f(x)));
 
     const withPay = deals.filter(d => d.UF_DATE_PAY_1C);
 

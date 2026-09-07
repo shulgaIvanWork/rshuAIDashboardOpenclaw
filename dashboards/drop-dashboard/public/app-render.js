@@ -118,7 +118,7 @@ window.setMgrReportFilter = function (kind, val) {
   var wrap = document.getElementById('mgrReportSlices');
   var wrapDev = document.getElementById('mgrReportDevTables');
   if (wrap) wrap.style.opacity = '0.5';
-  api('/api/managers-report?' + qs.join('&')).then(function (rep) {
+  dashApi('/api/managers-report?' + qs.join('&')).then(function (rep) {
     if (lastRenderData) lastRenderData.mgr_report = rep;
     if (window.Chart && Chart.instances) {
       Object.keys(Chart.instances).forEach(function (k) { var c = Chart.instances[k]; if (c.canvas && wrap && wrap.contains(c.canvas)) c.destroy(); });
@@ -354,7 +354,7 @@ window.setMgrWeekFilter = function(id) {
   if (id && id !== 'all' && !window.mgrWeekFilter.cache[id]) {
     var el = document.getElementById('newWeekTable');
     if (el) el.innerHTML = '<div class="muted" style="padding:12px">Загрузка…</div>';
-    api('/api/manager-weeks?mgr=' + encodeURIComponent(id)).then(function(r){
+    dashApi('/api/manager-weeks?mgr=' + encodeURIComponent(id)).then(function(r){
       window.mgrWeekFilter.cache[id] = { weeks: r.weeks||[], months: r.months||[] };
       renderWeekTableEl();
     }).catch(function(e){ console.error('/api/manager-weeks error:', e); renderWeekTableEl(); });
@@ -379,7 +379,7 @@ function mgrWeekSelectHtml(d) {
 function ensurePosDays() {
   if (window.posDayLoading || window.posDayCache) return;
   window.posDayLoading = true;
-  api('/api/day-series').then(function (r) {
+  dashApi('/api/day-series').then(function (r) {
     window.posDayCache = r.days || [];
     window.posDayLoading = false;
     if (lastRenderData) renderPageMainNew(lastRenderData);
@@ -390,7 +390,7 @@ async function renderPageMainNew(d) {
   var areaNew = document.getElementById('contentAreaNew');
   if (!areaNew) return;
   try {
-    if (!d) d = await api('/api/data');
+    if (!d) d = await dashApi('/api/data');
     if (!d || !d.ytd) { areaNew.innerHTML = '<div class="alert alert-danger">Нет данных</div>'; return; }
 
         function kpi(label, val, sub, cls) {
@@ -490,10 +490,12 @@ async function renderPageMainNew(d) {
     var komMqlPrev = (wkPrev.mql || 0) - oomMqlPrev;
 
     var html = '';
-    // KPI sections
-    html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0, d.pp && d.pp.ytd, d.pp && d.pp.leads_ytd, d.pp && d.pp.qual_lead_ytd);
-    html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev, d.pp && d.pp.oom_ytd, d.pp && d.pp.oom_leads_ytd, d.pp && d.pp.oom_qual_lead_ytd);
-    html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
+    // KPI sections: при выбранном «Типе направления» показываем только нужную
+    // секцию (ООМ/КОМ) — она и есть весь лист; «ИТОГО» — только при «Все».
+    var fDirSec = (window.dashFilters || {}).dir || 'all';
+    if (fDirSec === 'all') html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0, d.pp && d.pp.ytd, d.pp && d.pp.leads_ytd, d.pp && d.pp.qual_lead_ytd);
+    if (fDirSec !== 'kom') html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev, d.pp && d.pp.oom_ytd, d.pp && d.pp.oom_leads_ytd, d.pp && d.pp.oom_qual_lead_ytd);
+    if (fDirSec !== 'oom') html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
     // 👥 Продажи по менеджерам — сравнение за выбранный период (остаётся, не заменяется)
     if (d.mgr_sales) html += renderManagersBlock(d.mgr_sales);
     // Treemap «Вклад менеджеров» + лидеры периода + скидки (на данных managers-sales)
@@ -514,8 +516,11 @@ async function renderPageMainNew(d) {
 
         // MBA — перенесён на ratings-dashboard
 
-    // Регистрация — над недельной таблицей
-    html += '<div class="kpis kpis-8" id="newRegKpis" style="margin-top:16px"></div>';
+    // Регистрация — над недельной таблицей (источник «Регистрация» — маркетинговый,
+    // поэтому при фильтре «внутренняя база» блок скрываем)
+    if ((window.dashFilters || {}).traffic !== 'internal') {
+      html += '<div class="kpis kpis-8" id="newRegKpis" style="margin-top:16px"></div>';
+    }
     html += '<div class="card"><h2>'+(isMonths('table')?'Таблица по месяцам':'Недельная таблица')+mgrWeekSelectHtml(d)+perToggle('table')+'</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
     // ── Вкладка «🧪 В разработке»: перенесённые с «Продаж» блоки (не теряем):

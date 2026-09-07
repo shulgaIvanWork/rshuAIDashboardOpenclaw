@@ -110,8 +110,8 @@ function loadFunnel() {
   var pfUrl = '/api/portfolio-flow?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
   if (mgr && mgr !== 'all') pfUrl += '&mgr=' + encodeURIComponent(mgr);
   Promise.all([
-    api(url),                                        // воронка — критична
-    api(pfUrl).catch(function () { return null; }),  // Sankey — до рестарта API может отсутствовать
+    dashApi(url),                                        // воронка — критична
+    dashApi(pfUrl).catch(function () { return null; }),  // Sankey — до рестарта API может отсутствовать
   ]).then(function (rs) {
     var d = rs[0];
     if (!funnelMgrReady) fillMgrSelect(d.managers || []);

@@ -64,7 +64,7 @@ window.initKpiTab = function () {
   var mgrSel = document.getElementById('kpiMgrSelect');
   var editor = document.getElementById('kpiPlanEditor');
 
-  api('/api/data').then(function (d) {
+  dashApi('/api/data').then(function (d) {
     var year = (d && d.year) || new Date().getFullYear();
     var now = new Date();
     var cur = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
@@ -76,7 +76,7 @@ window.initKpiTab = function () {
     sel.innerHTML = opts.join('');
     sel.onchange = loadKpi;
     // Список менеджеров — из срезов (main персонально + нулевые + группы)
-    api('/api/kpi-slices?month=' + cur).then(function (s) {
+    dashApi('/api/kpi-slices?month=' + cur).then(function (s) {
       var rows = (s.managers && s.managers.rows) || [];
       var zero = (s.managers && s.managers.zero_ids) || [];
       var html = '<option value="all">Весь отдел</option>';
@@ -95,7 +95,7 @@ window.initKpiTab = function () {
   }).catch(function () { sel.innerHTML = '<option>—</option>'; });
 
   // Редактор плана — только админам
-  api('/api/user').then(function (u) {
+  dashApi('/api/user').then(function (u) {
     if (u && u.role === 'admin') { kpiIsAdmin = true; editor.style.display = ''; }
   }).catch(function () {});
 };
@@ -110,7 +110,7 @@ function loadKpi() {
   var mgr = mgrSel ? mgrSel.value : 'all';
   var isPersonal = mgr && mgr !== 'all';
   cards.innerHTML = '<div class="text-center text-secondary py-5" style="grid-column:1/-1"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка…</div></div>';
-  api('/api/kpi-month?month=' + sel.value + '&mgr=' + encodeURIComponent(mgr)).then(function (d) {
+  dashApi('/api/kpi-month?month=' + sel.value + '&mgr=' + encodeURIComponent(mgr)).then(function (d) {
     var calcTxt = d.calculated_at ? ' · данные от ' + d.calculated_at.substring(0, 16).replace('T', ' ') : '';
     info.textContent = 'рабочих дней в месяце: ' + d.workdays.total + ' · осталось: ' + d.workdays.left + calcTxt;
     // Редактор планов: виден только в режиме «Весь отдел» (общий план ООМ/КОМ +
@@ -133,7 +133,7 @@ function loadKpi() {
   // Спиннер на весь экран КПЭ один — он выше, в блоке карточек. Второй здесь
   // показывался одновременно с ним и читался как два лоадера подряд.
   slicesEl.innerHTML = '';
-  api('/api/kpi-slices?month=' + sel.value + '&mgr=' + encodeURIComponent(mgr)).then(function (d) {
+  dashApi('/api/kpi-slices?month=' + sel.value + '&mgr=' + encodeURIComponent(mgr)).then(function (d) {
     renderSlices(d, isPersonal);
   }).catch(function (e) {
     slicesEl.innerHTML = '<div class="alert alert-danger">⚠️ Срезы: ' + escapeHtml(e.message || e) + '</div>';
@@ -144,7 +144,7 @@ function loadKpi() {
 // Заполняет поля ООМ/КОМ и таблицу личных планов действующих менеджеров
 // из /api/plan-editor?month=YYYY-MM.
 function loadPlanEditor(month) {
-  api('/api/plan-editor?month=' + encodeURIComponent(month)).then(function (d) {
+  dashApi('/api/plan-editor?month=' + encodeURIComponent(month)).then(function (d) {
     document.getElementById('kpiPlanMonth').textContent = d.month;
     var oomEl = document.getElementById('kpiPlanOom');
     var komEl = document.getElementById('kpiPlanKom');

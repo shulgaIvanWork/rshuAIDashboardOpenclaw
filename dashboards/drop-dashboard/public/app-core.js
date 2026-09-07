@@ -14,7 +14,14 @@
  */
 
 function loadArtifacts(mgr) {
-  fetch((window.BASE_PATH || '') + '/api/artifacts' + (mgr && mgr !== 'all' ? '?mgr=' + encodeURIComponent(mgr) : '')).then(function(r) {
+  var url = '/api/artifacts';
+  var q = [];
+  if (mgr && mgr !== 'all') q.push('mgr=' + encodeURIComponent(mgr));
+  var f = window.dashFilters || {};
+  if (f.dir && f.dir !== 'all') q.push('dir=' + encodeURIComponent(f.dir));
+  if (f.traffic && f.traffic !== 'all') q.push('traffic=' + encodeURIComponent(f.traffic));
+  if (q.length) url += '?' + q.join('&');
+  fetch((window.BASE_PATH || '') + url).then(function(r) {
     if (r.status === 403) return null;
     return r.json();
   }).then(function(d) {
@@ -56,6 +63,64 @@ let chartInstances = {};
 let dataCache = null;
 let dateFromCache = null;
 let dateToCache = null;
+
+// ── Фильтры всего листа (drop-dashboard): направление ООМ/КОМ + трафик ─────
+// Применяются ко ВСЕМ вкладкам/блокам. Состояние живёт в window.dashFilters
+// и переживает перезагрузку через localStorage.
+window.dashFilters = { dir: 'all', traffic: 'all' };
+try {
+  var savedFilters = JSON.parse(localStorage.getItem('dropDashFilters') || 'null');
+  if (savedFilters && savedFilters.dir && savedFilters.traffic) window.dashFilters = savedFilters;
+} catch (e) { /* ignore */ }
+
+// dashApi — как api(), но добавляет активные фильтры листа к GET /api/*.
+// Планы и права фильтрами не трогаем (/api/user, /api/plans*, /api/plan-editor).
+function dashApi(url) {
+  if (typeof url !== 'string' || url.indexOf('/api/') !== 0) return api(url);
+  if (/^\/api\/(user|plans|plan-editor)/.test(url)) return api(url);
+  var f = window.dashFilters || {};
+  var q = [];
+  if (f.dir && f.dir !== 'all') q.push('dir=' + encodeURIComponent(f.dir));
+  if (f.traffic && f.traffic !== 'all') q.push('traffic=' + encodeURIComponent(f.traffic));
+  if (!q.length) return api(url);
+  return api(url + (url.indexOf('?') >= 0 ? '&' : '?') + q.join('&'));
+}
+
+// Показать/обновить выбранные фильтры в контролах (при старте) и бейдж-подпись
+function updateDashFilterInfo() {
+  var f = window.dashFilters || {};
+  var dirSel = document.getElementById('dashDirFilter');
+  var trSel = document.getElementById('dashTrafficFilter');
+  if (dirSel) dirSel.value = f.dir || 'all';
+  if (trSel) trSel.value = f.traffic || 'all';
+  var info = document.getElementById('dashFilterInfo');
+  if (!info) return;
+  var parts = [];
+  if (f.dir && f.dir !== 'all') parts.push(f.dir === 'oom' ? 'ООМ' : 'КОМ');
+  if (f.traffic && f.traffic !== 'all') parts.push(f.traffic === 'internal' ? 'внутренняя база' : 'маркетинговый');
+  info.textContent = parts.length ? 'фильтр: ' + parts.join(' · ') : '';
+}
+
+// Применение фильтров: обновить состояние и пересчитать активную вкладку
+window.applyDashFilters = function () {
+  var dirSel = document.getElementById('dashDirFilter');
+  var trSel = document.getElementById('dashTrafficFilter');
+  window.dashFilters = {
+    dir: dirSel ? dirSel.value : 'all',
+    traffic: trSel ? trSel.value : 'all',
+  };
+  try { localStorage.setItem('dropDashFilters', JSON.stringify(window.dashFilters)); } catch (e) { /* ignore */ }
+  updateDashFilterInfo();
+  // Сброс локальных кэшей годовых данных (они зависят от фильтра)
+  window.posDayCache = null;
+  window.posDayLoading = false;
+  window.mgrWeekFilter = { id: 'all', cache: {} };
+  var activeBtn = document.querySelector('.kpi-tab.active');
+  var tab = activeBtn ? activeBtn.dataset.tab : 'sales';
+  if (tab === 'kpi') { if (window.loadKpi) loadKpi(); }
+  else if (tab === 'funnel') { if (typeof loadFunnel === 'function') loadFunnel(); }
+  else if (window.reloadDataLayer) reloadDataLayer();
+};
 
 // Календарики на полях периода/сравнения (свой RangeCalendar, /vendor/range-calendar/)
 // #dateFrom/#dateTo/#compareFrom — скрытые поля с ISO-значением (как и раньше читает весь код ниже);

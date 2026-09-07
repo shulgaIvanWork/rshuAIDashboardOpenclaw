@@ -30,6 +30,26 @@
     <h1 class="mb-0">Дашборд отдела продаж РШУ 2026 <span id="updateDate" class="page-title-meta"></span></h1>
     <a href="guide.pdf" download class="btn-guide">📄 Инструкция</a>
   </div>
+  <!-- Фильтры всего листа: применяются ко всем вкладкам и всем блокам -->
+  <div class="date-filter-bar" id="dashFilterBar" style="margin-bottom:8px">
+    <div class="date-filter-group">
+      <div class="date-filter-row">
+        <label>🧭 Тип направления:</label>
+        <select id="dashDirFilter" class="rc-input" style="width:auto" onchange="window.applyDashFilters()">
+          <option value="all">Все</option>
+          <option value="oom">ООМ</option>
+          <option value="kom">КОМ</option>
+        </select>
+        <label style="margin-left:16px">🚦 Тип трафика:</label>
+        <select id="dashTrafficFilter" class="rc-input" style="width:auto" onchange="window.applyDashFilters()">
+          <option value="all">Весь</option>
+          <option value="internal">Внутренняя база</option>
+          <option value="market">Маркетинговый</option>
+        </select>
+        <span id="dashFilterInfo" class="filter-info"></span>
+      </div>
+    </div>
+  </div>
   <div class="kpi-tabs mb-2">
     <button class="kpi-tab active" data-tab="sales" onclick="window.switchDashTab('sales')">📊 Продажи</button>
     <button class="kpi-tab" data-tab="kpi" onclick="window.switchDashTab('kpi')">🎯 КПЭ</button>
