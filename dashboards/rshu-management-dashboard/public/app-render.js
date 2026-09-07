@@ -60,7 +60,7 @@ async function renderPageMainNew(d) {
         + '<div class="kpi '+kc+'"><div class="lbl">Лиды</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmt(curLeadsVal)+'</div>'+(ppYtd?pctDelta(curLeadsVal,ppL):'')+'</div>'+pp(fmt(ppL))+'</div>'
         + '<div class="kpi '+kc+'"><div class="lbl">Конверсия</div><div style="display:flex;justify-content:space-between;align-items:baseline"><div class="val-big">'+fmtPct(curConv)+'%</div>'+(ppYtd?pctDelta(curConv,ppConv):'')+'</div>'+pp(fmtPct(ppConv)+'%')+'</div>'
         + '<div class="kpi '+kc+'">'
-        + '<div class="row"><div class="lbl" style="margin:0">Оплач. в&nbsp;периоде</div>'+(ppYtd?('<span style="white-space:nowrap">'+pctDelta(ytd.paid_created_same_pct,ppYtd.paid_created_same_pct)+'</span>'):'')+'</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:baseline"><div class="lbl" style="margin:0">Оплач. в&nbsp;периоде</div>'+(ppYtd?('<span style="white-space:nowrap">'+pctDelta(ytd.paid_created_same_pct,ppYtd.paid_created_same_pct)+'</span>'):'')+'</div>'
         + '<div style="margin:3px 0 0;font-size:15px;font-weight:700;color:#0F172A">'+fmtPct(ytd.paid_created_same_pct)+'% · '+fmt(ytd.paid_same_period||0)+' · '+fmtCompact(ytd.paid_same_period_sum||0)+' &#8381;</div>'
         + (ppYtd?('<div class="pp-val" style="margin-top:4px;font-size:13px">'+fmtPct(ppYtd.paid_created_same_pct)+'% · '+fmt(ppYtd.paid_same_period||0)+' · '+fmtCompact(ppYtd.paid_same_period_sum||0)+' &#8381;</div>'):'')
         + '</div>'
