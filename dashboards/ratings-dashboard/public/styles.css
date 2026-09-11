@@ -1,1 +1,11 @@
 /* Dashboard-specific: ratings — all common styles in /shared.css */
+
+/* Вкладки дашборда: «Рейтинги» / «Лиды по направлениям» */
+.tabs { display: flex; gap: 6px; margin: 12px 0 4px; border-bottom: 1px solid #E2E5EA; }
+.tab-btn {
+  background: none; border: none; cursor: pointer; padding: 9px 14px;
+  font: inherit; font-size: 14px; color: #475569; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; border-radius: 8px 8px 0 0;
+}
+.tab-btn:hover { background: #F1F4F9; color: #093EB4; }
+.tab-btn.active { color: #093EB4; font-weight: 600; border-bottom-color: #093EB4; }

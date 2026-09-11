@@ -20,7 +20,7 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getAgg, getCacheAt, getRatingsCtx, buildRangeBuckets } from '@rshu/data-service/agg-cache.js';
+import { getAgg, getCacheAt, getRatingsCtx, buildRangeBuckets, buildLeadsByDirection } from '@rshu/data-service/agg-cache.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -84,6 +84,27 @@ app.get('/api/data/range', async (req, res) => {
       { _loadedAt: new Date(getCacheAt()).toISOString() }));
   } catch (e) {
     console.error('/api/data/range error:', e.message);
+    res.status(503).json({ error: e.message });
+  }
+});
+
+// Вкладка «Лиды по направлениям»: сделки, созданные за период (Sale + Pre Sale),
+// никак не КОМ. Сводка по каноническим направлениям + список сделок со стадией,
+// причиной отказа и суммой. См. buildLeadsByDirection (analyze.js).
+app.get('/api/leads-by-direction', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const dFrom = parseYmd(from), dTo = parseYmd(to);
+    if (!dFrom || !dTo) {
+      return res.status(400).json({ error: 'from и to обязательны в формате YYYY-MM-DD' });
+    }
+    if (dFrom > dTo) {
+      return res.status(400).json({ error: 'некорректный диапазон дат: from позже to' });
+    }
+    const out = buildLeadsByDirection(await getRatingsCtx(), dFrom, dTo);
+    res.json(Object.assign(out, { _loadedAt: new Date(getCacheAt()).toISOString() }));
+  } catch (e) {
+    console.error('/api/leads-by-direction error:', e.message);
     res.status(503).json({ error: e.message });
   }
 });

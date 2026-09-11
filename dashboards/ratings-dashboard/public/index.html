@@ -27,6 +27,10 @@
     <span id="filterInfo" class="filter-info"></span>
     <button id="exportExcelBtn" type="button" class="btn-excel">📥 Скачать Excel</button>
   </div>
+  <div id="tabBar" class="tabs">
+    <button type="button" class="tab-btn active" data-tab="ratings">Рейтинги</button>
+    <button type="button" class="tab-btn" data-tab="leads">Лиды по направлениям</button>
+  </div>
   <div id="contentAreaNew">
     <div class="loading-state" id="loadingStateNew"><div class="spinner"></div><div>Загрузка данных…</div></div>
   </div>
@@ -38,6 +42,7 @@
 <script src="app-core.js"></script>
 <script src="app-build-data.js"></script>
 <script src="app-render.js"></script>
+<script src="app-leads.js"></script>
 <script src="app-export.js"></script>
 </body>
 </html>

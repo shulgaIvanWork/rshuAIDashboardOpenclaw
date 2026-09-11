@@ -31,6 +31,7 @@ let dateToCache = null;
 let userRole = 'guest';
 var lastRatingsData = null; // последний отрисованный срез (для Excel-экспорта за выбранный период)
 var rcPeriod = null;        // виджет календаря периода (инициализируется в app-export.js)
+var currentTab = 'ratings'; // активная вкладка: ratings | leads
 
 // --- Date helpers ---
 function getWeekNumber(d) {
@@ -73,7 +74,7 @@ async function loadAll() {
     dateToCache = document.getElementById('dateTo').value;
     if (rcPeriod) rcPeriod.setRange(dateFromDefault, todayStr);
 
-    renderFilteredData();
+    refreshActiveTab();
 
     var dateEl = document.getElementById('updateDate');
     if (dateEl && d._loadedAt) {
@@ -132,3 +133,40 @@ async function renderFilteredData() {
 
   renderPageMainNew(filteredData);
 }
+
+// --- Вкладки ---
+function markActiveTab(tab) {
+  var btns = document.querySelectorAll('#tabBar .tab-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', btns[i].getAttribute('data-tab') === tab);
+  }
+  // Кнопка «Скачать Excel» в верхней панели относится к вкладке «Рейтинги»;
+  // у вкладки «Лиды по направлениям» своя кнопка «Выгрузить».
+  var ex = document.getElementById('exportExcelBtn');
+  if (ex) ex.style.display = (tab === 'ratings') ? '' : 'none';
+}
+
+function switchTab(tab) {
+  currentTab = (tab === 'leads') ? 'leads' : 'ratings';
+  markActiveTab(currentTab);
+  if (currentTab === 'ratings') {
+    renderFilteredData();
+  } else {
+    loadLeadsTab();
+  }
+}
+
+// Перерисовка активной вкладки при смене периода (вызывается календарём и loadAll).
+function refreshActiveTab() {
+  return currentTab === 'ratings' ? renderFilteredData() : loadLeadsTab();
+}
+
+(function bindTabs() {
+  var bar = document.getElementById('tabBar');
+  if (!bar) return;
+  bar.addEventListener('click', function(ev) {
+    var btn = ev.target.closest ? ev.target.closest('.tab-btn') : null;
+    if (btn) switchTab(btn.getAttribute('data-tab'));
+  });
+  markActiveTab(currentTab);
+})();

@@ -42,6 +42,7 @@ const SELECT = [
   'UF_CRM_1753341391806',
   'UF_CRM_DATE_START_LEARN', 'UF_CRM_DATE_END_LEARN',
   'UF_CRM_1477555902',
+  'UF_CRM_1686871344507',   // Причина отказа (список) — для вкладки «Лиды по направлениям»
   'UF_DISCOUNT',
 ];
 

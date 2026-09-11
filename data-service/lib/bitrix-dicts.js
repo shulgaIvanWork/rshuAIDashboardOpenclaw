@@ -143,6 +143,31 @@ async function fetchUserFields() {
   return r.data?.items || {};
 }
 
+// Значения списочных UF-полей (enum ID → текст). Export-справочник getUserFieldsCrm
+// отдаёт только код/название/тип, без вариантов списка, поэтому тянем crm.deal.fields
+// из REST и вытаскиваем items для нужных полей.
+// Зачем: «Причина отказа» (UF_CRM_1686871344507) хранится ID варианта — без этой
+// карты вкладка «Лиды по направлениям» покажет вместо причины цифру.
+const ENUM_FIELD_CODES = ['UF_CRM_1686871344507'];
+
+async function fetchDealFieldEnums() {
+  const map = {};
+  try {
+    const r = await restCall('crm.deal.fields');
+    const fields = r.result || {};
+    for (const code of ENUM_FIELD_CODES) {
+      const f = fields[code];
+      if (!f || !Array.isArray(f.items)) continue;
+      const vals = {};
+      for (const it of f.items) vals[String(it.ID)] = it.VALUE;
+      map[code] = vals;
+    }
+  } catch (e) {
+    process.stderr.write(`  WARN dealFieldEnums: ${e.message}\n`);
+  }
+  return map;
+}
+
 // --- Основная функция ---
 
 export async function fetchDicts(deals) {
@@ -174,5 +199,9 @@ export async function fetchDicts(deals) {
   const userFields = await fetchUserFields();
   process.stdout.write(`    ${Object.keys(userFields).length} полей\n`);
 
-  return { categories, stages, sources, users, formats, directions, userFields };
+  process.stdout.write('  Значения списочных полей (REST)...\n');
+  const dealFieldEnums = await fetchDealFieldEnums();
+  process.stdout.write(`    ${Object.keys(dealFieldEnums).length} полей с вариантами\n`);
+
+  return { categories, stages, sources, users, formats, directions, userFields, dealFieldEnums };
 }

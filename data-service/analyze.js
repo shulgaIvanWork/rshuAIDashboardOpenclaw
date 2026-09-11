@@ -38,6 +38,7 @@ import {
   MQL_SALE_STAGES, NOT_MQL_SALE, EDU_TYPE_MAP,
   isKomDeal, isInternalSource, detectFormat, detectB2b, isFullYearLearn,
 } from './lib/deal-rules.js';
+import { resolveDealDirection } from './lib/direction-map.js';
 
 // ── Даты ─────────────────────────────────────────────────────────────────────
 
@@ -434,6 +435,83 @@ export function buildRangeBuckets(ctx, from, to) {
            by_prod, by_src, by_company, by_mba };
 }
 
+// ── Лиды по направлениям (вкладка «Лиды по направлениям», ratings-dashboard) ──
+// База: сделки, СОЗДАННЫЕ в периоде [from, to], воронки Sale (0) + Pre Sale (8),
+// без КОМ. Направление канонизируется по direction-map.js: приоритет — из товара
+// (UF_CRM_1498466811), иначе — «направление при создании» (UF_CRM_1744273716729).
+// Сделка считается один раз. «blog» и нераспознанные тексты — в артефакты.
+//
+// Возвращает:
+//   summary[]: { id, name, created, added, paid, sum }  — сводка по направлениям
+//   deals[]:   { id, title, dirName, stageId, stageName, reason, sum, created }
+//   artifacts: { excluded[], unresolved[], noDirection, noReasonInRefusals[] }
+//
+// Группы стадий для фильтра (уже посчитаны в сделке как group):
+//   paid   — есть дата оплаты 1С (вкл. частичные)
+//   refuse — «Предзакрытие в отказ» (UC_F2YC3N) + все финальные «в отказ» (SEM=F)
+//   work   — остальные
+const REFUSE_STAGE_IDS = new Set(['UC_F2YC3N']);
+
+export function buildLeadsByDirection(ctx, from, to) {
+  const { rows, dicts } = ctx;
+  const directions = dicts.directions || {};
+  const stages     = dicts.stages || {};
+  const reasonMap  = (dicts.dealFieldEnums || {})['UF_CRM_1686871344507'] || {};
+
+  const inR = (d) => !!d && d >= from && d <= to;
+  const CREATED_CATS = new Set([0, 8]);   // Sale + Pre Sale (КОМ не берём)
+
+  const ACC = {};                          // id → { id, name, created, added, paid, sum }
+  const deals = [];
+  const artifacts = { excluded: [], unresolved: [], noDirection: 0, refusalsWithoutReason: 0 };
+
+  for (const r of rows) {
+    if (!CREATED_CATS.has(r.CAT_ID)) continue;
+    if (r.IS_KOM) continue;
+    if (!inR(r.DC)) continue;
+
+    const dir = resolveDealDirection(r.UF_CRM_1498466811, r.CREATED_DIR, directions);
+
+    if (dir.source === 'excluded') { artifacts.excluded.push({ id: String(r.ID), title: r.TITLE, dir: dir.name }); continue; }
+    if (dir.source === 'unresolved') { artifacts.unresolved.push({ id: String(r.ID), title: r.TITLE, dir: dir.name }); }
+
+    const key = dir.id || ('~' + (dir.name || '—'));
+    const a = ACC[key] || (ACC[key] = { id: dir.id, name: dir.name || 'Без направления', created: 0, added: 0, paid: 0, sum: 0 });
+    a.created++;
+    const paid = isPaid(r);
+    if (dir.source === 'product') a.added++;
+    if (paid) { a.paid++; a.sum += r.OPP; }
+    if (!dir.id && !dir.name) artifacts.noDirection++;
+
+    // Группа стадии: оплата → отказ → в работе.
+    let group = 'work';
+    if (paid) group = 'paid';
+    else if (r.SEM === 'F' || REFUSE_STAGE_IDS.has(String(r.STAGE).replace(/^C\d+:/, ''))) group = 'refuse';
+
+    const reasonId = r.REASON_ID;
+    let reason = '—';
+    if (reasonId) reason = reasonMap[reasonId] || reasonId;
+    else if (group === 'refuse') artifacts.refusalsWithoutReason++;
+
+    deals.push({
+      id: String(r.ID),
+      title: r.TITLE,
+      dirName: dir.name || '—',
+      dirId: dir.id,
+      stageId: r.STAGE,
+      stageName: stages[r.STAGE] || String(r.STAGE).replace(/^C\d+:/, '') || '—',
+      group,
+      reason,
+      sum: r.OPP,
+      created: dateOnly(r.DC) ? dateOnly(r.DC).toISOString().slice(0, 10) : null,
+    });
+  }
+
+  const summary = Object.values(ACC).sort((a, b) => b.sum - a.sum || b.created - a.created);
+  deals.sort((a, b) => (b.created || '').localeCompare(a.created || '') || (+b.sum - +a.sum));
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10), summary, deals, artifacts };
+}
+
 // ── Контекст для рейтингов ───────────────────────────────────
 // Загружает кэш и обогащает сделки. Раньше жило внутри analyze() и было
 // недоступно снаружи, поэтому buildRatings / buildRangeBuckets нельзя было
@@ -498,6 +576,8 @@ export async function loadRatingsContext() {
       MOVED_TIME: x.MOVED_TIME||null,
       PREVIOUS_STAGE_ID: x.PREVIOUS_STAGE_ID||null,
       UF_CRM_1498466811: Array.isArray(dir)?dir:(dir?[dir]:[]),
+      CREATED_DIR: x.UF_CRM_1744273716729 || '',
+      REASON_ID: x.UF_CRM_1686871344507 ? String(x.UF_CRM_1686871344507) : '',
     };
   });
 

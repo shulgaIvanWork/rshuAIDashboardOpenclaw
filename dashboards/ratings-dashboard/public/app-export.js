@@ -72,7 +72,7 @@ async function exportRatingsExcel() {
       onApply: function(startISO, endISO) {
         document.getElementById('dateFrom').value = startISO;
         document.getElementById('dateTo').value = endISO;
-        renderFilteredData();
+        refreshActiveTab();
       }
     });
   }

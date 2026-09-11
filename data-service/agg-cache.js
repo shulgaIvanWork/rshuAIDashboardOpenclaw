@@ -22,8 +22,8 @@
  * TTL: 5 минут. После истечения следующий запрос к getAgg() запустит analyze() заново.
  */
 
-import { analyze, loadRatingsContext, buildRangeBuckets } from './analyze.js';
-export { buildRangeBuckets };
+import { analyze, loadRatingsContext, buildRangeBuckets, buildLeadsByDirection } from './analyze.js';
+export { buildRangeBuckets, buildLeadsByDirection };
 import { getNpsAggFull } from './analyze-nps.js';
 import { YEAR } from '@rshu/data-service/lib/deal-rules.js';
 
