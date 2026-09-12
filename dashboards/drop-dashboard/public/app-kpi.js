@@ -325,14 +325,18 @@ function weeksNote(d) {
     + '</div>';
 }
 
-// Тело карточки календаря: график либо объяснение, почему дней нет. У закрытого
-// месяца оставшихся дней не бывает — раньше в этом случае рисовался пустой холст
-// без единой подписи, и это читалось как поломка дашборда.
+// Есть ли в календаре хоть что-то (факт/просрочка/ожидания) — календарь теперь
+// всегда отдаёт ВЕСЬ месяц, поэтому пустота определяется по суммам, а не по длине.
+function calendarHasData(d) {
+  return (d.calendar || []).some(function (x) { return x.fact.sum > 0 || x.ovd.sum > 0 || x.exp.sum > 0; });
+}
+
+// Тело карточки календаря: график либо объяснение, почему данных нет. У месяца без
+// единой оплаты/ожидания пустой холст читался бы как поломка дашборда.
 function calendarBody(d) {
-  if (!d.calendar.length) {
+  if (!calendarHasData(d)) {
     return '<div class="text-secondary" style="font-size:13px;padding:6px 0">'
-      + 'Месяц закрыт — оставшихся дней нет. Календарь показывает ожидаемые оплаты '
-      + 'от сегодняшнего дня до конца выбранного месяца.</div>';
+      + 'В выбранном месяце нет ни оплат, ни ожидаемых платежей.</div>';
   }
   return '<div style="height:320px;position:relative"><canvas id="kpiChCalendar"></canvas></div>';
 }
@@ -343,7 +347,7 @@ function renderSlices(d, isPersonal) {
   kpiLastSlices = d;
   var hideCoverage = isPersonal && !d.plan_set; // без личного плана покрытие не считаем
   var hideManagers = isPersonal;                // в персональном режиме график менеджеров скрыт
-  if (d.weeks.length === 0 && d.managers.rows.length === 0 && d.calendar.length === 0 && expectDistEmpty(d)) {
+  if (d.weeks.length === 0 && d.managers.rows.length === 0 && !calendarHasData(d) && expectDistEmpty(d)) {
     el.innerHTML = '<div class="text-secondary" style="font-size:13px">Нет данных для срезов</div>';
     return;
   }
@@ -352,7 +356,7 @@ function renderSlices(d, isPersonal) {
     + '<div class="card" style="margin-top:14px"><h2>План-факт по неделям месяца</h2>' + weeksNote(d) + '<div style="height:340px;position:relative"><canvas id="kpiChWeeks"></canvas></div></div>'
     + (hideManagers ? '' : '<div class="card" style="margin-top:14px"><h2>Факт и ожидания по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(основные — персонально; автооплаты/ОЗК/bond/afanasyev — строками; «Артефакт» — уволенные и тех. аккаунты)</span></h2><div style="position:relative"><canvas id="kpiChManagers"></canvas></div><div id="mgrZeroDrill" style="display:none;margin-top:8px;font-size:12px;color:#475569"></div></div>')
     + renderOverdueBlock(d.overdue)
-    + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(оставшиеся дни месяца)</span></h2>' + calendarBody(d) + '</div>'
+    + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(весь месяц · 🟢 пришло · 🔴 ждали, но просрочка · 🟣 ожидаем)</span></h2>' + calendarBody(d) + '</div>'
     + renderExpectDistBlock(d);
 
   // Расшифровку заполняем ПОСЛЕ вставки разметки: раньше fillOverdueDrill вызывался
@@ -362,7 +366,7 @@ function renderSlices(d, isPersonal) {
   kpiChartDestroy('weeks'); kpiChartDestroy('managers'); kpiChartDestroy('calendar'); kpiChartDestroy('expect');
   renderWeeksChart(d);
   if (!hideManagers) renderManagersChart(d);
-  if (d.calendar.length) renderCalendarChart(d);
+  if (calendarHasData(d)) renderCalendarChart(d);
   renderExpectDistChart(d);
 }
 
@@ -559,7 +563,17 @@ function fillOverdueDrill(ovd) {
   el.innerHTML = '<div class="scroll-x"><table class="table table-sm"><thead><tr><th>ID</th><th>Сделка</th><th>Менеджер</th><th>Стадия</th><th>Сумма</th><th>Согласованная дата</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
-// ── 4. Календарь ожидаемых оплат: vertical bar по рабочим дням ──
+// ── 4. Календарь оплат и ожиданий: весь месяц, 3 датасета (пришло/просрочка/ожидаем) ──
+var CAL_COLORS = {
+  fact: '#2E7D32',   // 🟢 пришло — оплаты по дате 1С
+  ovd:  '#C62828',   // 🔴 просрочка — ждали к дате, день прошёл, оплаты нет
+  exp:  '#9C27B0',   // 🟣 ожидаем — будущие согласованные даты
+};
+var CAL_SETS = [
+  { key: 'fact', label: 'Пришло', color: CAL_COLORS.fact },
+  { key: 'ovd', label: 'Просрочка дня', color: CAL_COLORS.ovd },
+  { key: 'exp', label: 'Ожидаем', color: CAL_COLORS.exp },
+];
 function renderCalendarChart(d) {
   var ctx = document.getElementById('kpiChCalendar');
   if (!ctx) return;
@@ -568,37 +582,53 @@ function renderCalendarChart(d) {
     type: 'bar',
     data: {
       labels: days.map(function (x) { return x.label; }),
-      datasets: [{
-        label: 'Ожидания, ₽', data: days.map(function (x) { return x.expected_sum; }),
-        backgroundColor: KPI_COLORS.actual, borderRadius: 3,
-      }]
+      datasets: CAL_SETS.map(function (s) {
+        return {
+          label: s.label,
+          data: days.map(function (x) { return x[s.key].sum; }),
+          backgroundColor: s.color, borderRadius: 3,
+        };
+      })
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return fmt(v); } } } },
       plugins: {
-        legend: { display: false },
+        legend: { position: 'bottom' },
         tooltip: {
           callbacks: {
-            title: function (items) { return 'Дата: ' + days[items[0].dataIndex].date; },
+            title: function (items) {
+              var x = days[items[0].dataIndex];
+              var p = String(x.date).split('-');
+              var wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+              var dt = new Date(x.date + 'T00:00:00Z');
+              return p[2] + '.' + p[1] + '.' + p[0] + ', ' + wd[dt.getUTCDay()];
+            },
             label: function (c) {
-              var x = days[c.dataIndex];
-              return 'Сумма: ' + fmt(x.expected_sum) + ' ₽ · сделок: ' + x.expected_cnt;
+              var s = CAL_SETS[c.datasetIndex];
+              var v = days[c.dataIndex][s.key];
+              if (!v.cnt) return s.label + ': —';
+              return s.label + ': ' + fmt(v.sum) + ' ₽ · сделок: ' + v.cnt;
             },
             afterBody: function (items) {
-              var x = days[items[0].dataIndex];
               var out = [];
-              if (x.managers && x.managers.length) out.push('Менеджеры:', x.managers.map(function (m) { return '  ' + m.name + ' — ' + fmt(m.sum) + ' ₽'; }).join('\n'));
-              if (x.stages && x.stages.length) out.push('Стадии:', x.stages.map(function (s) { return '  ' + s.name + ' — ' + fmt(s.sum) + ' ₽'; }).join('\n'));
+              items.forEach(function (it) {
+                var s = CAL_SETS[it.datasetIndex];
+                var v = days[it.dataIndex][s.key];
+                if (!v.cnt || !v.managers.length) return;
+                out.push(s.label + ' — менеджеры:', v.managers.map(function (m) { return '  ' + m.name + ' — ' + fmt(m.sum) + ' ₽'; }).join('\n'));
+                out.push('Стадии:', v.stages.map(function (g) { return '  ' + g.name + ' — ' + fmt(g.sum) + ' ₽'; }).join('\n'));
+              });
               return out.join('\n');
             }
           }
         },
         datalabels: {
-          display: function (c) { return days[c.dataIndex].expected_cnt > 0; },
+          display: function (c) { return days[c.dataIndex][CAL_SETS[c.datasetIndex].key].cnt > 0; },
           anchor: 'end', align: 'end',
-          formatter: function (v, c) { return days[c.dataIndex].expected_cnt; },
-          color: '#475569', font: { weight: 600, size: 10 }
+          formatter: function (v, c) { return days[c.dataIndex][CAL_SETS[c.datasetIndex].key].cnt; },
+          color: function (c) { return CAL_SETS[c.datasetIndex].color; },
+          font: { weight: 600, size: 9 }
         }
       }
     }

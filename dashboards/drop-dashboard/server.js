@@ -670,49 +670,71 @@ function buildManagers(dealsRaw, dicts, range, today) {
   return { rows, total, zero_names: zero.map(z => z.name), zero_ids: zero };
 }
 
-// Календарь ожидаемых оплат: оставшиеся рабочие дни месяца (от today), только актуальные.
+// Календарь оплат и ожиданий: ВЕСЬ выбранный месяц (1-е…последнее число).
+// В каждом дне — три независимые величины:
+//   fact (🟢 пришло)    — оплаты, фактически поступившие в этот день (UF_DATE_PAY_1C);
+//   ovd  (🔴 просрочка) — ждали оплату к этому дню (согласованная дата), день уже
+//                         прошёл (< today), а оплаты так и нет — сделка всё ещё
+//                         открыта на стадии ожидания;
+//   exp  (🟣 ожидаем)   — будущие ожидания (согласованная дата = этот день, >= today).
+// Сделка, оплаченная позже согласованной даты, попадает только в fact (на день
+// оплаты): просрочка — это ожидания, не закрытые до сих пор.
+// «Переходящие» просрочки из прошлых месяцев (согл. дата < from) сюда не попадают —
+// у них нет дня в выбранном месяце, они остаются в блоке «⏰ Просроченные ожидания».
+// Работает и для закрытых месяцев: тогда весь месяц зелёный/красный, без фиолетового.
 function buildCalendar(dealsRaw, dicts, range, today) {
   const users = dicts.users || {};
   const stages = dicts.stages || {};
   const stageName = x => stages[String(x.STAGE_ID)] || stages[String(x.STAGE_ID).replace(/^C\d+:/, '')] || String(x.STAGE_ID);
+  const mk = () => ({ sum: 0, cnt: 0, managers: {}, stages: {} });
   const byDay = {};
-  for (const x of dealsRaw) {
-    const st = String(x.STAGE_ID || '').replace(/^C\d+:/, '');
-    if (!EXP_STAGES.has(st)) continue;
-    if (x.STAGE_SEMANTIC_ID === 'F' || x.STAGE_SEMANTIC_ID === 'S') continue;
-    if (x.UF_DATE_PAY_1C) continue;
-    const opp = parseFloat(x.OPPORTUNITY || 0);
-    if (opp < MIN_OPP) continue;
-    const ad = parseDt(x[UF.AGREED_PAY_DATE]);
-    if (!ad || ad < today || ad < range.from || ad > range.to) continue;
-    const key = ad.toISOString().substring(0, 10);
-    const b = byDay[key] || (byDay[key] = { sum: 0, cnt: 0, managers: {}, stages: {} });
+  const rec = key => byDay[key] || (byDay[key] = { fact: mk(), ovd: mk(), exp: mk() });
+  const add = (b, x, opp) => {
     b.sum += opp; b.cnt++;
     const mn = users[x.ASSIGNED_BY_ID] || x.ASSIGNED_BY_ID || '—';
     b.managers[mn] = (b.managers[mn] || 0) + opp;
     const sn = stageName(x);
     b.stages[sn] = (b.stages[sn] || 0) + opp;
+  };
+  for (const x of dealsRaw) {
+    const opp = parseFloat(x.OPPORTUNITY || 0);
+    if (opp < MIN_OPP) continue;
+    // Факт: оплаченные (дата 1С) — в день фактической оплаты, любые категории,
+    // как в поступлениях (calcPeriodKpi: isPaid не смотрит на стадию/категорию).
+    const pd = parseDt(x.UF_DATE_PAY_1C);
+    if (pd && pd >= range.from && pd <= range.to) {
+      add(rec(pd.toISOString().substring(0, 10)).fact, x, opp);
+      continue; // оплаченная сделка ожиданием быть не может
+    }
+    if (x.UF_DATE_PAY_1C) continue; // оплачена вне месяца — как в calcExpectParts, из ожиданий исключается
+    // Ожидания: стадии PROPOSAL/6/2, не F/S, без оплаты, согл. дата в месяце.
+    const st = String(x.STAGE_ID || '').replace(/^C\d+:/, '');
+    if (!EXP_STAGES.has(st)) continue;
+    if (x.STAGE_SEMANTIC_ID === 'F' || x.STAGE_SEMANTIC_ID === 'S') continue;
+    const ad = parseDt(x[UF.AGREED_PAY_DATE]);
+    if (!ad || ad < range.from || ad > range.to) continue;
+    const b = rec(ad.toISOString().substring(0, 10));
+    if (ad < today) add(b.ovd, x, opp); // день прошёл — просрочка
+    else add(b.exp, x, opp);            // сегодня и позже — ждём
   }
+  const toObj = b => ({
+    sum: Math.round(b.sum), cnt: b.cnt,
+    managers: Object.entries(b.managers).map(([n, s]) => ({ name: n, sum: Math.round(s) })).sort((a, z) => z.sum - a.sum),
+    stages: Object.entries(b.stages).map(([n, s]) => ({ name: n, sum: Math.round(s) })).sort((a, z) => z.sum - a.sum),
+  });
+  const empty = () => ({ sum: 0, cnt: 0, managers: [], stages: [] });
   const days = [];
-  const start = today > range.from ? today : range.from;
   const DOW_SHORT = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-  for (let d = new Date(start); d <= range.to; d.setUTCDate(d.getUTCDate() + 1)) {
+  for (let d = new Date(range.from); d <= range.to; d.setUTCDate(d.getUTCDate() + 1)) {
     const dow = d.getUTCDay();
     const key = d.toISOString().substring(0, 10);
     const b = byDay[key];
     const weekend = dow === 0 || dow === 6;
-    // Суббота и воскресенье попадают в календарь только когда на них есть
-    // ожидания: раньше они отбрасывались всегда, и эти суммы пропадали из
-    // графика, оставаясь в карточке «Ожидания» (инвариант
-    // sum(calendar) + overdue = expected не выполнялся). Пустые выходные
-    // не показываем, чтобы не раздувать график нулевыми столбцами.
-    if (weekend && !b) continue;
     days.push({
       date: key, label: fmtDate(d) + (weekend ? ' ' + DOW_SHORT[dow] : ''), weekend,
-      expected_sum: b ? Math.round(b.sum) : 0,
-      expected_cnt: b ? b.cnt : 0,
-      managers: b ? Object.entries(b.managers).map(([n, s]) => ({ name: n, sum: Math.round(s) })) : [],
-      stages: b ? Object.entries(b.stages).map(([n, s]) => ({ name: n, sum: Math.round(s) })) : [],
+      fact: b ? toObj(b.fact) : empty(),
+      ovd: b ? toObj(b.ovd) : empty(),
+      exp: b ? toObj(b.exp) : empty(),
     });
   }
   return days;
@@ -745,9 +767,12 @@ function buildOverdueList(dealsRaw, dicts, today) {
 }
 
 // Все данные для 4 срезов вкладки КПЭ за выбранный месяц.
-// Контрольные равенства:
-//   sum(weeks.expected_sum) + overdue = expected; sum(calendar.expected_sum) + overdue = expected;
-//   sum(managers.expected_sum) = expected; forecast = fact + expected.
+// Контрольные равенства (для открытого месяца):
+//   sum(weeks.expected_sum) + overdue = expected; sum(managers.expected_sum) = expected;
+//   forecast = fact + expected; sum(calendar[].fact) = fact;
+//   sum(calendar[].exp) = expected_actual (согл. дата в месяце и >= today);
+//   calendar[].ovd — только просрочки с согл. датой ВНУТРИ месяца (переходящие
+//   из прошлых месяцев в календарь не попадают, они в overdue.deals и карточках).
 app.get('/api/kpi-slices', async (req, res) => {
   try {
     const { month, mgr } = req.query;
