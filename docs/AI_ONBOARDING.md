@@ -94,7 +94,7 @@ dashboards/<name>/  каждый дашборд = отдельное Express sub
 ```
 
 ## Обновление данных (на проде)
-- Crontab: `30 6 * * * npm --prefix /root/.openclaw/workspace/projects/rshu-dashboards/data-service run fetch` (ежедневно 06:30 UTC)
+- Crontab: `30 6 * * * npm --prefix /root/projects/rshu-dashboards/data-service run fetch` (ежедневно 06:30 UTC)
 - Ручной запуск: `cd data-service && npm run fetch` (~20–40 мин)
 - Кэш агрегатов in-memory TTL 5 мин (`agg-cache.js`), при ошибке отдаёт старый кэш
 - Дашборды читают `cache/deals.json` напрямую там, где нужны свежие/сырые данные

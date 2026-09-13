@@ -16,6 +16,7 @@ import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import xlsx from 'xlsx'; // чтение эталонной Excel-выгрузки (inbound/*.xlsx)
 import { getCacheAt } from '@rshu/data-service/agg-cache.js';
 // Единые бизнес-правила: отчётный год и КОМ-признак
 import { isKomDeal, YEAR } from '@rshu/data-service/lib/deal-rules.js';
@@ -1390,9 +1391,13 @@ app.get('/api/forecast', (req, res) => {
 // ===== API: Рейтинг продуктов (из Excel-файла Ольги — эталон) =====
 app.get('/api/product-ranking', async (req, res) => {
   try {
-    const xlsxPath = '/root/.openclaw/media/inbound/выгрузка_май_20266_оплаты_для_ИИ---f37f06ca-a14d-45cb-a070-afc94a1770df.xlsx';
+    // Файл выгрузки лежит внутри проекта (inbound/), путь относительный — не зависит от расположения проекта
+    const xlsxPath = path.join(__dirname, '..', '..', 'inbound', 'выгрузка_май_20266_оплаты_для_ИИ---f37f06ca-a14d-45cb-a070-afc94a1770df.xlsx');
     
-    // Dynamic import of xlsx
+    if (!(await fs.stat(xlsxPath).catch(() => null))) {
+      return res.json({ error: 'Файл выгрузки не найден: ' + xlsxPath });
+    }
+
     const wb = xlsx.readFile(xlsxPath);
     const ws = wb.Sheets[wb.SheetNames[0]];
     const data = xlsx.utils.sheet_to_json(ws, { header: 1 });

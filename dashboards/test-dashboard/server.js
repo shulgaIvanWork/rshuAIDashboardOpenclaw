@@ -203,14 +203,23 @@ app.get('/api/roistat-calls', async (req, res) => {
 // ============== API: Product Ranking ==============
 app.get('/api/product-ranking', (req, res) => {
   try {
-    const xlsDir = '/root/.openclaw/media/inbound/';
+    // Папка выгрузок внутри проекта (inbound/), путь относительный
+    const xlsDir = path.join(__dirname, '..', '..', 'inbound');
     let xlsPath = null;
     if (fs.existsSync(xlsDir)) {
-      const files = fs.readdirSync(xlsDir).filter(f => f.startsWith('выгрузка_') && (f.endsWith('.xls') || f.endsWith('.xlsx')));
-      if (files.length > 0) xlsPath = path.join(xlsDir, files.sort().reverse()[0]);
+      // Парсер ниже рассчитан на HTML-выгрузку (.xls из Bitrix24), а не на бинарный .xlsx.
+      // Берём самый свежий по mtime файл с HTML-таблицей.
+      const candidates = fs.readdirSync(xlsDir)
+        .filter(f => f.startsWith('выгрузка_') && /\.xlsx?$/i.test(f))
+        .filter(f => {
+          try { return fs.readFileSync(path.join(xlsDir, f), 'utf-8').slice(0, 500).includes('<table'); }
+          catch (e) { return false; }
+        })
+        .sort((a, b) => fs.statSync(path.join(xlsDir, b)).mtimeMs - fs.statSync(path.join(xlsDir, a)).mtimeMs);
+      if (candidates.length > 0) xlsPath = path.join(xlsDir, candidates[0]);
     }
     if (!xlsPath || !fs.existsSync(xlsPath)) {
-      return res.json({ error: 'Файл выгрузки не найден. Подложите выгрузку из Bitrix24 в /root/.openclaw/media/inbound/' });
+      return res.json({ error: 'Файл HTML-выгрузки не найден. Подложите выгрузку из Bitrix24 (.xls с таблицей) в ' + xlsDir });
     }
     const html = fs.readFileSync(xlsPath, 'utf-8');
     const rows = html.match(/<tr>(.*?)<\/tr>/gs) || [];
