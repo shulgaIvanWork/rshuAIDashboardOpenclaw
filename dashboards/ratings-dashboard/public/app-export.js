@@ -15,16 +15,16 @@ async function exportRatingsExcel() {
   var prods = (d.top_products || []).filter(function(p){ return p.name; });
   var prodSheet = {
     name: 'Продукты',
-    header: ['#','Продукт','Лиды','Сделки','Поступления, ₽','Ср.чек, ₽','Цикл, дн','Доля, %','Очно, шт','Онлайн, шт','Дистанц., шт'],
-    rows: prods.map(function(p,i){ return [i+1, p.name, p.mql||0, p.cnt||p.deals||0, p.sum||0, p.avg_check||0, r1(p.avg_won_days), r1(p.share), p.fmt_ochn_cnt||0, p.fmt_om_cnt||0, p.fmt_sdo_cnt||0]; })
+    header: ['#','Продукт','Лиды','Сумма лидов, ₽','Сделки','Поступления, ₽','Ср.чек, ₽','Цикл, дн','Доля, %','Очно, шт','Онлайн, шт','Дистанц., шт'],
+    rows: prods.map(function(p,i){ return [i+1, p.name, p.mql||0, p.mql_sum||0, p.cnt||p.deals||0, p.sum||0, p.avg_check||0, r1(p.avg_won_days), r1(p.share), p.fmt_ochn_cnt||0, p.fmt_om_cnt||0, p.fmt_sdo_cnt||0]; })
   };
 
   var pct = function(a,b){ return b ? r1(a/b*100) : 0; };
   var src = (d.src_funnel || []).filter(function(s){ return s.name; });
   var srcSheet = {
     name: 'Источники',
-    header: ['Источник','Лиды','MQL','SQL','Счёт','Сделки','Поступления, ₽','Ср.чек, ₽','Цикл, дн','Лиды→MQL, %','MQL→SQL, %','SQL→Счёт, %','Счёт→Сделка, %','Лид→Сделка, %','Тип трафика'],
-    rows: src.map(function(s){ return [s.name, s.leads||0, s.mql||0, s.sql||0, s.invoice_cnt||0, s.deals||0, s.postupleniya||0, s.avg_check||0, r1(s.avg_dur), pct(s.mql,s.leads), pct(s.sql,s.mql), pct(s.invoice_cnt,s.sql), pct(s.deals,s.invoice_cnt), pct(s.deals,s.leads), s.type==='internal'?'ВНБ':(s.type==='marketing'?'МТ':'')]; })
+    header: ['Источник','Лиды','Сумма лидов, ₽','MQL','SQL','Счёт','Сделки','Поступления, ₽','Ср.чек, ₽','Цикл, дн','Лиды→MQL, %','MQL→SQL, %','SQL→Счёт, %','Счёт→Сделка, %','Лид→Сделка, %','Тип трафика'],
+    rows: src.map(function(s){ return [s.name, s.leads||0, s.mql_sum||0, s.mql||0, s.sql||0, s.invoice_cnt||0, s.deals||0, s.postupleniya||0, s.avg_check||0, r1(s.avg_dur), pct(s.mql,s.leads), pct(s.sql,s.mql), pct(s.invoice_cnt,s.sql), pct(s.deals,s.invoice_cnt), pct(s.deals,s.leads), s.type==='internal'?'ВНБ':(s.type==='marketing'?'МТ':'')]; })
   };
 
   var comps = (d.top_companies || []).filter(function(c){ return c.name; });
@@ -39,8 +39,8 @@ async function exportRatingsExcel() {
   var mbaAll = mba.reduce(function(s,m){ return s + (m.sum||0); }, 0) || 1;
   var mbaSheet = {
     name: 'Семейство МВА',
-    header: ['Тип','Лиды','Сделки','Поступления, ₽','Ср.чек, ₽','Цикл, дн','Доля, %','Очно, шт','Онлайн, шт','Дистанц., шт'],
-    rows: mba.map(function(m){ return [m.type, m.mql||0, m.cnt||m.deals||0, m.sum||0, m.avg_check||0, r1(m.avg_won_days), r1((m.sum||0)/mbaAll*100), m.fmt_ochn_cnt||0, m.fmt_om_cnt||0, m.fmt_sdo_cnt||0]; })
+    header: ['Тип','Лиды','Сумма лидов, ₽','Сделки','Поступления, ₽','Ср.чек, ₽','Цикл, дн','Доля, %','Очно, шт','Онлайн, шт','Дистанц., шт'],
+    rows: mba.map(function(m){ return [m.type, m.mql||0, m.mql_sum||0, m.cnt||m.deals||0, m.sum||0, m.avg_check||0, r1(m.avg_won_days), r1((m.sum||0)/mbaAll*100), m.fmt_ochn_cnt||0, m.fmt_om_cnt||0, m.fmt_sdo_cnt||0]; })
   };
 
   var sheets = [prodSheet, srcSheet, compSheet, mbaSheet].filter(function(s){ return s.rows.length; });

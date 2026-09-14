@@ -375,9 +375,9 @@ export function buildRangeBuckets(ctx, from, to) {
   const fmt = { fmt_oom:0, fmt_om:0, fmt_sdo:0, fmt_kom:0,
                 fmt_oom_cnt:0, fmt_om_cnt:0, fmt_sdo_cnt:0, fmt_kom_cnt:0 };
   const FMT_KEY = { 'Очный':'fmt_oom', 'Онлайн':'fmt_om', 'Видеокурс':'fmt_sdo', 'Корпоративное обучение':'fmt_kom' };
-  const newProd = (r) => ({ deals:0, sum:0, mql:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[], dir:r.DIR });
-  const newSrc  = ()  => ({ deals:0, sum:0, durs:[], mql:0, sql:0, invoice_cnt:0, leads:0 });
-  const newMba  = ()  => ({ cnt:0, sum:0, mql:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[] });
+  const newProd = (r) => ({ deals:0, sum:0, mql:0, mql_sum:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[], dir:r.DIR });
+  const newSrc  = ()  => ({ deals:0, sum:0, durs:[], mql:0, sql:0, invoice_cnt:0, leads:0, mql_sum:0 });
+  const newMba  = ()  => ({ cnt:0, sum:0, mql:0, mql_sum:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[] });
   const okProd = (r) => !r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'');
   const okSrc  = (r) => !r.IS_KOM && !r.IS_FULLYEAR;
   const getProd = (r) => { const pk=r.PRODUCT.slice(0,90); const p=by_prod[pk]||(by_prod[pk]=newProd(r)); if(!p.dir||p.dir==='—') p.dir=r.DIR; return p; };
@@ -413,12 +413,12 @@ export function buildRangeBuckets(ctx, from, to) {
       if (mt) { const m=by_mba[mt]||(by_mba[mt]=newMba()); m.cnt++; m.sum+=r.OPP; addFmt(m,r); addDur(m,r); }
     }
 
-    // MQL — по ДАТЕ СОЗДАНИЯ
+    // MQL — по ДАТЕ СОЗДАНИЯ (mql_sum — «потенциал»: сумма OPPORTUNITY этих же сделок)
     if (createdIn(r) && isQualLeadW(r)) {
-      if (okSrc(r))  getSrc(r).mql++;
-      if (okProd(r)) getProd(r).mql++;
+      if (okSrc(r))  { getSrc(r).mql++; getSrc(r).mql_sum += r.OPP; }
+      if (okProd(r)) { getProd(r).mql++; getProd(r).mql_sum += r.OPP; }
       const mt=mbaOf(r);
-      if (mt) (by_mba[mt]||(by_mba[mt]=newMba())).mql++;
+      if (mt) { const m=by_mba[mt]||(by_mba[mt]=newMba()); m.mql++; m.mql_sum += r.OPP; }
     }
 
     // SQL — по ДАТЕ СОЗДАНИЯ
@@ -882,7 +882,7 @@ export async function analyze(onProgress, opts) {
       if (inv && inv.getFullYear()===YEAR) {
         const [,wk]=isoCalendar(inv);
         if (wk in weekly) { const wd=weekly[wk]; wd.invoice_cnt++;
-          if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].invoice_cnt++; } }
+          if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0,mql_sum:0}; wd.by_src[sn].invoice_cnt++; } }
       }
     }
 
@@ -916,7 +916,7 @@ export async function analyze(onProgress, opts) {
           // by_prod: только ООМ, без конструктора (ILP) — таблица продуктов пересчитывается из by_prod
           if (!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')) {
             const pk=r.PRODUCT.slice(0,90);
-            if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR};
+            if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR};
             if (!wd.by_prod[pk].dir || wd.by_prod[pk].dir==='—') wd.by_prod[pk].dir=r.DIR;  // направление курса (для фильтра в рейтингах)
             wd.by_prod[pk].deals++; wd.by_prod[pk].sum+=r.OPP;
             if (r.FORMAT==='Очный') { wd.by_prod[pk].fmt_ochn_cnt++; wd.by_prod[pk].fmt_ochn_sum+=r.OPP; }
@@ -928,11 +928,11 @@ export async function analyze(onProgress, opts) {
           // by_src: сделки/поступления — по дате оплаты (реальные деньги).
           // MQL/SQL — по дате создания, счёт — по дате счёта (см. секции ниже),
           // чтобы воронка источников была как в управленческом (без >100%).
-          if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
+          if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0,mql_sum:0}; wd.by_src[sn].deals++; wd.by_src[sn].sum+=r.OPP; if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_src[sn].durs.push(d);} }
           // by_company
           { const cid=r.COMPANY_ID; if(cid&&cid!=='0' && !r.IS_FULLYEAR){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; if(!r.IS_KOM){wd.by_company[cid].om_cnt++;wd.by_company[cid].om_sum+=r.OPP;} else {wd.by_company[cid].kom_cnt++;wd.by_company[cid].kom_sum+=r.OPP;} const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
           // by_mba
-          { const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else if(r.FORMAT==='Онлайн'){wd.by_mba[mt].fmt_om_cnt++;wd.by_mba[mt].fmt_om_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_mba[mt].durs.push(d);}}}}
+          { const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else if(r.FORMAT==='Онлайн'){wd.by_mba[mt].fmt_om_cnt++;wd.by_mba[mt].fmt_om_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_mba[mt].durs.push(d);}}}}
         }
       }
     }
@@ -942,10 +942,10 @@ export async function analyze(onProgress, opts) {
       const [,wk]=isoCalendar(r.DC);
       if (wk in weekly) { const wd=weekly[wk]; wd.mql++; if(r.IS_OOM) wd.oom_mql++;
         if(r.BLOCK==='sdo') wd.sdo_mql++; else if(r.BLOCK==='kom') wd.kom_mql++; else wd.open_mql++;
-        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].mql++; }
+        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0,mql_sum:0}; wd.by_src[sn].mql++; wd.by_src[sn].mql_sum+=r.OPP; }
         // «Лиды» продукта/МВА = MQL (к продукту лид привязывается только с MQL). По дате создания.
-        if(!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')){ const pk=r.PRODUCT.slice(0,90); if(!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR}; if(!wd.by_prod[pk].dir||wd.by_prod[pk].dir==='—')wd.by_prod[pk].dir=r.DIR; wd.by_prod[pk].mql++; }
-        { const isMbaQ=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMbaQ){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].mql++;}} }
+        if(!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')){ const pk=r.PRODUCT.slice(0,90); if(!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR}; if(!wd.by_prod[pk].dir||wd.by_prod[pk].dir==='—')wd.by_prod[pk].dir=r.DIR; wd.by_prod[pk].mql++; wd.by_prod[pk].mql_sum+=r.OPP; }
+        { const isMbaQ=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMbaQ){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].mql++;wd.by_mba[mt].mql_sum+=r.OPP;}} }
       }
     }
 
@@ -953,7 +953,7 @@ export async function analyze(onProgress, opts) {
     if (isSqlByCreate(r) && r.DC && r.DC.getFullYear()===YEAR) {
       const [,wk]=isoCalendar(r.DC);
       if (wk in weekly) { const wd=weekly[wk]; wd.sql++;
-        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; wd.by_src[sn].sql++; } }
+        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0,mql_sum:0}; wd.by_src[sn].sql++; } }
     }
 
     // Pre Sale duration
@@ -969,7 +969,7 @@ export async function analyze(onProgress, opts) {
       const [,wk]=isoCalendar(r.DC);
       if (wk in weekly) { weekly[wk].leads++; if(r.IS_OOM) weekly[wk].oom_leads++;
         if(r.BLOCK==='sdo') weekly[wk].sdo_leads++; else if(r.BLOCK==='kom') weekly[wk].kom_leads++; else weekly[wk].open_leads++;
-        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!weekly[wk].by_src[sn]) weekly[wk].by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0}; weekly[wk].by_src[sn].leads++; } }
+        if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!weekly[wk].by_src[sn]) weekly[wk].by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0,mql_sum:0}; weekly[wk].by_src[sn].leads++; } }
     }
   }
 

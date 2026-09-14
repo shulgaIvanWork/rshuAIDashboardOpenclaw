@@ -34,7 +34,7 @@ async function renderPageMainNew(d) {
     function isRest(p){ return (p.name||'').includes('Остальные'); }
     // Единая «синяя полоска» для таблиц Продукты и Семейство МВА (nameLabel — «Продукт»/«Тип»)
     function prodHeadRow(nameLabel){
-      return '<tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">'+nameLabel+'</th><th class="sort" data-col="2">Лиды</th><th class="sort" data-col="3">Сделки</th><th class="sort" data-col="4">Поступления, ₽</th><th class="sort" data-col="5">Ср.чек, ₽</th><th class="sort" data-col="6">Цикл сделки, дн.</th><th class="sort" data-col="7">Доля</th><th class="sort" data-col="8">Очно</th><th class="sort" data-col="9">Онлайн</th><th class="sort" data-col="10">Дистанционно</th></tr>';
+      return '<tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">'+nameLabel+'</th><th class="sort" data-col="2">Лиды</th><th class="sort" data-col="3">Сумма лидов, ₽</th><th class="sort" data-col="4">Сделки</th><th class="sort" data-col="5">Поступления, ₽</th><th class="sort" data-col="6">Ср.чек, ₽</th><th class="sort" data-col="7">Цикл сделки, дн.</th><th class="sort" data-col="8">Доля</th><th class="sort" data-col="9">Очно</th><th class="sort" data-col="10">Онлайн</th><th class="sort" data-col="11">Дистанционно</th></tr>';
     }
     function totalsOf(list) {
       var deals = list.reduce(function(s,p){return s+(p.deals||p.cnt||0);},0);
@@ -43,6 +43,7 @@ async function renderPageMainNew(d) {
       return {
         deals: deals,
         mql:   list.reduce(function(s,p){return s+(p.mql||0);},0),
+        mqlSum:list.reduce(function(s,p){return s+(p.mql_sum||0);},0),
         sum:   totalSum,
         avgCycle: deals > 0 ? cycleNum / deals : 0,
         ochn:  list.reduce(function(s,p){return s+(p.fmt_ochn_cnt||0);},0),
@@ -55,10 +56,10 @@ async function renderPageMainNew(d) {
       };
     }
     function totalRow(label, t, shareTxt) {
-      return '<tr class="total-row" style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+(t.mql||0)+'</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>'+(t.avgCycle||0).toFixed(1)+'</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
+      return '<tr class="total-row" style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+(t.mql||0)+'</b></td><td><b>'+fmt(t.mqlSum||0)+' ₽</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>'+(t.avgCycle||0).toFixed(1)+'</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
     }
     function prodDataRow(p, num, isRem){
-      return '<tr'+(isRem?' class="total-row" style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':num)+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td>'+(p.mql||0)+'</td><td><b>'+(p.cnt||p.deals||0)+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
+      return '<tr'+(isRem?' class="total-row" style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':num)+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td>'+(p.mql||0)+'</td><td><b>'+fmt(p.mql_sum||0)+' ₽</b></td><td><b>'+(p.cnt||p.deals||0)+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
     }
     // Топ-20 + «Остальные» из полного списка с фильтром по направлению; доли — внутри выборки
     function prodSliceForDir(dir) {
@@ -73,7 +74,8 @@ async function renderPageMainNew(d) {
         var rs = rest.reduce(function(s,p){return s+(p.sum||0);},0), rd = rest.reduce(function(s,p){return s+(p.deals||0);},0);
         var rcn = rest.reduce(function(s,p){return s+((p.avg_won_days||0)*(p.deals||0));},0);
         var rmql = rest.reduce(function(s,p){return s+(p.mql||0);},0);
-        top20.push({ name:'📦 Остальные ('+rest.length+' продуктов)', deals:rd, mql:rmql, sum:rs, avg_check:rd?Math.round(rs/rd):0, avg_won_days:rd?rcn/rd:0, share:Math.round(rs/totalSum*100*10)/10,
+        var rmqlSum = rest.reduce(function(s,p){return s+(p.mql_sum||0);},0);
+        top20.push({ name:'📦 Остальные ('+rest.length+' продуктов)', deals:rd, mql:rmql, mql_sum:rmqlSum, sum:rs, avg_check:rd?Math.round(rs/rd):0, avg_won_days:rd?rcn/rd:0, share:Math.round(rs/totalSum*100*10)/10,
           fmt_ochn_cnt:rest.reduce(function(s,p){return s+(p.fmt_ochn_cnt||0);},0), fmt_ochn_sum:rest.reduce(function(s,p){return s+(p.fmt_ochn_sum||0);},0),
           fmt_om_cnt:rest.reduce(function(s,p){return s+(p.fmt_om_cnt||0);},0), fmt_om_sum:rest.reduce(function(s,p){return s+(p.fmt_om_sum||0);},0),
           fmt_sdo_cnt:rest.reduce(function(s,p){return s+(p.fmt_sdo_cnt||0);},0), fmt_sdo_sum:rest.reduce(function(s,p){return s+(p.fmt_sdo_sum||0);},0) });
@@ -118,19 +120,20 @@ async function renderPageMainNew(d) {
     var sfStr = '<table class="table table-sm sortable" style="font-size:11px"><thead><tr>' +
       '<th class="sort" data-col="0">Источник</th>' +
       '<th class="sort" data-col="1">Лиды</th>' +
-      '<th class="sort" data-col="2">MQL</th>' +
-      '<th class="sort" data-col="3">SQL</th>' +
-      '<th class="sort" data-col="4">Счёт</th>' +
-      '<th class="sort" data-col="5">Сделки</th>' +
-      '<th class="sort" data-col="6">Поступл.</th>' +
-      '<th class="sort" data-col="7">Ср.чек</th>' +
-      '<th class="sort" data-col="8">Цикл</th>' +
-      '<th class="sort" data-col="9">Лиды→MQL</th>' +
-      '<th class="sort" data-col="10">MQL→SQL</th>' +
-      '<th class="sort" data-col="11">SQL→Счёт</th>' +
-      '<th class="sort" data-col="12">Счёт→Сделка</th>' +
-      '<th class="sort" data-col="13">Лид→Сделка</th>' +
-      '<th class="sort" data-col="14">Тип трафика</th>' +
+      '<th class="sort" data-col="2">Сумма лидов, ₽</th>' +
+      '<th class="sort" data-col="3">MQL</th>' +
+      '<th class="sort" data-col="4">SQL</th>' +
+      '<th class="sort" data-col="5">Счёт</th>' +
+      '<th class="sort" data-col="6">Сделки</th>' +
+      '<th class="sort" data-col="7">Поступл.</th>' +
+      '<th class="sort" data-col="8">Ср.чек</th>' +
+      '<th class="sort" data-col="9">Цикл</th>' +
+      '<th class="sort" data-col="10">Лиды→MQL</th>' +
+      '<th class="sort" data-col="11">MQL→SQL</th>' +
+      '<th class="sort" data-col="12">SQL→Счёт</th>' +
+      '<th class="sort" data-col="13">Счёт→Сделка</th>' +
+      '<th class="sort" data-col="14">Лид→Сделка</th>' +
+      '<th class="sort" data-col="15">Тип трафика</th>' +
       '</tr>';
 
     function sfRow(r, isTotalRow, idx) {
@@ -164,6 +167,7 @@ async function renderPageMainNew(d) {
       }
       return '<tr' + rowStyle + '><td><b>' + escapeHtml(r.name) + '</b></td>' +
         '<td>' + leads + '</td>' +
+        '<td><b>' + fmt(r.mql_sum||0) + ' ₽</b></td>' +
         '<td>' + mql + '</td>' +
         '<td>' + sql + '</td>' +
         '<td>' + invoice + '</td>' +
@@ -259,7 +263,7 @@ async function renderPageMainNew(d) {
 
     // Семейство МВА — тот же формат («синяя полоска»), что и ТОП-20: переиспользуем helpers
     var mbaList = (d.mba_rating || []).map(function(m){
-      return { name:m.type, deals:m.cnt||m.deals||0, mql:m.mql||0, sum:m.sum||0, avg_check:m.avg_check||0, avg_won_days:m.avg_won_days||0,
+      return { name:m.type, deals:m.cnt||m.deals||0, mql:m.mql||0, mql_sum:m.mql_sum||0, sum:m.sum||0, avg_check:m.avg_check||0, avg_won_days:m.avg_won_days||0,
         fmt_ochn_cnt:m.fmt_ochn_cnt, fmt_ochn_sum:m.fmt_ochn_sum, fmt_om_cnt:m.fmt_om_cnt, fmt_om_sum:m.fmt_om_sum, fmt_sdo_cnt:m.fmt_sdo_cnt, fmt_sdo_sum:m.fmt_sdo_sum };
     });
     var mbaTotalSum = mbaList.reduce(function(s,p){ return s+(p.sum||0); }, 0) || 1;

@@ -82,9 +82,10 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
     // by_prod
     Object.entries(w.by_prod || {}).forEach(function(e) {
       var name = e[0], v = e[1];
-      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,mql:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:v.dir||'—'};
+      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,mql:0,mql_sum:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:v.dir||'—'};
       if ((!prodAgg[name].dir || prodAgg[name].dir==='—') && v.dir) prodAgg[name].dir = v.dir;
       prodAgg[name].deals += v.deals||0; prodAgg[name].sum += v.sum||0; prodAgg[name].mql += v.mql||0;
+      prodAgg[name].mql_sum += v.mql_sum||0;  // «потенциал»: сумма OPPORTUNITY MQL-сделок (по дате создания)
       prodAgg[name].fmt_ochn_cnt += v.fmt_ochn_cnt||0; prodAgg[name].fmt_ochn_sum += v.fmt_ochn_sum||0;
       prodAgg[name].fmt_om_cnt += v.fmt_om_cnt||0; prodAgg[name].fmt_om_sum += v.fmt_om_sum||0;
       prodAgg[name].fmt_sdo_cnt += v.fmt_sdo_cnt||0; prodAgg[name].fmt_sdo_sum += v.fmt_sdo_sum||0;
@@ -100,8 +101,9 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
     // by_mba
     Object.entries(w.by_mba || {}).forEach(function(e) {
       var type = e[0], v = e[1];
-      if (!mbaAgg[type]) mbaAgg[type] = {cnt:0,sum:0,mql:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
+      if (!mbaAgg[type]) mbaAgg[type] = {cnt:0,sum:0,mql:0,mql_sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
       mbaAgg[type].cnt += v.cnt||0; mbaAgg[type].sum += v.sum||0; mbaAgg[type].mql += v.mql||0;
+      mbaAgg[type].mql_sum += v.mql_sum||0;
       if (v.durs) mbaAgg[type].durs = mbaAgg[type].durs.concat(v.durs);
       mbaAgg[type].fmt_ochn_cnt += v.fmt_ochn_cnt||0; mbaAgg[type].fmt_ochn_sum += v.fmt_ochn_sum||0;
       mbaAgg[type].fmt_om_cnt += v.fmt_om_cnt||0; mbaAgg[type].fmt_om_sum += v.fmt_om_sum||0;
@@ -115,7 +117,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
     var name = e[0], v = e[1];
     var avgCheck = v.deals ? Math.round(v.sum/v.deals) : 0;
     var avgDur = Math.round(avg(v.durs)*10)/10;
-    return {name:name, deals:v.deals, sum:v.sum, mql:v.mql||0, avg_check:avgCheck,
+    return {name:name, deals:v.deals, sum:v.sum, mql:v.mql||0, mql_sum:v.mql_sum||0, avg_check:avgCheck,
       avg_won_days:avgDur, share:Math.round(v.sum/totalSum*100*10)/10, dir:v.dir||'—',
       fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
       fmt_om_cnt:v.fmt_om_cnt, fmt_om_sum:v.fmt_om_sum,
@@ -127,8 +129,10 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   var restDeals = rest.reduce(function(s,p){return s+p.deals;},0);
   var restCycleNum = rest.reduce(function(s,p){return s+((p.avg_won_days||0)*(p.deals||0));},0);
   var restCycle = restDeals > 0 ? restCycleNum/restDeals : 0;
+  var restMql = rest.reduce(function(s,p){return s+(p.mql||0);},0);
+  var restMqlSum = rest.reduce(function(s,p){return s+(p.mql_sum||0);},0);
   if (rest.length) {
-    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', deals:restDeals, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:restCycle,
+    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', deals:restDeals, mql:restMql, mql_sum:restMqlSum, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:restCycle,
       share:Math.round(restSum/totalSum*100*10)/10,
       fmt_ochn_cnt:rest.reduce(function(s,p){return s+p.fmt_ochn_cnt;},0),
       fmt_ochn_sum:rest.reduce(function(s,p){return s+p.fmt_ochn_sum;},0),
@@ -187,7 +191,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   // Построить mba_rating
   out.mba_rating = Object.entries(mbaAgg).map(function(e) {
     var type = e[0], v = e[1];
-    return {type:type, cnt:v.cnt, sum:v.sum, deals:v.cnt, mql:v.mql||0,
+    return {type:type, cnt:v.cnt, sum:v.sum, deals:v.cnt, mql:v.mql||0, mql_sum:v.mql_sum||0,
       avg_check:v.cnt?Math.round(v.sum/v.cnt):0,
       avg_won_days:Math.round(avg(v.durs||[])*10)/10,
       fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
@@ -241,8 +245,8 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   bucketWeeks.forEach(function(w){
     Object.entries(w.by_src||{}).forEach(function(e){
       var sn=e[0], v=e[1];
-      if(!sfAgg[sn]) sfAgg[sn]={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0,durs:[],type:''};
-      sfAgg[sn].leads+=(v.leads||0); sfAgg[sn].mql+=(v.mql||0); sfAgg[sn].sql+=(v.sql||0);
+      if(!sfAgg[sn]) sfAgg[sn]={leads:0,mql:0,mql_sum:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0,durs:[],type:''};
+      sfAgg[sn].leads+=(v.leads||0); sfAgg[sn].mql+=(v.mql||0); sfAgg[sn].mql_sum+=(v.mql_sum||0); sfAgg[sn].sql+=(v.sql||0);
       sfAgg[sn].invoice_cnt+=(v.invoice_cnt||0); sfAgg[sn].deals+=(v.deals||0); sfAgg[sn].postupleniya+=(v.sum||0);
       if(v.durs) sfAgg[sn].durs=sfAgg[sn].durs.concat(v.durs);
       if(!sfAgg[sn].type) sfAgg[sn].type = origFunnelType[sn] || (isSrcInternal(sn)?'internal':'marketing');
@@ -251,13 +255,13 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   function avg(arr){return arr.length?arr.reduce(function(s,x){return s+x;},0)/arr.length:0;}
   var sfList=Object.entries(sfAgg).filter(function(e){return e[1].postupleniya>0;}).map(function(e){
     var sn=e[0], d=e[1];
-    return {name:sn, leads:d.leads, mql:d.mql, sql:d.sql, invoice_cnt:d.invoice_cnt,
+    return {name:sn, leads:d.leads, mql:d.mql, mql_sum:d.mql_sum, sql:d.sql, invoice_cnt:d.invoice_cnt,
       deals:d.deals, postupleniya:d.postupleniya, type:d.type,
       avg_check:d.deals?Math.round(d.postupleniya/d.deals):0,
       avg_dur:avg(d.durs)};
   }).sort(function(a,b){return b.postupleniya-a.postupleniya;});
   var sfTop=sfList.slice(0,20), sfRestList=sfList.slice(20);
-  var sfAggFn=function(arr){var r={leads:0,mql:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0};arr.forEach(function(x){r.leads+=x.leads;r.mql+=x.mql;r.sql+=x.sql;r.invoice_cnt+=x.invoice_cnt;r.deals+=x.deals;r.postupleniya+=x.postupleniya;});r.avg_check=r.deals?Math.round(r.postupleniya/r.deals):0;var c=arr.reduce(function(s,x){return s+(x.avg_dur||0)*(x.deals||0);},0);var dc=arr.reduce(function(s,x){return s+(x.deals||0);},0);r.avg_dur=dc?c/dc:0;return r;};
+  var sfAggFn=function(arr){var r={leads:0,mql:0,mql_sum:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0};arr.forEach(function(x){r.leads+=x.leads;r.mql+=x.mql;r.mql_sum+=(x.mql_sum||0);r.sql+=x.sql;r.invoice_cnt+=x.invoice_cnt;r.deals+=x.deals;r.postupleniya+=x.postupleniya;});r.avg_check=r.deals?Math.round(r.postupleniya/r.deals):0;var c=arr.reduce(function(s,x){return s+(x.avg_dur||0)*(x.deals||0);},0);var dc=arr.reduce(function(s,x){return s+(x.deals||0);},0);r.avg_dur=dc?c/dc:0;return r;};
   function mkSfRow(name, data, extra){ var r=Object.assign({name:name, type:''},data); if(extra) Object.assign(r,extra); return r; }
   var sfTopTotal=mkSfRow('📊 ИТОГО (топ-20)', sfAggFn(sfTop));
   var sfAllTotal=mkSfRow('📊 ИТОГО (все без КОМ)', sfAggFn(sfList));
