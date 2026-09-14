@@ -347,6 +347,10 @@ function detectMbaType(title) {
   return null;
 }
 
+// Конструктор ILP (индивидуальный план из модулей). Одно правило для рейтинга продуктов
+// и таблицы МВА: иначе ILP-сделка с "Mini MBA" в названии попадала в МВА, но не в ТОП-20.
+function isIlpDeal(r) { return /\bILP\b/i.test(r.TITLE||''); }
+
 // Среднее по массиву (нужно и buildRatings, и analyze).
 const avg = (arr) => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
 
@@ -361,7 +365,7 @@ const avg = (arr) => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
 // Правила бакетирования взяты из недельного цикла analyze() без изменений:
 //   деньги, чек, цикл — по дате оплаты;  MQL, SQL, лиды — по дате создания;
 //   счета — по дате счёта.  Везде отсекаются КОМ и фантомы IS_FULLYEAR,
-//   в продуктах дополнительно конструктор ILP.
+//   в продуктах и МВА дополнительно конструктор ILP (isIlpDeal).
 export function buildRangeBuckets(ctx, from, to) {
   const { rows } = ctx;
   const inR       = (d) => !!d && d >= from && d <= to;
@@ -377,11 +381,11 @@ export function buildRangeBuckets(ctx, from, to) {
   const newProd = (r) => ({ deals:0, sum:0, mql:0, mql_sum:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[], dir:r.DIR });
   const newSrc  = ()  => ({ deals:0, sum:0, durs:[], mql:0, sql:0, invoice_cnt:0, leads:0, mql_sum:0 });
   const newMba  = ()  => ({ cnt:0, sum:0, mql:0, mql_sum:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[] });
-  const okProd = (r) => !r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'');
+  const okProd = (r) => !r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !isIlpDeal(r);
   const okSrc  = (r) => !r.IS_KOM && !r.IS_FULLYEAR;
   const getProd = (r) => { const pk=r.PRODUCT.slice(0,90); const p=by_prod[pk]||(by_prod[pk]=newProd(r)); if(!p.dir||p.dir==='—') p.dir=r.DIR; return p; };
   const getSrc  = (r) => by_src[r.SRC]||(by_src[r.SRC]=newSrc());
-  const mbaOf   = (r) => ((r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE)) ? detectMbaType(r.TITLE) : null);
+  const mbaOf   = (r) => (!isIlpDeal(r) && (r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE))) ? detectMbaType(r.TITLE) : null;
   const addFmt  = (o,r) => { if(r.FORMAT==='Очный'){o.fmt_ochn_cnt++;o.fmt_ochn_sum+=r.OPP;} else if(r.FORMAT==='Онлайн'){o.fmt_om_cnt++;o.fmt_om_sum+=r.OPP;} else {o.fmt_sdo_cnt++;o.fmt_sdo_sum+=r.OPP;} };
   const addDur  = (o,r) => { if(r.DC&&r.PAY_DT){ const d=daysBetween(r.DC,r.PAY_DT); if(d>=0) o.durs.push(d); } };
 
@@ -603,7 +607,7 @@ export function buildRatings(ctx, from, to, curW) {
   const prodData={};
   for (const r of rows) {
     if (r.IS_KOM) continue;                          // всё корпоративное, не только FORMAT==='КОМ'
-    if (/\bILP\b/i.test(r.TITLE||'')) continue;      // конструктор (ILP где угодно в названии) — по просьбе Насти Ш.
+    if (isIlpDeal(r)) continue;      // конструктор (ILP где угодно в названии) — по просьбе Насти Ш.
     const key=r.PRODUCT.slice(0,90);
     if (!prodData[key]) prodData[key]={deals:0,sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
     if (paidIn(r)) {
@@ -662,7 +666,7 @@ export function buildRatings(ctx, from, to, curW) {
   for (const r of rows) {
     if (!paidIn(r)) continue;
     const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE);
-    if (!isMba) continue;
+    if (!isMba || isIlpDeal(r)) continue;
     const mt=detectMbaType(r.TITLE); if(!mt) continue;
     if(!mbaMap[mt]) mbaMap[mt]={cnt:0,sum:0,deals:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
     mbaMap[mt].cnt++; mbaMap[mt].sum+=r.OPP; mbaMap[mt].deals++;
@@ -835,7 +839,7 @@ export async function analyze(onProgress, opts) {
             if (d>=0) { wd.durs.push(d); if(r.IS_KOM) wd.kom_durs.push(d); else wd.oom_durs.push(d); }
           }
           // by_prod: только ООМ, без конструктора (ILP) — таблица продуктов пересчитывается из by_prod
-          if (!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')) {
+          if (!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !isIlpDeal(r)) {
             const pk=r.PRODUCT.slice(0,90);
             if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR};
             if (!wd.by_prod[pk].dir || wd.by_prod[pk].dir==='—') wd.by_prod[pk].dir=r.DIR;  // направление курса (для фильтра в рейтингах)
@@ -853,7 +857,7 @@ export async function analyze(onProgress, opts) {
           // by_company
           { const cid=r.COMPANY_ID; if(cid&&cid!=='0' && !r.IS_FULLYEAR){if(!wd.by_company) wd.by_company={}; if(!wd.by_company[cid]) wd.by_company[cid]={sum:0,cnt:0,last:null,om_cnt:0,om_sum:0,kom_cnt:0,kom_sum:0}; wd.by_company[cid].sum+=r.OPP; wd.by_company[cid].cnt++; if(!r.IS_KOM){wd.by_company[cid].om_cnt++;wd.by_company[cid].om_sum+=r.OPP;} else {wd.by_company[cid].kom_cnt++;wd.by_company[cid].kom_sum+=r.OPP;} const pd2=getPayDate(r); if(pd2&&(!wd.by_company[cid].last||pd2>wd.by_company[cid].last))wd.by_company[cid].last=pd2.toISOString().slice(0,10); } }
           // by_mba
-          { const isMba=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else if(r.FORMAT==='Онлайн'){wd.by_mba[mt].fmt_om_cnt++;wd.by_mba[mt].fmt_om_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_mba[mt].durs.push(d);}}}}
+          { const isMba=!isIlpDeal(r)&&(r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE)); if(isMba){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].cnt++;wd.by_mba[mt].sum+=r.OPP;if(r.FORMAT==='Очный'){wd.by_mba[mt].fmt_ochn_cnt++;wd.by_mba[mt].fmt_ochn_sum+=r.OPP;}else if(r.FORMAT==='Онлайн'){wd.by_mba[mt].fmt_om_cnt++;wd.by_mba[mt].fmt_om_sum+=r.OPP;}else{wd.by_mba[mt].fmt_sdo_cnt++;wd.by_mba[mt].fmt_sdo_sum+=r.OPP;}if(r.DC&&r.PAY_DT){const d=daysBetween(r.DC,r.PAY_DT);if(d>=0)wd.by_mba[mt].durs.push(d);}}}}
         }
       }
     }
@@ -865,8 +869,8 @@ export async function analyze(onProgress, opts) {
         if(r.BLOCK==='sdo') wd.sdo_mql++; else if(r.BLOCK==='kom') wd.kom_mql++; else wd.open_mql++;
         if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0,mql_sum:0}; wd.by_src[sn].mql++; wd.by_src[sn].mql_sum+=r.OPP; }
         // «Лиды» продукта/МВА = MQL (к продукту лид привязывается только с MQL). По дате создания.
-        if(!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !/\bILP\b/i.test(r.TITLE||'')){ const pk=r.PRODUCT.slice(0,90); if(!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR}; if(!wd.by_prod[pk].dir||wd.by_prod[pk].dir==='—')wd.by_prod[pk].dir=r.DIR; wd.by_prod[pk].mql++; wd.by_prod[pk].mql_sum+=r.OPP; }
-        { const isMbaQ=r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE); if(isMbaQ){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].mql++;wd.by_mba[mt].mql_sum+=r.OPP;}} }
+        if(!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !isIlpDeal(r)){ const pk=r.PRODUCT.slice(0,90); if(!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR}; if(!wd.by_prod[pk].dir||wd.by_prod[pk].dir==='—')wd.by_prod[pk].dir=r.DIR; wd.by_prod[pk].mql++; wd.by_prod[pk].mql_sum+=r.OPP; }
+        { const isMbaQ=!isIlpDeal(r)&&(r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE)); if(isMbaQ){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].mql++;wd.by_mba[mt].mql_sum+=r.OPP;}} }
       }
     }
 
