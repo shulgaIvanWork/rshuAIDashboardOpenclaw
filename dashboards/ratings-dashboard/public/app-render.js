@@ -1,7 +1,7 @@
 /**
  * app-render.js — renderPageMainNew(): отрисовка таблиц среза.
  *
- * Рисует 4 таблицы в #contentAreaNew: Семейство МВА, ТОП-20 продуктов (с фильтром по
+ * Рисует 5 таблиц в #contentAreaNew: Семейство МВА, Направления, ТОП-20 продуктов (с фильтром по
  * направлению), Рейтинг источников (полная воронка), Топ-20 компаний. Итоговые строки —
  * в <thead>/<tfoot>, чтобы не всплывать при сортировке (initTableSort из shared.js).
  * Пишет lastRatingsData (app-core.js) для Excel-экспорта. Вызывается из renderFilteredData().
@@ -20,8 +20,11 @@ async function renderPageMainNew(d) {
     // ММВА — в самый вверх
     html += '<div class="card" style="margin-top:8px"><h3>Продукты Семейства МВА</h3><div id="newMbaTable"></div></div>';
 
+    // Направления (решение 14.09.2026)
+    html += '<div class="card" style="margin-top:8px"><h2 style="margin:0 0 6px">Направления <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · направление по сделке</span></h2><div class="sub" style="margin:0 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newDirTable"></div></div></div>';
+
     // Топ-20 продуктов
-    html += '<div class="card" style="margin-top:8px"><div class="d-flex align-items-center justify-content-between flex-wrap gap-2"><h2 style="margin:0">ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · по доле в поступлениях</span></h2><label style="font-size:12px;color:#475569">Направление: <select id="prodDirFilter" class="rc-input" style="width:auto;font-size:12px;padding:4px 8px"></select></label></div><div class="sub" style="margin:6px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
+    html += '<div class="card" style="margin-top:8px"><div class="d-flex align-items-center justify-content-between flex-wrap gap-2"><h2 style="margin:0">ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · по доле в поступлениях</span></h2><label style="font-size:12px;color:#475569">Направление: <select id="prodDirFilter" class="rc-input" style="width:auto;font-size:12px;padding:4px 8px"></select></label></div><div class="sub" style="margin:6px 0 14px">Клик по заголовку для сортировки<span id="prodFilterNote"></span></div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
     // Источники
     html += '<div class="card"><h2>Рейтинг источников поступлений (открытое обучение без КОМ)</h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newSrcTable"></div></div></div>';
     html += '<div class="card"><h2>Топ-20 компаний</h2><div class="sub" style="margin:-8px 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newCompaniesTable"></div></div></div>';
@@ -31,10 +34,11 @@ async function renderPageMainNew(d) {
     // Fill tables
     function fmtFmt(cnt, sum) { return cnt+' / '+fmt(sum)+' р'; }
     // «📦 Остальные» — агрегат хвоста; топ-20 считаем без него, «все продукты» — вместе с ним
-    function isRest(p){ return (p.name||'').includes('Остальные'); }
+    // «Без оплат в периоде» (_noPay) - тоже строка подвала: в ТОП-20 не показывается поштучно, но входит в итог.
+    function isRest(p){ return (p.name||'').includes('Остальные') || !!p._noPay; }
     // Единая «синяя полоска» для таблиц Продукты и Семейство МВА (nameLabel — «Продукт»/«Тип»)
     function prodHeadRow(nameLabel){
-      return '<tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">'+nameLabel+'</th><th class="sort" data-col="2">Лиды</th><th class="sort" data-col="3">Сумма лидов, ₽</th><th class="sort" data-col="4">Сделки</th><th class="sort" data-col="5">Поступления, ₽</th><th class="sort" data-col="6">Ср.чек, ₽</th><th class="sort" data-col="7">Цикл сделки, дн.</th><th class="sort" data-col="8">Доля</th><th class="sort" data-col="9">Очно</th><th class="sort" data-col="10">Онлайн</th><th class="sort" data-col="11">Дистанционно</th></tr>';
+      return '<tr><th class="sort" data-col="0">#</th><th class="sort" data-col="1">'+nameLabel+'</th><th class="sort" data-col="2">Лиды</th><th class="sort" data-col="3">Сумма лидов, ₽</th><th class="sort" data-col="4">Сделки</th><th class="sort" data-col="5">Выставленные счета, ₽</th><th class="sort" data-col="6">Поступления, ₽</th><th class="sort" data-col="7">Ср.чек, ₽</th><th class="sort" data-col="8">Цикл сделки, дн.</th><th class="sort" data-col="9">Доля</th><th class="sort" data-col="10">Очно</th><th class="sort" data-col="11">Онлайн</th><th class="sort" data-col="12">Дистанционно</th></tr>';
     }
     function totalsOf(list) {
       var deals = list.reduce(function(s,p){return s+(p.deals||p.cnt||0);},0);
@@ -44,6 +48,7 @@ async function renderPageMainNew(d) {
         deals: deals,
         mql:   list.reduce(function(s,p){return s+(p.mql||0);},0),
         mqlSum:list.reduce(function(s,p){return s+(p.mql_sum||0);},0),
+        invSum:list.reduce(function(s,p){return s+(p.inv_sum||0);},0),
         sum:   totalSum,
         avgCycle: deals > 0 ? cycleNum / deals : 0,
         ochn:  list.reduce(function(s,p){return s+(p.fmt_ochn_cnt||0);},0),
@@ -56,17 +61,20 @@ async function renderPageMainNew(d) {
       };
     }
     function totalRow(label, t, shareTxt) {
-      return '<tr class="total-row" style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+(t.mql||0)+'</b></td><td><b>'+fmt(t.mqlSum||0)+' ₽</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>'+(t.avgCycle||0).toFixed(1)+'</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
+      return '<tr class="total-row" style="background:#fff8e1;font-weight:700"><td></td><td><b>'+label+'</b></td><td><b>'+(t.mql||0)+'</b></td><td><b>'+fmt(t.mqlSum||0)+' ₽</b></td><td><b>'+t.deals+'</b></td><td><b>'+fmt(t.invSum||0)+' ₽</b></td><td><b>'+fmt(t.sum)+'</b> ₽</td><td>'+fmt(t.deals?Math.round(t.sum/t.deals):0)+'</td><td>'+(t.avgCycle||0).toFixed(1)+'</td><td><b>'+shareTxt+'</b></td><td>'+fmtFmt(t.ochn,t.ochnS)+'</td><td>'+fmtFmt(t.om,t.omS)+'</td><td>'+fmtFmt(t.sdo,t.sdoS)+'</td></tr>';
     }
     function prodDataRow(p, num, isRem){
-      return '<tr'+(isRem?' class="total-row" style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':num)+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td>'+(p.mql||0)+'</td><td><b>'+fmt(p.mql_sum||0)+' ₽</b></td><td><b>'+(p.cnt||p.deals||0)+'</b></td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
+      return '<tr'+(isRem?' class="total-row" style="background:#f0f4ff;font-weight:700"':'')+'><td>'+(isRem?'':num)+'</td><td style="max-width:260px;white-space:normal">'+escapeHtml((p.name||'').substring(0,100))+'</td><td>'+(p.mql||0)+'</td><td><b>'+fmt(p.mql_sum||0)+' ₽</b></td><td><b>'+(p.cnt||p.deals||0)+'</b></td><td>'+fmt(p.inv_sum||0)+' ₽</td><td><b>'+fmt(p.sum)+'</b> ₽</td><td>'+fmt(p.avg_check)+'</td><td>'+(p.avg_won_days||0).toFixed(1)+'</td><td><b>'+(p.share||0).toFixed(1)+'%</b></td><td>'+fmtFmt(p.fmt_ochn_cnt||0, p.fmt_ochn_sum||0)+'</td><td>'+fmtFmt(p.fmt_om_cnt||0, p.fmt_om_sum||0)+'</td><td>'+fmtFmt(p.fmt_sdo_cnt||0, p.fmt_sdo_sum||0)+'</td></tr>';
     }
     // Топ-20 + «Остальные» из полного списка с фильтром по направлению; доли — внутри выборки
     function prodSliceForDir(dir) {
       var all = d.all_products || d.top_products || [];
       // Это рейтинг СДЕЛОК: строки с лидами/MQL, но без единой сделки не показываем.
-      var list = (dir ? all.filter(function(p){ return (p.dir||'—')===dir; }) : all)
-        .filter(function(p){ return p.name && !isRest(p) && (p.deals||p.cnt||0) > 0; }).slice().sort(function(a,b){ return b.sum-a.sum; });
+      var scope = (dir ? all.filter(function(p){ return (p.dir||'—')===dir; }) : all).filter(function(p){ return p.name && !isRest(p); });
+      var list = scope.filter(function(p){ return (p.deals||p.cnt||0) > 0; }).slice().sort(function(a,b){ return b.sum-a.sum; });
+      // Продукты без оплат в периоде не показываем поштучно, но их лиды и счета сворачиваем в одну
+      // строку подвала: иначе «ИТОГО (все продукты)» не сходится с блоком «Направления».
+      var noPay = scope.filter(function(p){ return (p.deals||p.cnt||0) === 0; });
       var totalSum = list.reduce(function(s,p){ return s+(p.sum||0); }, 0) || 1;
       var withShare = list.map(function(p){ return Object.assign({}, p, { share: Math.round(p.sum/totalSum*100*10)/10 }); });
       var top20 = withShare.slice(0,20), rest = withShare.slice(20);
@@ -75,14 +83,35 @@ async function renderPageMainNew(d) {
         var rcn = rest.reduce(function(s,p){return s+((p.avg_won_days||0)*(p.deals||0));},0);
         var rmql = rest.reduce(function(s,p){return s+(p.mql||0);},0);
         var rmqlSum = rest.reduce(function(s,p){return s+(p.mql_sum||0);},0);
-        top20.push({ name:'📦 Остальные ('+rest.length+' продуктов)', deals:rd, mql:rmql, mql_sum:rmqlSum, sum:rs, avg_check:rd?Math.round(rs/rd):0, avg_won_days:rd?rcn/rd:0, share:Math.round(rs/totalSum*100*10)/10,
+        var rinv = rest.reduce(function(s,p){return s+(p.inv_sum||0);},0);
+        top20.push({ name:'📦 Остальные ('+rest.length+' продуктов)', deals:rd, mql:rmql, mql_sum:rmqlSum, inv_sum:rinv, sum:rs, avg_check:rd?Math.round(rs/rd):0, avg_won_days:rd?rcn/rd:0, share:Math.round(rs/totalSum*100*10)/10,
           fmt_ochn_cnt:rest.reduce(function(s,p){return s+(p.fmt_ochn_cnt||0);},0), fmt_ochn_sum:rest.reduce(function(s,p){return s+(p.fmt_ochn_sum||0);},0),
           fmt_om_cnt:rest.reduce(function(s,p){return s+(p.fmt_om_cnt||0);},0), fmt_om_sum:rest.reduce(function(s,p){return s+(p.fmt_om_sum||0);},0),
           fmt_sdo_cnt:rest.reduce(function(s,p){return s+(p.fmt_sdo_cnt||0);},0), fmt_sdo_sum:rest.reduce(function(s,p){return s+(p.fmt_sdo_sum||0);},0) });
       }
+      if (noPay.length) {
+        top20.push({ name:'💤 Без оплат в периоде ('+noPay.length+' продуктов)', _noPay:true, deals:0, sum:0, share:0, avg_check:0, avg_won_days:0,
+          mql:noPay.reduce(function(s,p){return s+(p.mql||0);},0), mql_sum:noPay.reduce(function(s,p){return s+(p.mql_sum||0);},0),
+          inv_sum:noPay.reduce(function(s,p){return s+(p.inv_sum||0);},0),
+          fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0 });
+      }
       return top20;
     }
+    // Полный перечень продуктов выбранного направления (решение 14.09.2026, вариант "б*").
+    function renderDirProducts(dir, full, attachSort) {
+      var all = full.rows.concat(full.forms ? [full.forms] : []);
+      var s = '<table id="prodTable" class="sortable" style="font-size:11px"><thead>' + prodHeadRow('Продукт')
+        + totalRow('📊 ИТОГО ('+escapeHtml(dir)+')', totalsOf(all), '100%') + '</thead><tbody>';
+      full.rows.forEach(function(p, i){ s += prodDataRow(p, i+1, false); });
+      s += '</tbody><tfoot>' + (full.forms ? prodDataRow(full.forms, 0, true) : '') + '</tfoot></table>';
+      var el = document.getElementById('newProductsTable'); if (el) el.innerHTML = s;
+      if (attachSort && typeof initTableSort === 'function') initTableSort('prodTable');
+    }
     function renderProductsTable(dir, attachSort) {
+      var full = dir && d.dir_products && d.dir_products[dir];
+      var note = document.getElementById('prodFilterNote');
+      if (note) note.textContent = full ? ' · все продукты направления: со сделкой в этом году и хотя бы одной оплатой за историю, нулевые строки показаны' : '';
+      if (full) { renderDirProducts(dir, full, attachSort); return; }
       var prods = prodSliceForDir(dir);
       var t20  = totalsOf(prods.filter(function(p){ return p.name && !isRest(p); }));
       var tAll = totalsOf(prods.filter(function(p){ return p.name; }));
@@ -92,8 +121,7 @@ async function renderPageMainNew(d) {
       var prodNum = 0;
       prods.forEach(function(p){ if(!p.name || isRest(p)) return; prodNum++; prodStr += prodDataRow(p, prodNum, false); });
       prodStr += '</tbody><tfoot>';
-      var prodRest = prods.find(function(p){ return p.name && isRest(p); });
-      if (prodRest) prodStr += prodDataRow(prodRest, 0, true);
+      prods.filter(function(p){ return p.name && isRest(p); }).forEach(function(p){ prodStr += prodDataRow(p, 0, true); });
       prodStr += totalRow('📊 ИТОГО (все продукты)', tAll, '100%');
       prodStr += '</tfoot></table>';
       var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
@@ -103,8 +131,14 @@ async function renderPageMainNew(d) {
     }
     // Заполняем селектор направлений (по убыванию поступлений) и вешаем фильтр
     (function(){
+      // Список направлений: из разреза по сделкам (без дублей справочника), если он есть;
+      // иначе по-старому - из направления продукта.
       var dirs = {};
-      (d.all_products || []).forEach(function(p){ if (p.dir && p.dir !== '—') dirs[p.dir] = (dirs[p.dir]||0) + (p.sum||0); });
+      if (d.dir_products && (d.dir_rating || []).length) {
+        d.dir_rating.forEach(function(r){ if (r.name !== 'Без направления') dirs[r.name] = r.sum || 0; });
+      } else {
+        (d.all_products || []).forEach(function(p){ if (p.dir && p.dir !== '—') dirs[p.dir] = (dirs[p.dir]||0) + (p.sum||0); });
+      }
       var sorted = Object.keys(dirs).sort(function(a,b){ return dirs[b]-dirs[a]; });
       var sel = document.getElementById('prodDirFilter');
       if (sel) {
@@ -113,6 +147,20 @@ async function renderPageMainNew(d) {
       }
     })();
     renderProductsTable('', false);
+
+    // ── Направления: разрез по сделкам, «Без направления» - в подвале ─────
+    (function(){
+      var el = document.getElementById('newDirTable');
+      if (!el) return;
+      var list = d.dir_rating || [];
+      if (!list.length) { el.innerHTML = '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по направлениям</div>'; return; }
+      var main = list.filter(function(r){ return r.name !== 'Без направления'; });
+      var noDir = list.find(function(r){ return r.name === 'Без направления'; });
+      el.innerHTML = '<table id="dirTable" class="sortable" style="font-size:11px"><thead>' + prodHeadRow('Направление')
+        + totalRow('📊 ИТОГО (все направления)', totalsOf(list), '100%') + '</thead><tbody>'
+        + main.map(function(r, i){ return prodDataRow(r, i+1, false); }).join('')
+        + '</tbody><tfoot>' + (noDir ? prodDataRow(noDir, 0, true) : '') + '</tfoot></table>';
+    })();
 
     // ── Рейтинг источников (полная воронка, без КОМ) ─────────────────────
     var srcFunnel = d.src_funnel || [];
@@ -263,7 +311,7 @@ async function renderPageMainNew(d) {
 
     // Семейство МВА — тот же формат («синяя полоска»), что и ТОП-20: переиспользуем helpers
     var mbaList = (d.mba_rating || []).map(function(m){
-      return { name:m.type, deals:m.cnt||m.deals||0, mql:m.mql||0, mql_sum:m.mql_sum||0, sum:m.sum||0, avg_check:m.avg_check||0, avg_won_days:m.avg_won_days||0,
+      return { name:m.type, deals:m.cnt||m.deals||0, mql:m.mql||0, mql_sum:m.mql_sum||0, inv_sum:m.inv_sum||0, sum:m.sum||0, avg_check:m.avg_check||0, avg_won_days:m.avg_won_days||0,
         fmt_ochn_cnt:m.fmt_ochn_cnt, fmt_ochn_sum:m.fmt_ochn_sum, fmt_om_cnt:m.fmt_om_cnt, fmt_om_sum:m.fmt_om_sum, fmt_sdo_cnt:m.fmt_sdo_cnt, fmt_sdo_sum:m.fmt_sdo_sum };
     });
     var mbaTotalSum = mbaList.reduce(function(s,p){ return s+(p.sum||0); }, 0) || 1;

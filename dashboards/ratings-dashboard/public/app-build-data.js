@@ -82,10 +82,11 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
     // by_prod
     Object.entries(w.by_prod || {}).forEach(function(e) {
       var name = e[0], v = e[1];
-      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,mql:0,mql_sum:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:v.dir||'—'};
+      if (!prodAgg[name]) prodAgg[name] = {deals:0,sum:0,mql:0,mql_sum:0,inv_sum:0,sql:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:v.dir||'—'};
       if ((!prodAgg[name].dir || prodAgg[name].dir==='—') && v.dir) prodAgg[name].dir = v.dir;
       prodAgg[name].deals += v.deals||0; prodAgg[name].sum += v.sum||0; prodAgg[name].mql += v.mql||0;
       prodAgg[name].mql_sum += v.mql_sum||0;  // «потенциал»: сумма OPPORTUNITY MQL-сделок (по дате создания)
+      prodAgg[name].inv_sum += v.inv_sum||0;  // выставленные счета: сумма сделок по дате счета
       prodAgg[name].fmt_ochn_cnt += v.fmt_ochn_cnt||0; prodAgg[name].fmt_ochn_sum += v.fmt_ochn_sum||0;
       prodAgg[name].fmt_om_cnt += v.fmt_om_cnt||0; prodAgg[name].fmt_om_sum += v.fmt_om_sum||0;
       prodAgg[name].fmt_sdo_cnt += v.fmt_sdo_cnt||0; prodAgg[name].fmt_sdo_sum += v.fmt_sdo_sum||0;
@@ -101,9 +102,10 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
     // by_mba
     Object.entries(w.by_mba || {}).forEach(function(e) {
       var type = e[0], v = e[1];
-      if (!mbaAgg[type]) mbaAgg[type] = {cnt:0,sum:0,mql:0,mql_sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
+      if (!mbaAgg[type]) mbaAgg[type] = {cnt:0,sum:0,mql:0,mql_sum:0,inv_sum:0,durs:[],fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0};
       mbaAgg[type].cnt += v.cnt||0; mbaAgg[type].sum += v.sum||0; mbaAgg[type].mql += v.mql||0;
       mbaAgg[type].mql_sum += v.mql_sum||0;
+      mbaAgg[type].inv_sum += v.inv_sum||0;
       if (v.durs) mbaAgg[type].durs = mbaAgg[type].durs.concat(v.durs);
       mbaAgg[type].fmt_ochn_cnt += v.fmt_ochn_cnt||0; mbaAgg[type].fmt_ochn_sum += v.fmt_ochn_sum||0;
       mbaAgg[type].fmt_om_cnt += v.fmt_om_cnt||0; mbaAgg[type].fmt_om_sum += v.fmt_om_sum||0;
@@ -117,7 +119,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
     var name = e[0], v = e[1];
     var avgCheck = v.deals ? Math.round(v.sum/v.deals) : 0;
     var avgDur = Math.round(avg(v.durs)*10)/10;
-    return {name:name, deals:v.deals, sum:v.sum, mql:v.mql||0, mql_sum:v.mql_sum||0, avg_check:avgCheck,
+    return {name:name, deals:v.deals, sum:v.sum, mql:v.mql||0, mql_sum:v.mql_sum||0, inv_sum:v.inv_sum||0, avg_check:avgCheck,
       avg_won_days:avgDur, share:Math.round(v.sum/totalSum*100*10)/10, dir:v.dir||'—',
       fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
       fmt_om_cnt:v.fmt_om_cnt, fmt_om_sum:v.fmt_om_sum,
@@ -131,8 +133,9 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   var restCycle = restDeals > 0 ? restCycleNum/restDeals : 0;
   var restMql = rest.reduce(function(s,p){return s+(p.mql||0);},0);
   var restMqlSum = rest.reduce(function(s,p){return s+(p.mql_sum||0);},0);
+  var restInvSum = rest.reduce(function(s,p){return s+(p.inv_sum||0);},0);
   if (rest.length) {
-    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', deals:restDeals, mql:restMql, mql_sum:restMqlSum, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:restCycle,
+    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', deals:restDeals, mql:restMql, mql_sum:restMqlSum, inv_sum:restInvSum, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:restCycle,
       share:Math.round(restSum/totalSum*100*10)/10,
       fmt_ochn_cnt:rest.reduce(function(s,p){return s+p.fmt_ochn_cnt;},0),
       fmt_ochn_sum:rest.reduce(function(s,p){return s+p.fmt_ochn_sum;},0),
@@ -143,6 +146,57 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   }
   out.top_products = top20;
   out.all_products = prodList;  // полный список с направлением (dir) — для фильтра по направлению
+
+  // Направления (решение 14.09.2026): разрез по сделкам с сервера (by_dir). Перечни продуктов
+  // направления - только из корзины точного периода (by_dir_prod); на недельном запасном пути
+  // их нет, и фильтр ТОП-20 работает по-старому, по направлению продукта.
+  var DIR_M = ['deals','sum','mql','mql_sum','inv_sum','fmt_ochn_cnt','fmt_ochn_sum','fmt_om_cnt','fmt_om_sum','fmt_sdo_cnt','fmt_sdo_sum'];
+  function addMetrics(to, v) {
+    DIR_M.forEach(function(f){ to[f] = (to[f]||0) + (v[f]||0); });
+    if (v.durs) to.durs = (to.durs||[]).concat(v.durs);
+    return to;
+  }
+  function finishRow(name, v, total) {
+    var r = { name: name };
+    DIR_M.forEach(function(f){ r[f] = v[f]||0; });
+    r.avg_check = r.deals ? Math.round(r.sum/r.deals) : 0;
+    r.avg_won_days = Math.round(avg(v.durs||[])*10)/10;
+    r.share = total ? Math.round(r.sum/total*100*10)/10 : 0;
+    return r;
+  }
+  var dirAgg = {};
+  bucketWeeks.forEach(function(w) {
+    Object.entries(w.by_dir || {}).forEach(function(e) { addMetrics(dirAgg[e[0]] || (dirAgg[e[0]] = {}), e[1]); });
+  });
+  var dirTotal = Object.values(dirAgg).reduce(function(s,v){ return s+(v.sum||0); }, 0);
+  out.dir_rating = Object.entries(dirAgg).map(function(e){ return finishRow(e[0], e[1], dirTotal); })
+    .sort(function(a,b){ return b.sum-a.sum || b.mql-a.mql; });
+
+  // Перечень продуктов направления по правилу "б*": продукты из dir_catalog (сделка в текущем
+  // году и хоть одна оплата за историю) плюс продукты с оплатами в периоде. Остальные строки
+  // периода (названия форм захвата лидов) сворачиваются в одну строку, чтобы сумма строк
+  // сходилась со строкой направления.
+  out.dir_products = null;
+  if (rangeBucket && rangeBucket.by_dir_prod) {
+    out.dir_products = {};
+    var catalog = orig.dir_catalog || {};
+    Object.keys(dirAgg).forEach(function(dn) {
+      var allowed = {};
+      (catalog[dn] || []).forEach(function(pk){ allowed[pk] = true; });
+      var rows = {}, forms = null;
+      Object.entries(rangeBucket.by_dir_prod[dn] || {}).forEach(function(e) {
+        if (allowed[e[0]] || (e[1].deals||0) > 0) rows[e[0]] = addMetrics({}, e[1]);
+        else forms = addMetrics(forms || {}, e[1]);
+      });
+      Object.keys(allowed).forEach(function(pk){ if (!rows[pk]) rows[pk] = {}; });
+      var dirSum = dirAgg[dn].sum || 0;
+      out.dir_products[dn] = {
+        rows: Object.entries(rows).map(function(e){ return finishRow(e[0], e[1], dirSum); })
+          .sort(function(a,b){ return b.sum-a.sum || b.mql-a.mql || a.name.localeCompare(b.name); }),
+        forms: forms ? finishRow('📨 Лиды с форм без программы', forms, dirSum) : null
+      };
+    });
+  }
 
   // Построить src_rating — MQL/SQL берём из оригинала по имени источника
   var origSrcByName = {};
@@ -191,7 +245,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   // Построить mba_rating
   out.mba_rating = Object.entries(mbaAgg).map(function(e) {
     var type = e[0], v = e[1];
-    return {type:type, cnt:v.cnt, sum:v.sum, deals:v.cnt, mql:v.mql||0, mql_sum:v.mql_sum||0,
+    return {type:type, cnt:v.cnt, sum:v.sum, deals:v.cnt, mql:v.mql||0, mql_sum:v.mql_sum||0, inv_sum:v.inv_sum||0,
       avg_check:v.cnt?Math.round(v.sum/v.cnt):0,
       avg_won_days:Math.round(avg(v.durs||[])*10)/10,
       fmt_ochn_cnt:v.fmt_ochn_cnt, fmt_ochn_sum:v.fmt_ochn_sum,
