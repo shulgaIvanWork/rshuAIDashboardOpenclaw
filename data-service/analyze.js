@@ -38,6 +38,7 @@ import {
   MQL_SALE_STAGES, NOT_MQL_SALE, EDU_TYPE_MAP,
   isKomDeal, isInternalSource, detectFormat, detectB2b, isFullYearLearn,
 } from './lib/deal-rules.js';
+import { resolveDealDirection } from './lib/direction-map.js';
 
 // ── Даты ─────────────────────────────────────────────────────────────────────
 
@@ -351,11 +352,47 @@ function detectMbaType(title) {
 // и таблицы МВА: иначе ILP-сделка с "Mini MBA" в названии попадала в МВА, но не в ТОП-20.
 function isIlpDeal(r) { return /\bILP\b/i.test(r.TITLE||''); }
 
+// Отбор сделок в рейтинги продуктов и направлений: без КОМ, фантомов полного года и ILP.
+function isRatingProduct(r) { return !r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !isIlpDeal(r); }
+
+// Каноническое имя направления сделки (direction-map.js): из товара, иначе из текста при
+// создании; пустое и мусорное ('blog') направление - 'Без направления'.
+const NO_DIRECTION = 'Без направления';
+function canonDirName(productDirIds, createdText, directions) {
+  const d = resolveDealDirection(productDirIds, createdText, directions);
+  if (d.source === 'none' || d.source === 'excluded' || !d.name) return NO_DIRECTION;
+  return d.name;
+}
+
+// Разрез направлений (by_dir) и продуктов внутри направления (by_dir_prod). Направление
+// берется по сделке (DIR_C), а не по продукту: у одного продукта сделки бывают в разных
+// направлениях. Метрики и правила дат те же, что у by_prod.
+const newDirMetrics = () => ({ deals:0, sum:0, mql:0, mql_sum:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[] });
+function dirSlots(bucket, r) {
+  const dn = r.DIR_C;
+  const pk = r.PRODUCT.slice(0,90);
+  const d  = bucket.by_dir[dn] || (bucket.by_dir[dn] = newDirMetrics());
+  const dp = bucket.by_dir_prod[dn] || (bucket.by_dir_prod[dn] = {});
+  return [d, dp[pk] || (dp[pk] = newDirMetrics())];
+}
+function addPaidToDir(bucket, r) {
+  for (const o of dirSlots(bucket, r)) {
+    o.deals++; o.sum += r.OPP;
+    if (r.FORMAT==='Очный') { o.fmt_ochn_cnt++; o.fmt_ochn_sum += r.OPP; }
+    else if (r.FORMAT==='Онлайн') { o.fmt_om_cnt++; o.fmt_om_sum += r.OPP; }
+    else { o.fmt_sdo_cnt++; o.fmt_sdo_sum += r.OPP; }
+    if (r.DC && r.PAY_DT) { const d = daysBetween(r.DC, r.PAY_DT); if (d >= 0) o.durs.push(d); }
+  }
+}
+function addMqlToDir(bucket, r) {
+  for (const o of dirSlots(bucket, r)) { o.mql++; o.mql_sum += r.OPP; }
+}
+
 // Среднее по массиву (нужно и buildRatings, и analyze).
 const avg = (arr) => arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : 0;
 
 // ── Корзины рейтингов за произвольный период ─────────────────────────────────
-// Возвращает by_prod / by_src / by_company / by_mba в ТОЧНО ТОЙ ЖЕ форме, что и
+// Возвращает by_prod / by_src / by_company / by_mba / by_dir / by_dir_prod в ТОЧНО ТОЙ ЖЕ форме, что и
 // одна недельная корзина, но за диапазон [from, to] включительно. Дашборд
 // «Рейтинги» строит свои таблицы именно из недельных корзин, суммируя их на
 // клиенте, поэтому «август» у него = целые недели W31-W36 (27.07-02.09) и не
@@ -373,6 +410,8 @@ export function buildRangeBuckets(ctx, from, to) {
   const createdIn = (r) => inR(dateOnly(r.DC));
 
   const by_prod = {}, by_src = {}, by_company = {}, by_mba = {};
+  const by_dir = {}, by_dir_prod = {};
+  const dirBucket = { by_dir, by_dir_prod };
   // Скалярные поля недели, которые читает фронт рейтингов (KPI-карточки).
   let postupleniya = 0, oplata = 0, kom_postupleniya = 0, kom_won_cnt = 0, leads = 0;
   const fmt = { fmt_oom:0, fmt_om:0, fmt_sdo:0, fmt_kom:0,
@@ -381,7 +420,7 @@ export function buildRangeBuckets(ctx, from, to) {
   const newProd = (r) => ({ deals:0, sum:0, mql:0, mql_sum:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[], dir:r.DIR });
   const newSrc  = ()  => ({ deals:0, sum:0, durs:[], mql:0, sql:0, invoice_cnt:0, leads:0, mql_sum:0 });
   const newMba  = ()  => ({ cnt:0, sum:0, mql:0, mql_sum:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[] });
-  const okProd = (r) => !r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !isIlpDeal(r);
+  const okProd = isRatingProduct;
   const okSrc  = (r) => !r.IS_KOM && !r.IS_FULLYEAR;
   const getProd = (r) => { const pk=r.PRODUCT.slice(0,90); const p=by_prod[pk]||(by_prod[pk]=newProd(r)); if(!p.dir||p.dir==='—') p.dir=r.DIR; return p; };
   const getSrc  = (r) => by_src[r.SRC]||(by_src[r.SRC]=newSrc());
@@ -399,7 +438,7 @@ export function buildRangeBuckets(ctx, from, to) {
       if (r.IS_KOM) { kom_postupleniya += r.OPP; kom_won_cnt++; }
       const fk = FMT_KEY[r.FORMAT];
       if (fk) { fmt[fk] += r.OPP; fmt[fk + '_cnt']++; }
-      if (okProd(r)) { const p=getProd(r); p.deals++; p.sum+=r.OPP; addFmt(p,r); addDur(p,r); }
+      if (okProd(r)) { const p=getProd(r); p.deals++; p.sum+=r.OPP; addFmt(p,r); addDur(p,r); addPaidToDir(dirBucket, r); }
       if (okSrc(r))  { const s=getSrc(r);  s.deals++; s.sum+=r.OPP; addDur(s,r); }
       const cid=r.COMPANY_ID;
       if (cid && cid!=='0' && !r.IS_FULLYEAR) {
@@ -419,7 +458,7 @@ export function buildRangeBuckets(ctx, from, to) {
     // MQL — по ДАТЕ СОЗДАНИЯ (mql_sum — «потенциал»: сумма OPPORTUNITY этих же сделок)
     if (createdIn(r) && isQualLeadW(r)) {
       if (okSrc(r))  { getSrc(r).mql++; getSrc(r).mql_sum += r.OPP; }
-      if (okProd(r)) { getProd(r).mql++; getProd(r).mql_sum += r.OPP; }
+      if (okProd(r)) { getProd(r).mql++; getProd(r).mql_sum += r.OPP; addMqlToDir(dirBucket, r); }
       const mt=mbaOf(r);
       if (mt) { const m=by_mba[mt]||(by_mba[mt]=newMba()); m.mql++; m.mql_sum += r.OPP; }
     }
@@ -435,7 +474,7 @@ export function buildRangeBuckets(ctx, from, to) {
   // Форма ответа = одна недельная корзина, чтобы клиент рейтингов скормил её
   // своей существующей агрегации вместо списка недель.
   return { postupleniya, oplata, leads, kom_postupleniya, kom_won_cnt, ...fmt,
-           by_prod, by_src, by_company, by_mba };
+           by_prod, by_src, by_company, by_mba, by_dir, by_dir_prod };
 }
 
 // ── Контекст для рейтингов ───────────────────────────────────
@@ -503,6 +542,7 @@ export async function loadRatingsContext() {
       PREVIOUS_STAGE_ID: x.PREVIOUS_STAGE_ID||null,
       UF_CRM_1498466811: Array.isArray(dir)?dir:(dir?[dir]:[]),
       CREATED_DIR: x.UF_CRM_1744273716729 || '',
+      DIR_C: canonDirName(x.UF_CRM_1498466811, x.UF_CRM_1744273716729, directions),
     };
   });
 
@@ -774,7 +814,7 @@ export async function analyze(onProgress, opts) {
       kom_leads:0, kom_mql:0,
       fmt_oom:0, fmt_om:0, fmt_sdo:0, fmt_kom:0,
       fmt_oom_cnt:0, fmt_om_cnt:0, fmt_sdo_cnt:0, fmt_kom_cnt:0, presale_durs:[],
-      by_prod:{}, by_src:{}, by_mba:{},
+      by_prod:{}, by_src:{}, by_mba:{}, by_dir:{}, by_dir_prod:{},
       btype_B2B_cnt:0,btype_B2B_sum:0,btype_B2C_cnt:0,btype_B2C_sum:0,
       src_internal_cnt:0,src_internal_sum:0,src_mkt_cnt:0,src_mkt_sum:0,
       edu_pk_cnt:0,edu_pk_sum:0,edu_pp_cnt:0,edu_pp_sum:0,edu_ko_cnt:0,edu_ko_sum:0,
@@ -839,7 +879,7 @@ export async function analyze(onProgress, opts) {
             if (d>=0) { wd.durs.push(d); if(r.IS_KOM) wd.kom_durs.push(d); else wd.oom_durs.push(d); }
           }
           // by_prod: только ООМ, без конструктора (ILP) — таблица продуктов пересчитывается из by_prod
-          if (!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !isIlpDeal(r)) {
+          if (isRatingProduct(r)) {
             const pk=r.PRODUCT.slice(0,90);
             if (!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR};
             if (!wd.by_prod[pk].dir || wd.by_prod[pk].dir==='—') wd.by_prod[pk].dir=r.DIR;  // направление курса (для фильтра в рейтингах)
@@ -848,6 +888,7 @@ export async function analyze(onProgress, opts) {
             else if (r.FORMAT==='Онлайн') { wd.by_prod[pk].fmt_om_cnt++; wd.by_prod[pk].fmt_om_sum+=r.OPP; }
             else { wd.by_prod[pk].fmt_sdo_cnt++; wd.by_prod[pk].fmt_sdo_sum+=r.OPP; }
             if (r.DC&&r.PAY_DT) { const d=daysBetween(r.DC,r.PAY_DT); if(d>=0) wd.by_prod[pk].durs.push(d); }
+            addPaidToDir(wd, r);
           }
           // by_src
           // by_src: сделки/поступления — по дате оплаты (реальные деньги).
@@ -869,7 +910,7 @@ export async function analyze(onProgress, opts) {
         if(r.BLOCK==='sdo') wd.sdo_mql++; else if(r.BLOCK==='kom') wd.kom_mql++; else wd.open_mql++;
         if(!r.IS_KOM && !r.IS_FULLYEAR){ const sn=r.SRC; if(!wd.by_src[sn]) wd.by_src[sn]={deals:0,sum:0,durs:[],mql:0,sql:0,invoice_cnt:0,leads:0,mql_sum:0}; wd.by_src[sn].mql++; wd.by_src[sn].mql_sum+=r.OPP; }
         // «Лиды» продукта/МВА = MQL (к продукту лид привязывается только с MQL). По дате создания.
-        if(!r.IS_KOM && !r.IS_FULLYEAR && r.FORMAT!=='КОМ' && !isIlpDeal(r)){ const pk=r.PRODUCT.slice(0,90); if(!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR}; if(!wd.by_prod[pk].dir||wd.by_prod[pk].dir==='—')wd.by_prod[pk].dir=r.DIR; wd.by_prod[pk].mql++; wd.by_prod[pk].mql_sum+=r.OPP; }
+        if(isRatingProduct(r)){ const pk=r.PRODUCT.slice(0,90); if(!wd.by_prod[pk]) wd.by_prod[pk]={deals:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[],dir:r.DIR}; if(!wd.by_prod[pk].dir||wd.by_prod[pk].dir==='—')wd.by_prod[pk].dir=r.DIR; wd.by_prod[pk].mql++; wd.by_prod[pk].mql_sum+=r.OPP; addMqlToDir(wd, r); }
         { const isMbaQ=!isIlpDeal(r)&&(r.UF_CRM_1498466811.map(String).some(d=>MBA_DIRECTION_IDS.has(d))||hasMbaInTitle(r.TITLE)); if(isMbaQ){const mt=detectMbaType(r.TITLE);if(mt){if(!wd.by_mba[mt])wd.by_mba[mt]={cnt:0,sum:0,mql:0,mql_sum:0,fmt_ochn_cnt:0,fmt_ochn_sum:0,fmt_om_cnt:0,fmt_om_sum:0,fmt_sdo_cnt:0,fmt_sdo_sum:0,durs:[]};wd.by_mba[mt].mql++;wd.by_mba[mt].mql_sum+=r.OPP;}} }
       }
     }
@@ -1217,6 +1258,19 @@ export async function analyze(onProgress, opts) {
   emit({ type: 'finalizing' });
   emit({ type: 'all_done' });
 
+  // Перечень продуктов направления для фильтра рейтингов (решение 14.09.2026, вариант 'б*'):
+  // продукт со сделкой, созданной в текущем году, и хотя бы одной оплатой за всю историю.
+  // Отсекает названия форм захвата лидов ('Промо', 'Запрос программы курса').
+  const paidEverProducts = new Set();
+  for (const r of rows) if (isRatingProduct(r) && isPaid(r) && VALID_CATS.has(r.CAT_ID)) paidEverProducts.add(r.PRODUCT.slice(0,90));
+  const dirCatalog = {};
+  for (const r of rows) {
+    if (!isRatingProduct(r) || !r.DC || r.DC.getFullYear()!==YEAR) continue;
+    const pk = r.PRODUCT.slice(0,90);
+    if (!paidEverProducts.has(pk)) continue;
+    (dirCatalog[r.DIR_C] || (dirCatalog[r.DIR_C] = new Set())).add(pk);
+  }
+
   const todayStr=`${TODAY.getFullYear()}-${fmt2(TODAY.getMonth()+1)}-${fmt2(TODAY.getDate())}`;
 
   return {
@@ -1249,5 +1303,6 @@ export async function analyze(onProgress, opts) {
     mgr_top:mgrTop, mgr_prev_top:mgrPrevTop,
     by_category:catTop, created_by_category:createdCatList,
     mba_rating:mbaRatingList,
+    dir_catalog:Object.fromEntries(Object.entries(dirCatalog).map(([k,set])=>[k,[...set].sort()])),
   };
 }

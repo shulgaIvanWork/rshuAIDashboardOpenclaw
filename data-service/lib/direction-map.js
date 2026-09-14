@@ -10,17 +10,19 @@
  *                                 («Право» вместо «Корпоративное право», «Персонал» вместо
  *                                 «Управление персоналом» и т.п.).
  *
- *   Чтобы в отчёте «Лиды по направлениям» строки не двоились, свободный текст сводим
+ *   Чтобы в разрезе направлений строки не двоились, свободный текст сводим
  *   к ID справочника (уже согласованный маппинг). Итоговое имя берём из dicts.directions.
  *
  * ПРАВИЛА (согласованы с Ольгой 11.09.2026):
  *   - Приоритет — направление из товара; текст при создании — только если товар пуст.
  *   - Сделка считается один раз (берём единственную ось направления).
  *   - «blog» — мусор: исключается из таблиц и уходит в артефакты.
- *   - Дубли справочника («Продажи и коммерция» и «Продажи и коммерция » с пробелом,
- *     «Строительство» и «Строительство и девелопмент») сводятся к одному ID.
+ *   - Дубли справочника сводятся к одному ID таблицей DIRECTION_ID_ALIASES - и для ID из
+ *     товара, и после разбора текста: «Строительство» (1907) -> «Строительство и девелопмент»
+ *     (35002), «Продажи и коммерция » с пробелом (34365) -> 1902, «MMBA» (35288) и «Архив MBA»
+ *     (21054) -> «MBA» (1917), как в MBA_DIRECTION_IDS.
  *
- * КТО ИМПОРТИРУЕТ: data-service/analyze.js (вкладка «Лиды по направлениям»).
+ * КТО ИМПОРТИРУЕТ: data-service/analyze.js (разрез направлений рейтингов: by_dir, by_dir_prod).
  */
 
 // Свободный текст «направление при создании» → ID справочника направлений.
@@ -63,6 +65,11 @@ export const CREATED_DIR_ALIASES = {
   'ИТ': '1925',
 };
 
+// Дубли справочника направлений: ID -> канонический ID. Применяется к любому источнику
+// (товар или текст при создании): точное совпадение текста "Строительство" находило
+// ID 1907 раньше таблицы CREATED_DIR_ALIASES, и сведение не срабатывало.
+export const DIRECTION_ID_ALIASES = { '1907': '35002', '34365': '1902', '35288': '1917', '21054': '1917' };
+
 // Значения поля «направление при создании», которые НЕ являются направлением.
 // Уходят в артефакты, в таблицы не попадают.
 export const CREATED_DIR_EXCLUDE = ['blog'];
@@ -78,10 +85,11 @@ export const CREATED_DIR_EXCLUDE = ['blog'];
  */
 export function resolveDealDirection(productDirIds, createdText, directions = {}) {
   const ids = (Array.isArray(productDirIds) ? productDirIds : [productDirIds])
-    .filter(v => v !== null && v !== undefined && String(v) !== '')
+    // Битрикс отдает пустое множественное поле и как [], и как false.
+    .filter(v => v !== null && v !== undefined && v !== false && String(v) !== '' && String(v) !== 'false')
     .map(String);
   if (ids.length) {
-    const id = ids[0];
+    const id = DIRECTION_ID_ALIASES[ids[0]] || ids[0];
     return { id, name: directions[id] || id, source: 'product' };
   }
 
@@ -91,10 +99,10 @@ export function resolveDealDirection(productDirIds, createdText, directions = {}
 
   // Точное совпадение с названием справочника.
   const exactId = Object.keys(directions).find(k => directions[k] === t);
-  if (exactId) return { id: exactId, name: t, source: 'created' };
+  if (exactId) { const id = DIRECTION_ID_ALIASES[exactId] || exactId; return { id, name: directions[id] || t, source: 'created' }; }
 
   const aliasId = CREATED_DIR_ALIASES[t];
-  if (aliasId) return { id: aliasId, name: directions[aliasId] || t, source: 'created' };
+  if (aliasId) { const id = DIRECTION_ID_ALIASES[aliasId] || aliasId; return { id, name: directions[id] || t, source: 'created' }; }
 
   return { id: null, name: t, source: 'unresolved' };
 }
