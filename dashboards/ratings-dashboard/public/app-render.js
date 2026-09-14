@@ -14,6 +14,8 @@ async function renderPageMainNew(d) {
   try {
     if (!d) d = await api('/api/data/new');
     if (!d || !d.ytd) { areaNew.innerHTML = '<div class="error-state">Нет данных</div>'; return; }
+    // Строки и итоги, отрисованные на экране: Excel-экспорт берет ровно их, без второй копии правил.
+    d._screen = {};
 
     var html = '';
 
@@ -89,12 +91,14 @@ async function renderPageMainNew(d) {
           fmt_om_cnt:rest.reduce(function(s,p){return s+(p.fmt_om_cnt||0);},0), fmt_om_sum:rest.reduce(function(s,p){return s+(p.fmt_om_sum||0);},0),
           fmt_sdo_cnt:rest.reduce(function(s,p){return s+(p.fmt_sdo_cnt||0);},0), fmt_sdo_sum:rest.reduce(function(s,p){return s+(p.fmt_sdo_sum||0);},0) });
       }
+      var noPayRow = null;
       if (noPay.length) {
-        top20.push({ name:'💤 Без оплат в периоде ('+noPay.length+' продуктов)', _noPay:true, deals:0, sum:0, share:0, avg_check:0, avg_won_days:0,
+        top20.push(noPayRow = { name:'💤 Без оплат в периоде ('+noPay.length+' продуктов)', _noPay:true, deals:0, sum:0, share:0, avg_check:0, avg_won_days:0,
           mql:noPay.reduce(function(s,p){return s+(p.mql||0);},0), mql_sum:noPay.reduce(function(s,p){return s+(p.mql_sum||0);},0),
           inv_sum:noPay.reduce(function(s,p){return s+(p.inv_sum||0);},0),
           fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0 });
       }
+      top20.all = withShare; top20.noPayRow = noPayRow;  // полный список для Excel
       return top20;
     }
     // Полный перечень продуктов выбранного направления (решение 14.09.2026, вариант "б*").
@@ -104,6 +108,7 @@ async function renderPageMainNew(d) {
         + totalRow('📊 ИТОГО ('+escapeHtml(dir)+')', totalsOf(all), '100%') + '</thead><tbody>';
       full.rows.forEach(function(p, i){ s += prodDataRow(p, i+1, false); });
       s += '</tbody><tfoot>' + (full.forms ? prodDataRow(full.forms, 0, true) : '') + '</tfoot></table>';
+      d._screen.products = { dir: dir, rows: full.rows, footers: full.forms ? [full.forms] : [], total: totalsOf(all) };
       var el = document.getElementById('newProductsTable'); if (el) el.innerHTML = s;
       if (attachSort && typeof initTableSort === 'function') initTableSort('prodTable');
     }
@@ -124,6 +129,7 @@ async function renderPageMainNew(d) {
       prods.filter(function(p){ return p.name && isRest(p); }).forEach(function(p){ prodStr += prodDataRow(p, 0, true); });
       prodStr += totalRow('📊 ИТОГО (все продукты)', tAll, '100%');
       prodStr += '</tfoot></table>';
+      d._screen.products = { dir: dir, rows: prods.all || [], footers: prods.noPayRow ? [prods.noPayRow] : [], total: tAll };
       var el = document.getElementById('newProductsTable'); if(el) el.innerHTML = prodStr;
       // На первом рендере сортировку вешает общий initTableSort() в конце renderPageMainNew;
       // при смене фильтра таблица пересоздаётся — привязываем точечно (attachSort=true).
@@ -156,6 +162,7 @@ async function renderPageMainNew(d) {
       if (!list.length) { el.innerHTML = '<div style="padding:8px;color:#475569;font-size:12px">Нет данных по направлениям</div>'; return; }
       var main = list.filter(function(r){ return r.name !== 'Без направления'; });
       var noDir = list.find(function(r){ return r.name === 'Без направления'; });
+      d._screen.dirs = { rows: main, footers: noDir ? [noDir] : [], total: totalsOf(list) };
       el.innerHTML = '<table id="dirTable" class="sortable" style="font-size:11px"><thead>' + prodHeadRow('Направление')
         + totalRow('📊 ИТОГО (все направления)', totalsOf(list), '100%') + '</thead><tbody>'
         + main.map(function(r, i){ return prodDataRow(r, i+1, false); }).join('')
@@ -320,6 +327,7 @@ async function renderPageMainNew(d) {
     var mbaStr;
     if (mbaList.length) {
       var mbaTot = totalsOf(mbaList);
+      d._screen.mba = { rows: mbaList, footers: [], total: mbaTot };
       mbaStr = '<table id="mbaTable" class="sortable" style="font-size:11px"><thead>' + prodHeadRow('Тип')
         + totalRow('📊 ИТОГО', mbaTot, '100%') + '</thead><tbody>'
         + mbaList.map(function(p, i){ return prodDataRow(p, i+1, false); }).join('')
