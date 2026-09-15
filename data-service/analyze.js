@@ -364,9 +364,30 @@ function canonDirName(productDirIds, createdText, directions) {
   return d.name;
 }
 
-// Разрез направлений (by_dir) и продуктов внутри направления (by_dir_prod). Направление
-// берется по сделке (DIR_C), а не по продукту: у одного продукта сделки бывают в разных
-// направлениях. Метрики и правила дат те же, что у by_prod.
+// Направление продукта (правка 15.09.2026): одно на все сделки продукта. По сделке продукт
+// попадал в чужие перечни: у 'Клиентский сервис' 3 сделки с направлением товара 'Управление и
+// стратегия' и 2 - 'Управление маркетингом', у 'Директор по производству' одна сделка без товара
+// с текстом 'Управление и стратегия'. Берется направление из товара у последней созданной сделки
+// продукта (текущая настройка товара в Б24); если товара нет ни в одной сделке - текст при
+// создании последней сделки. Продукт без распознанного направления остается по сделке.
+function assignProductDirections(rows, directions) {
+  const best = {};
+  for (const r of rows) {
+    if (!isRatingProduct(r)) continue;
+    const d = resolveDealDirection(r.UF_CRM_1498466811, r.CREATED_DIR, directions);
+    if (d.source !== 'product' && d.source !== 'created') continue;
+    const rank = d.source === 'product' ? 1 : 0, t = r.DC ? r.DC.getTime() : 0, pk = r.PRODUCT.slice(0,90);
+    const b = best[pk];
+    if (!b || rank > b.rank || (rank === b.rank && t > b.t)) best[pk] = { rank, t, name: d.name };
+  }
+  for (const r of rows) {
+    const b = isRatingProduct(r) && best[r.PRODUCT.slice(0,90)];
+    if (b) r.DIR_C = b.name;
+  }
+}
+
+// Разрез направлений (by_dir) и продуктов внутри направления (by_dir_prod) по DIR_C - направлению
+// продукта (assignProductDirections). Метрики и правила дат те же, что у by_prod.
 // by_dir_prod ведется только в корзине периода (buildRangeBuckets): в недельных корзинах он
 // дублировал by_prod - около трети ответа getAgg(), который целиком отдают несколько дашбордов.
 const newDirMetrics = () => ({ deals:0, sum:0, mql:0, mql_sum:0, inv_sum:0, fmt_ochn_cnt:0, fmt_ochn_sum:0, fmt_om_cnt:0, fmt_om_sum:0, fmt_sdo_cnt:0, fmt_sdo_sum:0, durs:[] });
@@ -582,6 +603,7 @@ export async function loadRatingsContext() {
       DIR_C: canonDirName(x.UF_CRM_1498466811, x.UF_CRM_1744273716729, directions),
     };
   });
+  assignProductDirections(rows, directions);
 
   return { dicts, companies, cats, usersMap, sourcesMap, directions, rows, leads: [], cc: {} };
 }

@@ -23,7 +23,7 @@ async function renderPageMainNew(d) {
     html += '<div class="card" style="margin-top:8px"><h3>Продукты Семейства МВА</h3><div id="newMbaTable"></div></div>';
 
     // Направления (решение 14.09.2026)
-    html += '<div class="card" style="margin-top:8px"><h2 style="margin:0 0 6px">Направления <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · направление по сделке</span></h2><div class="sub" style="margin:0 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newDirTable"></div></div></div>';
+    html += '<div class="card" style="margin-top:8px"><h2 style="margin:0 0 6px">Направления <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · направление продукта</span></h2><div class="sub" style="margin:0 0 14px">Клик по заголовку для сортировки</div><div style="overflow-x:auto"><div id="newDirTable"></div></div></div>';
 
     // Топ-20 продуктов
     html += '<div class="card" style="margin-top:8px"><div class="d-flex align-items-center justify-content-between flex-wrap gap-2"><h2 style="margin:0">ТОП-20 продуктов <span style="font-size:13px;color:#888;font-weight:400">без КОМ и конструктора · по доле в поступлениях</span></h2><label style="font-size:12px;color:#475569">Направление: <select id="prodDirFilter" class="rc-input" style="width:auto;font-size:12px;padding:4px 8px"></select></label></div><div class="sub" style="margin:6px 0 14px">Клик по заголовку для сортировки<span id="prodFilterNote"></span></div><div style="overflow-x:auto"><div id="newProductsTable"></div></div></div>';
