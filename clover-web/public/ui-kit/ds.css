@@ -1,0 +1,244 @@
+/* ds.css - внешний стиль платформы дашбордов РШУ на токенах RSU/UI-kit.
+   Подключается ПОСЛЕ bootstrap.min.css и /shared.css и только на переведенных страницах:
+   непереведенные страницы выглядят как раньше. Общее для всех (шрифт, кнопки, фильтры, табы,
+   таблицы, карточки) задается здесь; цвета KPI и графиков - у каждого дашборда свои. */
+
+@import url('./fonts.css');
+@import url('./tokens.css');
+
+/* ── Мост Bootstrap 5.3 -> токены кита ─────────────────────────────── */
+:root {
+  --bs-body-font-family: var(--font-family);
+  --bs-body-font-size: var(--ds-font-size);
+  --bs-body-color: var(--color-text-primary);
+  --bs-body-bg: var(--color-bg-secondary);
+  --bs-emphasis-color: var(--color-text-primary);
+  --bs-secondary-color: var(--color-text-muted);
+  --bs-primary: #093eb4;
+  --bs-primary-rgb: 9, 62, 180;
+  --bs-link-color: #093eb4;
+  --bs-link-color-rgb: 9, 62, 180;
+  --bs-link-hover-color: #2259d4;
+  --bs-link-hover-color-rgb: 34, 89, 212;
+  --bs-border-color: var(--ds-line-strong);
+  --bs-border-radius: var(--ds-control-radius);
+  --bs-border-radius-sm: var(--radius-s);
+  --bs-border-radius-lg: var(--radius-m);
+  --bs-focus-ring-color: rgba(12, 140, 255, .25);
+}
+
+/* ── База ──────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-family);
+  font-size: var(--ds-font-size);
+  line-height: 1.45;
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
+  -webkit-font-smoothing: antialiased;
+}
+h1 { font-size: 24px; line-height: 32px; font-weight: 700; letter-spacing: -.01em; }
+a { color: var(--color-primary); }
+a:hover { color: var(--color-primary-hover); }
+.sub, .sub-tight, .muted, .dt, .filter-info, .page-title-meta, .kpi-dates { color: var(--color-text-muted); }
+
+.ds-icon { width: 1.15em; height: 1.15em; flex: none; vertical-align: -.2em; fill: currentColor; }
+.ds-muted { color: var(--color-text-muted); }
+.ds-mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.ds-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.ds-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ── Страница и заголовок ──────────────────────────────────────────── */
+.ds-page { max-width: 1200px; margin: 0 auto; padding: var(--space-8) var(--space-6); }
+.ds-page--narrow { max-width: 880px; }
+.ds-page-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-6); }
+.ds-title { font-size: 24px; line-height: 32px; font-weight: 700; margin: 0; }
+.ds-subtitle { font-size: 14px; color: var(--color-text-muted); margin: 4px 0 0; }
+@media (max-width: 640px) {
+  .ds-page { padding: var(--space-5) var(--space-4); }
+}
+
+/* ── Верхняя панель платформы ──────────────────────────────────────── */
+.ds-topbar { display: flex; align-items: center; gap: var(--space-4); min-height: 64px; padding: 10px var(--space-6); background: var(--color-primary); color: #fff; }
+.ds-topbar__logo { display: block; height: 34px; width: auto; }
+.ds-topbar__user { margin-left: auto; font-size: 13px; color: rgba(255, 255, 255, .72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ds-topbar__nav { display: flex; gap: var(--space-1); }
+.ds-topbar__link { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--ds-control-h); padding: 0 var(--space-3); border-radius: var(--ds-control-radius); color: rgba(255, 255, 255, .82); font-weight: 600; font-size: 14px; text-decoration: none; white-space: nowrap; }
+.ds-topbar__link:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+.ds-topbar__link.is-active { background: rgba(255, 255, 255, .18); color: #fff; }
+.ds-topbar__link:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .ds-topbar { flex-wrap: wrap; padding: 10px var(--space-4); gap: var(--space-2) var(--space-3); }
+  .ds-topbar__logo { height: 28px; }
+  .ds-topbar__user { order: 3; flex-basis: 100%; margin-left: 0; }
+  .ds-topbar__nav { margin-left: auto; }
+  .ds-topbar__label { display: none; }
+}
+
+/* ── Кнопки (кит: button primary / brand-light; размер под дашборды) ─ */
+.ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); height: var(--ds-control-h); padding: 0 var(--space-4); border: 1px solid transparent; border-radius: var(--ds-control-radius); font-family: var(--font-family); font-size: 14px; font-weight: 600; line-height: 18px; text-decoration: none; white-space: nowrap; cursor: pointer; user-select: none; transition: background .2s ease-in-out, color .2s ease-in-out, border-color .2s ease-in-out; }
+.ds-btn:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.ds-btn--primary { background: var(--color-primary); color: #fff; }
+.ds-btn--primary:hover { background: var(--color-primary-hover); color: #fff; }
+.ds-btn--primary:active { background: var(--color-primary-active); }
+.ds-btn--light, .btn-guide, .btn-excel { background: var(--color-bg-accent); color: var(--color-primary-hover); }
+.ds-btn--light:hover, .btn-guide:hover, .btn-excel:hover { background: #d4dcf8; color: var(--color-primary-hover); }
+.ds-btn--light:active, .btn-guide:active, .btn-excel:active { background: #c3cef5; }
+.ds-btn--ghost { background: #fff; color: var(--color-text-primary); border-color: var(--ds-line-strong); }
+.ds-btn--ghost:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.ds-btn--danger { background: var(--ds-danger-bg); color: var(--ds-danger-text); }
+.ds-btn--danger:hover { background: #ffd0d5; color: var(--ds-danger-text); }
+.ds-btn:disabled, .ds-btn[aria-disabled="true"] { background: var(--ds-line-strong); border-color: transparent; color: #fff; cursor: not-allowed; pointer-events: none; }
+.ds-btn--sm { height: 30px; padding: 0 var(--space-3); font-size: 13px; border-radius: 10px; }
+.ds-btn--lg { height: 48px; padding: 0 22px; font-size: 15px; border-radius: var(--radius-m); }
+.ds-btn--icon { width: var(--ds-control-h); padding: 0; }
+.ds-btn--sm.ds-btn--icon { width: 30px; }
+.ds-btn--block { width: 100%; }
+
+/* Кнопки shared.css: Инструкция / Excel и панель действий - один стиль платформы */
+.btn-guide, .btn-excel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--ds-control-h); padding: 0 var(--space-4); border: 0; border-radius: var(--ds-control-radius); font-size: 14px; font-weight: 600; }
+.toolbar button { height: var(--ds-control-h); padding: 0 var(--space-4); border-radius: var(--ds-control-radius); background: var(--color-primary); font-family: var(--font-family); font-weight: 600; }
+.toolbar button:hover { background: var(--color-primary-hover); }
+.toolbar button:disabled { background: var(--ds-line-strong); }
+
+/* Кнопки Bootstrap */
+.btn { --bs-btn-font-family: var(--font-family); --bs-btn-font-weight: 600; --bs-btn-font-size: 14px; --bs-btn-padding-y: 7px; --bs-btn-padding-x: 16px; --bs-btn-border-radius: var(--ds-control-radius); --bs-btn-focus-box-shadow: 0 0 0 3px rgba(12, 140, 255, .25); }
+.btn-sm { --bs-btn-font-size: 13px; --bs-btn-padding-y: 4px; --bs-btn-padding-x: 12px; --bs-btn-border-radius: 10px; }
+.btn-primary { --bs-btn-bg: #093eb4; --bs-btn-border-color: #093eb4; --bs-btn-hover-bg: #2259d4; --bs-btn-hover-border-color: #2259d4; --bs-btn-active-bg: #0a34aa; --bs-btn-active-border-color: #0a34aa; --bs-btn-disabled-bg: #d0d5e3; --bs-btn-disabled-border-color: #d0d5e3; }
+.btn-outline-secondary { --bs-btn-color: var(--color-text-primary); --bs-btn-border-color: var(--ds-line-strong); --bs-btn-hover-color: #093eb4; --bs-btn-hover-bg: var(--color-bg-accent); --bs-btn-hover-border-color: var(--color-bg-accent); --bs-btn-active-color: #093eb4; --bs-btn-active-bg: var(--ds-accent-hover); --bs-btn-active-border-color: var(--ds-accent-hover); }
+
+/* ── Поля, выбор периода, селект, чекбокс (кит: input-text S, select, checkbox) ─ */
+.ds-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: var(--space-4); }
+.ds-label, .date-filter-bar label { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--color-text-primary); }
+.ds-hint { font-size: 12px; line-height: 16px; color: var(--color-text-muted); }
+.ds-input, .ds-select, .rc-input, .date-filter-bar input[type="date"] { height: var(--ds-control-h); padding: 0 var(--space-3); border: 1px solid var(--ds-line-strong); border-radius: var(--ds-control-radius); background-color: #fff; font-family: var(--font-family); font-size: 14px; font-weight: 500; color: var(--color-text-primary); transition: border-color .15s, box-shadow .15s; }
+.ds-input { width: 100%; }
+.ds-input::placeholder { color: var(--color-text-muted); font-weight: 400; }
+.ds-input:focus, .ds-select:focus, .rc-input:focus, .date-filter-bar input[type="date"]:focus { outline: none; border-color: var(--color-focus); box-shadow: 0 0 0 3px rgba(12, 140, 255, .18); }
+.ds-input--error { border-color: var(--color-error); }
+.ds-input:disabled, .rc-input:disabled { background: var(--color-bg-secondary); color: var(--color-text-disabled); }
+.ds-select { appearance: none; padding-right: 34px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23616f8d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 16px; cursor: pointer; }
+.rc-input { width: 220px; cursor: pointer; }
+
+.ds-check { display: inline-flex; align-items: center; gap: 10px; font-size: 13px; line-height: 18px; font-weight: 500; cursor: pointer; user-select: none; }
+.ds-check input { appearance: none; flex: none; width: 20px; height: 20px; margin: 0; border: 1px solid var(--ds-line); border-radius: var(--radius-xs); background: #fff center / 12px no-repeat; cursor: pointer; transition: background-color .18s, border-color .18s; }
+.ds-check:hover input:not(:checked) { border-color: #4a81fc; }
+.ds-check input:checked { background-color: var(--color-primary); border-color: var(--color-primary); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 13 10' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 5l3.5 3.5L12 1'/%3E%3C/svg%3E"); }
+.ds-check input:focus-visible { outline: 2px solid var(--color-primary-hover); outline-offset: 1px; }
+
+/* Bootstrap-поля */
+.form-label { font-size: 13px; font-weight: 600; color: var(--color-text-primary); margin-bottom: 6px; }
+.form-control, .form-select { min-height: var(--ds-control-h); font-size: 14px; border-color: var(--ds-line-strong); border-radius: var(--ds-control-radius); }
+.form-control:focus, .form-select:focus { border-color: var(--color-focus); box-shadow: 0 0 0 3px rgba(12, 140, 255, .18); }
+.form-check-input { border-color: var(--ds-line-strong); }
+.form-check-input:checked { background-color: var(--color-primary); border-color: var(--color-primary); }
+.form-check-input:focus { border-color: var(--color-focus); box-shadow: 0 0 0 3px rgba(12, 140, 255, .18); }
+.form-text { color: var(--color-text-muted); font-size: 12px; }
+
+/* Переключатель вариантов (кит: toggle) - для выбора режима в фильтрах */
+.ds-segment { display: inline-flex; gap: 2px; padding: 3px; background: #fff; border: 1px solid var(--ds-line); border-radius: var(--ds-control-radius); }
+.ds-segment__btn { height: 28px; padding: 0 var(--space-3); border: 0; border-radius: 9px; background: transparent; color: var(--color-primary-hover); font-family: var(--font-family); font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background .18s ease-in-out, color .18s ease-in-out; }
+.ds-segment__btn:hover { background: var(--color-bg-accent); }
+.ds-segment__btn.is-active, .ds-segment__btn[aria-pressed="true"] { background: var(--color-primary); color: #fff; }
+.ds-segment__btn:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 1px; }
+
+/* ── Табы (кит: tabs pills S) - классы .tabs/.tab из shared.css ────── */
+.tabs { gap: var(--space-2); }
+.tab { padding: var(--space-2) var(--space-4); border: 0; border-radius: var(--radius-s); background: #fff; color: var(--color-primary); font-family: var(--font-family); font-size: 14px; font-weight: 500; line-height: 18px; }
+.tab:hover { background: #e8edf9; color: var(--color-primary); }
+.tab.active { background: var(--color-primary); color: #fff; border-bottom-color: transparent; }
+.tab:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+@media (max-width: 900px) { .tabs { flex-direction: row; flex-wrap: wrap; } }
+
+/* ── Карточки ──────────────────────────────────────────────────────── */
+.card, .ds-card { background: #fff; border: 0; border-radius: var(--radius-m); box-shadow: 0 1px 2px rgba(9, 29, 54, .04); }
+.card { --bs-card-border-width: 0; --bs-card-border-radius: var(--radius-m); }
+.ds-card { padding: var(--space-5); }
+.card h2 { font-size: 17px; line-height: 24px; font-weight: 700; }
+.card h3 { font-size: 14px; line-height: 20px; font-weight: 600; }
+
+/* ── Таблицы (в ките нет; стиль на токенах) ───────────────────────── */
+table { font-variant-numeric: tabular-nums; }
+th { background: var(--color-bg-accent); color: var(--color-text-primary); font-size: 12px; line-height: 16px; font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--ds-line); }
+td { border-bottom: 1px solid var(--ds-line); }
+thead tr:first-child th:first-child { border-top-left-radius: var(--radius-s); }
+thead tr:first-child th:last-child { border-top-right-radius: var(--radius-s); }
+tr:hover td { background: var(--ds-row-hover); }
+tr.cur td { background: var(--color-bg-accent); }
+th.sort:hover { background: var(--ds-accent-hover); }
+th.sort::after { opacity: .35; }
+th.sort.asc::after, th.sort.desc::after { color: var(--color-primary); opacity: 1; }
+.sec td { background: #1d3047; color: #fff; }
+.table { --bs-table-color: var(--color-text-primary); --bs-table-hover-bg: var(--ds-row-hover); --bs-table-border-color: var(--ds-line); }
+.table > thead th { background: var(--color-bg-accent); color: var(--color-text-primary); }
+
+/* ── KPI-плитки: оформление общее, цвет темы (kpi-oom и т.п.) - у дашборда ─ */
+.kpi { background: #fff; border-radius: 12px; padding: 12px 14px; box-shadow: none; }
+.kpi .lbl, .kpi .lbl2 { font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: .05em; color: var(--color-text-muted); }
+.kpi .val { font-size: 20px; line-height: 26px; font-weight: 700; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+.kpi .val-big { font-size: 24px; line-height: 30px; }
+.kpi .sub, .kpi .si, .kpi .sub-right, .kpi .sub-sm, .kpi .minmax { color: var(--color-text-muted); }
+.kpi-header { font-size: 15px; line-height: 20px; font-weight: 700; }
+
+/* ── Бейджи, точки статуса, дельты (кит: badge) ───────────────────── */
+.ds-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--radius-full); background: var(--color-bg-secondary); color: var(--color-text-muted); font-size: 12px; line-height: 16px; font-weight: 600; white-space: nowrap; }
+.ds-badge--primary { background: var(--color-bg-accent); color: var(--color-primary); }
+.ds-badge--success, .badge-prev { background: var(--ds-success-bg); color: var(--ds-success-text); }
+.ds-badge--warning, .badge-new { background: var(--ds-warning-bg); color: var(--ds-warning-text); }
+.ds-badge--info { background: var(--ds-info-bg); color: var(--ds-info-text); }
+.ds-badge--danger { background: var(--ds-danger-bg); color: var(--ds-danger-text); }
+.badge-prev, .badge-new { border-radius: var(--radius-full); }
+.badge { border-radius: var(--radius-full); font-weight: 600; padding: .4em .75em; }
+
+.ds-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; background: var(--ds-line-strong); }
+.ds-dot--success { background: #2ac000; }
+.ds-dot--warning { background: var(--color-secondary); }
+.ds-dot--danger { background: var(--color-error); }
+.ds-dot--info { background: #59a7d8; }
+
+.delta-up { color: var(--ds-up); font-weight: 600; }
+.delta-down { color: var(--ds-down); font-weight: 600; }
+.delta-flat { color: var(--color-text-muted); }
+
+/* ── Сообщения ─────────────────────────────────────────────────────── */
+.ds-alert { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 18px; background: var(--ds-info-bg); color: var(--ds-info-text); }
+.ds-alert .ds-icon { margin-top: 1px; }
+.ds-alert--warning { background: var(--ds-warning-bg); color: var(--ds-warning-text); }
+.ds-alert--danger { background: var(--ds-danger-bg); color: var(--ds-danger-text); }
+.ds-alert--success { background: var(--ds-success-bg); color: var(--ds-success-text); }
+.alert { --bs-alert-border-radius: 12px; border: 0; font-size: 13px; }
+.alert-danger { --bs-alert-bg: var(--ds-danger-bg); --bs-alert-color: var(--ds-danger-text); }
+.alert-warning { --bs-alert-bg: var(--ds-warning-bg); --bs-alert-color: var(--ds-warning-text); }
+
+.loading-state { color: var(--color-text-muted); }
+.loading-state .spinner { border-color: var(--ds-line); border-top-color: var(--color-primary); }
+.error-state { color: var(--ds-danger-text); }
+
+/* ── Плитки-ссылки (список дашбордов) ─────────────────────────────── */
+.ds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--space-3); }
+.ds-tile { display: flex; align-items: center; gap: 14px; padding: var(--space-4) 18px; background: #fff; border: 1px solid transparent; border-radius: var(--radius-m); color: var(--color-text-primary); text-decoration: none; transition: border-color .2s, box-shadow .2s; }
+.ds-tile:hover { color: var(--color-text-primary); border-color: var(--ds-accent-hover); box-shadow: var(--elevation-sm); }
+.ds-tile:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.ds-tile__icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--color-bg-accent); color: var(--color-primary); }
+.ds-tile__icon .ds-icon { width: 24px; height: 24px; }
+.ds-tile__title { font-size: 15px; line-height: 20px; font-weight: 600; }
+.ds-tile__arrow { margin-left: auto; color: var(--color-text-muted); }
+
+/* ── Вход ──────────────────────────────────────────────────────────── */
+.ds-login { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--space-6) var(--space-4);
+  background: radial-gradient(circle at 12% 8%, rgba(89, 167, 216, .45) 0, rgba(89, 167, 216, 0) 45%),
+              radial-gradient(circle at 88% 92%, rgba(255, 103, 45, .22) 0, rgba(255, 103, 45, 0) 40%),
+              var(--color-primary); }
+.ds-login__card { width: 100%; max-width: 400px; background: #fff; border-radius: var(--radius-2l); padding: 36px 32px 32px; box-shadow: var(--elevation-lg); }
+.ds-login__logo { display: block; height: 46px; width: auto; margin-bottom: var(--space-6); }
+.ds-login__title { font-size: 22px; line-height: 28px; font-weight: 700; margin: 0 0 4px; }
+.ds-login__sub { font-size: 14px; color: var(--color-text-muted); margin: 0 0 var(--space-6); }
+@media (max-width: 440px) { .ds-login__card { padding: 28px 20px 24px; } }
+
+/* ── Модальное окно и уведомление ─────────────────────────────────── */
+.ds-modal { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; padding: var(--space-4); background: rgba(9, 29, 54, .45); }
+.ds-modal.active { display: flex; }
+.ds-modal__box { width: 520px; max-width: 100%; max-height: 88vh; overflow-y: auto; background: #fff; border-radius: var(--radius-l); padding: var(--space-6); box-shadow: var(--elevation-lg); }
+.ds-modal__title { font-size: 18px; line-height: 24px; font-weight: 700; margin: 0 0 var(--space-4); }
+.ds-modal__actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-5); flex-wrap: wrap; }
+.ds-toast { position: fixed; right: var(--space-6); bottom: var(--space-6); z-index: 2000; max-width: calc(100% - 48px); padding: 12px 16px; border-radius: 12px; background: var(--color-text-primary); color: #fff; font-size: 13px; line-height: 18px; font-weight: 500; opacity: 0; transform: translateY(8px); transition: opacity .25s, transform .25s; pointer-events: none; }
+.ds-toast.show { opacity: 1; transform: none; }

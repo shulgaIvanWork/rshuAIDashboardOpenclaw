@@ -1,0 +1,86 @@
+/* Токены дизайна платформы дашбордов РШУ.
+   Блок "из кита" скопирован из RSU/UI-kit, ветка feature/kit-components, коммит cead924,
+   src/styles/tokens.css (только продуктовые переменные, без служебных переменных витрины и утилит).
+   Блок "платформа" - плотность и элементы дашбордов, которых в ките нет; значения выведены из токенов кита. */
+
+:root {
+  /* ── Из кита: цвета ── */
+  --color-primary: #093eb4;
+  --color-primary-hover: #2259d4;
+  --color-primary-active: #0a34aa;
+  --color-secondary: #ff672d;
+
+  --color-text-primary: #091d36;
+  --color-text-muted: #616f8d;
+  --color-text-disabled: #a3a3a3;
+  --color-text-inverse: #ffffff;
+
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f2f5f9;
+  --color-bg-accent: #eaeffc;
+
+  --color-error: #ff4053;
+  --color-focus: #0c8cff;
+  --color-border: #c1c5d0;
+
+  /* ── Из кита: шрифт ── */
+  --font-family: 'Wix Madefor Display', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ── Из кита: радиусы, тени, отступы ── */
+  --radius-xs: 6px;
+  --radius-s: 8px;
+  --radius-m: 16px;
+  --radius-l: 20px;
+  --radius-2l: 26px;
+  --radius-full: 9999px;
+
+  --elevation-sm: 0px 4px 32px rgba(0, 0, 0, 0.1);
+  --elevation-lg: 0px 1px 3px rgba(0, 0, 0, 0.05), 0px 4px 24px rgba(0, 0, 0, 0.12);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ── Платформа: поверхности и линии (цвета из компонентов кита) ── */
+  --ds-line: #e0e8f5;            /* обводка чекбокса кита */
+  --ds-line-strong: #d0d5e3;     /* disabled кнопки кита */
+  --ds-row-hover: #f5f8ff;       /* неактивный таб кита */
+  --ds-accent-hover: #dce6ff;    /* hover таба кита */
+
+  /* ── Платформа: статусы (бейджи кита; текст дельт затемнен для контраста на белом) ── */
+  --ds-success-bg: #c8f1df;
+  --ds-success-text: #104f36;
+  --ds-warning-bg: #ffe9ba;
+  --ds-warning-text: #704d00;
+  --ds-info-bg: #d5ebff;
+  --ds-info-text: #284f71;
+  --ds-danger-bg: #ffe3e6;
+  --ds-danger-text: #c0162a;
+  --ds-up: #16803c;
+  --ds-down: #d62839;
+
+  /* ── Платформа: плотность элементов управления ── */
+  --ds-control-h: 36px;
+  --ds-control-radius: 12px;
+  --ds-font-size: 14px;
+
+  /* ── Платформа: палитра графиков и KPI по умолчанию (цвета палитры кита).
+     Дашборд может переопределить --ds-chart-* у себя: цвета данных у дашбордов свои. ── */
+  --ds-chart-1: #093eb4;
+  --ds-chart-2: #ff672d;
+  --ds-chart-3: #59a7d8;
+  --ds-chart-4: #2ac000;
+  --ds-chart-5: #1c5bc4;
+  --ds-chart-6: #3b475a;
+  --ds-chart-7: #ff4053;
+  --ds-chart-8: #9fb8f1;
+}

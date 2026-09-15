@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UI-kit платформы - образец</title>
+  <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="/ui-kit/ds.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/ui-kit/ds.js"></script>
+  <style>
+    .pv-section { margin-bottom: 20px; }
+    .pv-h { font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--color-text-muted); margin: 0 0 12px; }
+    .pv-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .pv-swatch { border-radius: 12px; overflow: hidden; border: 1px solid var(--ds-line); background: #fff; font-size: 12px; }
+    .pv-swatch i { display: block; height: 44px; }
+    .pv-swatch span { display: block; padding: 6px 10px; }
+    .pv-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+    .pv-icon { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-muted); }
+    .pv-icon .ds-icon { width: 22px; height: 22px; color: var(--color-primary); }
+    .pv-stack > * + * { margin-top: 10px; }
+  </style>
+</head>
+<body class="app-chrome">
+  <nav class="ds-topbar">
+    <img class="ds-topbar__logo" src="/ui-kit/logo-white.svg" alt="Российская школа управления">
+    <span class="ds-topbar__user">Иван Иванов</span>
+    <div class="ds-topbar__nav">
+      <a class="ds-topbar__link is-active" href="#"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-dashboard"></use></svg><span class="ds-topbar__label">Дашборды</span></a>
+      <a class="ds-topbar__link" href="#"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-users"></use></svg><span class="ds-topbar__label">Пользователи</span></a>
+      <a class="ds-topbar__link" href="#"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-logout"></use></svg><span class="ds-topbar__label">Выйти</span></a>
+    </div>
+  </nav>
+
+  <main class="ds-page">
+    <div class="ds-page-head">
+      <div>
+        <h1 class="ds-title">Образец элементов платформы</h1>
+        <p class="ds-subtitle">Токены RSU/UI-kit (feature/kit-components, cead924) в плотности дашбордов</p>
+      </div>
+      <div class="ds-row">
+        <a class="btn-guide" href="#"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-file"></use></svg>Инструкция</a>
+        <button class="btn-excel" type="button"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-download"></use></svg>Скачать Excel</button>
+      </div>
+    </div>
+
+    <section class="card pv-section">
+      <h2 class="pv-h">Цвета</h2>
+      <div class="pv-swatches" id="swatches"></div>
+    </section>
+
+    <section class="card pv-section">
+      <h2 class="pv-h">Типографика</h2>
+      <div class="pv-stack">
+        <div style="font-size:24px;line-height:32px;font-weight:700">Заголовок страницы 24 / Bold</div>
+        <div style="font-size:17px;line-height:24px;font-weight:700">Заголовок карточки 17 / Bold</div>
+        <div style="font-size:14px;font-weight:500">Основной текст 14 / Medium. Поступления 23 292 060 ₽, сделки 1 077</div>
+        <div class="ds-muted" style="font-size:13px">Вторичный текст 13 / Regular</div>
+      </div>
+    </section>
+
+    <section class="card pv-section">
+      <h2 class="pv-h">Кнопки</h2>
+      <div class="ds-row" style="margin-bottom:12px">
+        <button class="ds-btn ds-btn--primary">Применить</button>
+        <button class="ds-btn ds-btn--light"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-download"></use></svg>Скачать Excel</button>
+        <button class="ds-btn ds-btn--ghost"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-refresh"></use></svg>Обновить</button>
+        <button class="ds-btn ds-btn--danger"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-trash"></use></svg>Удалить</button>
+        <button class="ds-btn ds-btn--primary" disabled>Недоступна</button>
+        <button class="ds-btn ds-btn--ghost ds-btn--icon" title="Изменить"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-edit"></use></svg></button>
+        <button class="ds-btn ds-btn--primary ds-btn--sm"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-plus"></use></svg>Малая</button>
+      </div>
+      <div class="ds-row">
+        <span class="ds-muted" style="font-size:12px">Bootstrap:</span>
+        <button class="btn btn-primary">btn-primary</button>
+        <button class="btn btn-outline-secondary">btn-outline-secondary</button>
+        <button class="btn btn-sm btn-outline-secondary">btn-sm</button>
+        <span class="badge text-bg-primary">badge</span>
+      </div>
+    </section>
+
+    <section class="card pv-section">
+      <h2 class="pv-h">Фильтры и поля</h2>
+      <div class="date-filter-bar">
+        <label>Период:</label>
+        <input type="text" class="rc-input" readonly value="01.06.2026 - 31.08.2026">
+        <select class="ds-select"><option>Все направления</option><option>Корпоративное право</option></select>
+        <div class="ds-segment" role="group">
+          <button class="ds-segment__btn is-active" type="button">Неделя</button>
+          <button class="ds-segment__btn" type="button">Месяц</button>
+          <button class="ds-segment__btn" type="button">Год</button>
+        </div>
+        <span class="filter-info">166 продуктов</span>
+      </div>
+      <div class="tabs">
+        <button class="tab active" type="button">Продукты</button>
+        <button class="tab" type="button">Источники</button>
+        <button class="tab" type="button">Компании</button>
+      </div>
+      <div class="ds-row" style="align-items:flex-start;gap:16px">
+        <div class="ds-field" style="min-width:260px">
+          <label class="ds-label" for="pvLogin">Логин</label>
+          <input class="ds-input" id="pvLogin" placeholder="Логин">
+          <span class="ds-hint">Подсказка к полю</span>
+        </div>
+        <div class="ds-field" style="min-width:260px">
+          <label class="ds-label" for="pvErr">С ошибкой</label>
+          <input class="ds-input ds-input--error" id="pvErr" value="client name">
+        </div>
+        <div class="ds-field" style="justify-content:flex-end;padding-top:24px">
+          <label class="ds-check"><input type="checkbox" checked>Отдел продаж</label>
+          <label class="ds-check"><input type="checkbox">Рейтинги</label>
+        </div>
+      </div>
+    </section>
+
+    <section class="pv-section">
+      <div class="kpis kpis-8">
+        <div class="kpi"><div class="lbl">Поступления</div><div class="val">23,3 млн ₽</div><div class="sub"><span class="delta-up">+2,3%</span> к прошлому</div></div>
+        <div class="kpi"><div class="lbl">Сделки</div><div class="val">1 077</div><div class="sub"><span class="delta-down">-4,1%</span></div></div>
+        <div class="kpi"><div class="lbl">Лиды</div><div class="val">8 412</div><div class="sub"><span class="delta-flat">0,0%</span></div></div>
+        <div class="kpi kpi-oom"><div class="lbl">Тема дашборда</div><div class="val c-oom">91,8%</div><div class="sub">цвет задает дашборд</div></div>
+      </div>
+    </section>
+
+    <section class="card pv-section">
+      <h2 class="pv-h">Таблица</h2>
+      <div class="scroll-x">
+        <table>
+          <thead><tr><th class="sort desc">Продукт</th><th class="sort tdright">Сделки</th><th class="sort tdright">Выставленные счета, ₽</th><th class="sort tdright">Поступления, ₽</th><th>Статус</th></tr></thead>
+          <tbody>
+            <tr><td>Mini MBA. Классический</td><td class="tdright">5</td><td class="tdright">1 210 000</td><td class="tdright">1 051 500</td><td><span class="ds-badge ds-badge--success">Оплачено</span></td></tr>
+            <tr><td>Директор по производству</td><td class="tdright">12</td><td class="tdright">964 000</td><td class="tdright">812 300</td><td><span class="ds-badge ds-badge--warning">Частично</span></td></tr>
+            <tr><td>Клиентский сервис</td><td class="tdright">0</td><td class="tdright">80 000</td><td class="tdright">0</td><td><span class="ds-badge ds-badge--danger">Нет оплат</span></td></tr>
+            <tr class="cur"><td>ИТОГО</td><td class="tdright">17</td><td class="tdright">2 254 000</td><td class="tdright">1 863 800</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="twocol pv-section">
+      <section class="card">
+        <h2 class="pv-h">График (палитра по умолчанию)</h2>
+        <div class="chartbox-sm"><canvas id="pvChart"></canvas></div>
+      </section>
+      <section class="card">
+        <h2 class="pv-h">Сообщения и статусы</h2>
+        <div class="pv-stack">
+          <div class="ds-alert"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-info"></use></svg>Данные обновлены 16.09.2026 в 09:00</div>
+          <div class="ds-alert ds-alert--warning"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-warning"></use></svg>Часть сделок без направления</div>
+          <div class="ds-alert ds-alert--danger"><svg class="ds-icon"><use href="/ui-kit/icons.svg#i-close"></use></svg>Не удалось загрузить данные</div>
+          <div class="ds-row">
+            <span><i class="ds-dot ds-dot--success"></i>в плане</span>
+            <span><i class="ds-dot ds-dot--warning"></i>риск</span>
+            <span><i class="ds-dot ds-dot--danger"></i>отставание</span>
+            <span class="ds-badge ds-badge--primary">Новый</span>
+            <span class="ds-badge ds-badge--info">Инфо</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="pv-section">
+      <h2 class="pv-h">Плитки дашбордов</h2>
+      <div class="ds-grid">
+        <a class="ds-tile" href="#"><span class="ds-tile__icon"><svg class="ds-icon"><use href="/ui-kit/icons.svg#icon-query-stats"></use></svg></span><span class="ds-tile__title">Управленческий дашборд</span><svg class="ds-icon ds-tile__arrow"><use href="/ui-kit/icons.svg#i-chevron-right"></use></svg></a>
+        <a class="ds-tile" href="#"><span class="ds-tile__icon"><svg class="ds-icon"><use href="/ui-kit/icons.svg#icon-school"></use></svg></span><span class="ds-tile__title">Участники</span></a>
+      </div>
+    </section>
+
+    <section class="card pv-section">
+      <h2 class="pv-h">Иконки</h2>
+      <div class="pv-icons" id="icons"></div>
+    </section>
+
+    <section class="pv-section">
+      <h2 class="pv-h">Модальное окно и уведомление</h2>
+      <div class="ds-row">
+        <button class="ds-btn ds-btn--primary" type="button" onclick="document.getElementById('pvModal').classList.add('active')">Открыть окно</button>
+        <button class="ds-btn ds-btn--ghost" type="button" onclick="var t=document.getElementById('pvToast');t.classList.add('show');setTimeout(function(){t.classList.remove('show')},2500)">Показать уведомление</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="ds-modal" id="pvModal" onclick="if(event.target===this)this.classList.remove('active')">
+    <div class="ds-modal__box">
+      <h2 class="ds-modal__title">Создать пользователя</h2>
+      <div class="ds-field"><label class="ds-label" for="pvM1">Логин</label><input class="ds-input" id="pvM1" placeholder="client_name"></div>
+      <div class="ds-modal__actions">
+        <button class="ds-btn ds-btn--ghost" type="button" onclick="document.getElementById('pvModal').classList.remove('active')">Отмена</button>
+        <button class="ds-btn ds-btn--primary" type="button">Создать</button>
+      </div>
+    </div>
+  </div>
+  <div class="ds-toast" id="pvToast">Сохранено</div>
+
+  <script>
+    (function () {
+      var sw = [
+        ['--color-primary', 'primary'], ['--color-primary-hover', 'primary hover'], ['--color-secondary', 'secondary'],
+        ['--color-text-primary', 'текст'], ['--color-text-muted', 'текст вторичный'], ['--color-bg-secondary', 'фон страницы'],
+        ['--color-bg-accent', 'фон акцент'], ['--ds-line', 'линии'], ['--color-error', 'ошибка'], ['--color-focus', 'фокус']
+      ];
+      document.getElementById('swatches').innerHTML = sw.map(function (s) {
+        return '<div class="pv-swatch"><i style="background:var(' + s[0] + ')"></i><span><b>' + s[1] + '</b><br>' + DS.tok(s[0]) + '</span></div>';
+      }).join('');
+
+      fetch('/ui-kit/icons.svg').then(function (r) { return r.text(); }).then(function (t) {
+        var ids = (t.match(/id="([^"]+)"/g) || []).map(function (m) { return m.slice(4, -1); });
+        document.getElementById('icons').innerHTML = ids.map(function (id) {
+          return '<div class="pv-icon">' + DS.icon(id) + '<span>' + id + '</span></div>';
+        }).join('');
+      });
+
+      new Chart(document.getElementById('pvChart'), {
+        type: 'bar',
+        data: {
+          labels: ['Июнь', 'Июль', 'Август'],
+          datasets: [
+            { label: 'Очный', data: [8.1, 6.4, 8.8], backgroundColor: DS.color(0), borderRadius: 6 },
+            { label: 'Онлайн', data: [3.2, 2.9, 4.1], backgroundColor: DS.color(2), borderRadius: 6 },
+            { label: 'СДО', data: [1.1, 0.9, 1.4], backgroundColor: DS.color(1), borderRadius: 6 }
+          ]
+        },
+        options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    })();
+  </script>
+</body>
+</html>

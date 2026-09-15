@@ -1,0 +1,30 @@
+/* Wix Madefor Display (SIL OFL 1.1). Файлы из RSU/UI-kit, feature/kit-components, cead924,
+   src/styles/fonts. Жирное начертание в ките есть только в ttf. */
+@font-face {
+  font-family: 'Wix Madefor Display';
+  src: url('./fonts/WixMadeforDisplay-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Wix Madefor Display';
+  src: url('./fonts/WixMadeforDisplay-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Wix Madefor Display';
+  src: url('./fonts/WixMadeforDisplay-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Wix Madefor Display';
+  src: url('./fonts/WixMadeforDisplay-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
