@@ -1,0 +1,18 @@
+<%# Верхняя панель оболочки (UI-kit платформы). Параметры: user {name, role}, active: 'dashboards' | 'admin'. %>
+<nav class="ds-topbar">
+  <a href="/dashboards" aria-label="На главную"><img class="ds-topbar__logo" src="/ui-kit/logo-white.svg" alt="Российская школа управления"></a>
+  <span class="ds-topbar__user"><%= user.name %><% if (user.role === 'guest') { %> (гость)<% } %></span>
+  <div class="ds-topbar__nav">
+    <a href="/dashboards" class="ds-topbar__link<%= active === 'dashboards' ? ' is-active' : '' %>" title="Дашборды">
+      <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-dashboard"></use></svg><span class="ds-topbar__label">Дашборды</span>
+    </a>
+    <% if (user.role === 'admin') { %>
+    <a href="/admin" class="ds-topbar__link<%= active === 'admin' ? ' is-active' : '' %>" title="Пользователи">
+      <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-users"></use></svg><span class="ds-topbar__label">Пользователи</span>
+    </a>
+    <% } %>
+    <a href="/logout" class="ds-topbar__link" title="Выйти">
+      <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-logout"></use></svg><span class="ds-topbar__label">Выйти</span>
+    </a>
+  </div>
+</nav>

@@ -378,7 +378,8 @@ function getAvailableDashboards(user) {
         dashboards.push({
           name: entry.name,
           description: meta ? meta.label : entry.name,
-          icon: meta ? meta.icon : '📁',
+          // id символа из /ui-kit/icons.svg (icon-* кита или i-* платформы)
+          icon: (meta && meta.icon) || 'i-dashboard',
           url: kp.url
         });
       }

@@ -3,31 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>РШУ дашборды — вход</title>
+  <title>Дашборды РШУ - вход</title>
   <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="/ui-kit/ds.css">
 </head>
 <body class="app-chrome">
-  <div class="login-page">
-    <div class="card p-4 text-center" style="width:360px">
-      <div style="font-size:40px">📊</div>
-      <h1 class="h4 mb-1">РШУ дашборды</h1>
-      <p class="text-secondary mb-4">Вход в систему</p>
+  <main class="ds-login">
+    <div class="ds-login__card">
+      <img class="ds-login__logo" src="/ui-kit/logo.svg" alt="Российская школа управления">
+      <h1 class="ds-login__title">Дашборды РШУ</h1>
+      <p class="ds-login__sub">Войдите, чтобы открыть дашборды</p>
       <% if (locals.error) { %>
-        <div class="alert alert-danger py-2"><%= error %></div>
+        <div class="ds-alert ds-alert--danger" role="alert" style="margin-bottom:16px">
+          <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-warning"></use></svg><span><%= error %></span>
+        </div>
       <% } %>
-      <form method="POST" action="/login" class="text-start">
-        <div class="mb-3">
-          <label for="username" class="form-label">Логин</label>
-          <input type="text" id="username" name="username" class="form-control" placeholder="Логин" required autofocus>
+      <form method="POST" action="/login">
+        <div class="ds-field">
+          <label for="username" class="ds-label">Логин</label>
+          <input type="text" id="username" name="username" class="ds-input" placeholder="Логин" autocomplete="username" required autofocus>
         </div>
-        <div class="mb-3">
-          <label for="password" class="form-label">Пароль</label>
-          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+        <div class="ds-field">
+          <label for="password" class="ds-label">Пароль</label>
+          <input type="password" id="password" name="password" class="ds-input" placeholder="Пароль" autocomplete="current-password" required>
         </div>
-        <button type="submit" class="btn btn-primary w-100">Войти</button>
+        <button type="submit" class="ds-btn ds-btn--primary ds-btn--lg ds-btn--block" style="margin-top:8px">Войти</button>
       </form>
     </div>
-  </div>
+  </main>
 </body>
 </html>

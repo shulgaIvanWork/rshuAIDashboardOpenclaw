@@ -19,6 +19,7 @@ clover-web/     ← оболочка (порт 3000)
   data/dashboards.json меты дашбордов (label, icon)
   public/shared.js    общие фронт-хелперы: api(), fmt(), escapeHtml(), initTableSort(), shortCompany(), BASE_PATH
   public/shared.css   общие стили + .btn-guide/.btn-excel/.rc-input
+  public/ui-kit/      внешний стиль платформы на RSU/UI-kit: ds.css, ds.js, icons.svg, шрифт (см. SOURCE.md, образец preview.html)
   public/vendor/      bootstrap, range-calendar (кастомный виджет периода)
 
 dashboards/<name>/  ← каждый дашборд = отдельное Express-приложение
@@ -35,7 +36,8 @@ dashboards/<name>/  ← каждый дашборд = отдельное Express
 
 1. **Положить папку** `dashboards/my-dashboard/` с `server.js` (экспорт `default` app/Router).
 2. **Добавить запись** в `clover-web/data/dashboards.json`:
-   `"my-dashboard": { "label": "...", "icon": "..." }`
+   `"my-dashboard": { "label": "...", "icon": "icon-school" }`, где `icon` - id символа из
+   `clover-web/public/ui-kit/icons.svg` (эмодзи не использовать).
 
 Всё остальное автоматически: `clover-web/server.js` по ключам `dashboards.json`
 монтирует sub-app (`requireDashboardAccess` + `lazyApp`) и строит список для пользователей.

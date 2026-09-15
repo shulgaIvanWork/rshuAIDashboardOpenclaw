@@ -3,39 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>РШУ дашборды — админка</title>
+  <title>Дашборды РШУ - пользователи</title>
   <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="/ui-kit/ds.css">
   <style>
-    /* Модалка и тост — локально: их show/hide реализован на classList,
-       без bootstrap.bundle.js штатные Modal/Toast не поднять. */
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1000; align-items: center; justify-content: center; }
-    .modal-overlay.active { display: flex; }
-    .modal-box { background: #fff; border-radius: 16px; padding: 24px; width: 500px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
-    .app-toast { position: fixed; bottom: 24px; right: 24px; background: #093EB4; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; z-index: 2000; opacity: 0; transition: opacity .3s; }
-    .app-toast.show { opacity: 1; }
+    .adm-table-card { padding: 0; overflow: hidden; }
+    .adm-table td, .adm-table th { vertical-align: middle; padding: 10px 14px; }
+    .adm-table thead tr:first-child th { border-radius: 0; }
+    .adm-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+    .adm-dash-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 16px; }
+    .adm-pw { display: inline-flex; align-items: center; gap: 4px; }
   </style>
 </head>
 <body class="app-chrome">
-  <nav class="app-navbar navbar navbar-expand px-4">
-    <span class="navbar-brand text-white fw-bold mb-0">📊 РШУ</span>
-    <span class="text-white-50 small me-auto"><%= user.name %></span>
-    <div class="navbar-nav flex-row gap-2">
-      <a href="/dashboards" class="nav-link">📊 Дашборды</a>
-      <a href="/admin" class="nav-link active">👥 Пользователи</a>
-      <a href="/logout" class="nav-link logout-link">🚪 Выйти</a>
-    </div>
-  </nav>
+  <%- include('partials/topbar', { user: { name: user.name, role: 'admin' }, active: 'admin' }) %>
 
-  <main class="container py-4" style="max-width:1200px">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h1 class="h4 mb-0">👥 Управление пользователями</h1>
-      <button class="btn btn-primary" onclick="openCreate()">➕ Создать</button>
+  <main class="ds-page">
+    <div class="ds-page-head">
+      <h1 class="ds-title">Пользователи</h1>
+      <button class="ds-btn ds-btn--primary" type="button" onclick="openCreate()">
+        <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-plus"></use></svg>Создать
+      </button>
     </div>
 
-    <div class="card">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+    <div class="ds-card adm-table-card">
+      <div class="scroll-x">
+        <table class="adm-table">
           <thead>
             <tr>
               <th>Логин</th>
@@ -49,35 +43,39 @@
           <tbody>
             <% users.forEach(function(u) { %>
             <tr data-id="<%= u.id %>">
-              <td><code><%= u.id %></code></td>
+              <td class="ds-mono"><%= u.id %></td>
               <td><%= u.name %></td>
-              <td><span class="badge <%= u.role === 'admin' ? 'text-bg-primary badge-admin' : 'text-bg-info badge-guest' %>"><%= u.role === 'admin' ? 'Админ' : 'Гость' %></span></td>
+              <td><span class="ds-badge <%= u.role === 'admin' ? 'ds-badge--primary' : 'ds-badge--info' %>"><%= u.role === 'admin' ? 'Админ' : 'Гость' %></span></td>
               <td>
                 <% if (u.password) { %>
-                  <span class="font-monospace pw-mask" data-pw="<%= u.password %>">••••••••</span>
-                  <button class="btn btn-sm btn-link p-0 ms-1 pw-toggle" title="Показать/скрыть">👁️</button>
-                  <button class="btn btn-sm btn-link p-0 ms-1 pw-copy" title="Скопировать">📋</button>
+                  <span class="adm-pw">
+                    <span class="ds-mono pw-mask" data-pw="<%= u.password %>">••••••••</span>
+                    <button class="ds-btn ds-btn--ghost ds-btn--sm ds-btn--icon pw-toggle" type="button" title="Показать или скрыть" aria-label="Показать или скрыть пароль"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-eye"></use></svg></button>
+                    <button class="ds-btn ds-btn--ghost ds-btn--sm ds-btn--icon pw-copy" type="button" title="Скопировать" aria-label="Скопировать пароль"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-copy"></use></svg></button>
+                  </span>
                 <% } else { %>
-                  <span class="text-secondary small">скрыт (старый) — сбросьте 🔑</span>
+                  <span class="ds-muted" style="font-size:12px">скрыт (старый), сбросьте пароль</span>
                 <% } %>
               </td>
               <td>
                 <% if (u.role === 'admin') { %>
-                  <span class="text-secondary small">все</span>
+                  <span class="ds-muted" style="font-size:12px">все</span>
                 <% } else if (u.dashboards && u.dashboards.length > 0) { %>
+                  <span class="adm-badges">
                   <% u.dashboards.forEach(function(d) { %>
-                    <span class="badge text-bg-success badge-dash me-1"><%= d %></span>
+                    <span class="ds-badge ds-badge--success"><%= d %></span>
                   <% }); %>
+                  </span>
                 <% } else { %>
-                  <span class="badge text-bg-danger">нет доступа</span>
+                  <span class="ds-badge ds-badge--danger">нет доступа</span>
                 <% } %>
               </td>
               <td>
-                <div class="d-flex gap-1">
-                  <button class="btn btn-sm btn-outline-secondary" onclick="openEdit('<%= u.id %>')">✏️</button>
+                <div class="ds-row" style="gap:4px;flex-wrap:nowrap">
+                  <button class="ds-btn ds-btn--ghost ds-btn--sm ds-btn--icon" type="button" title="Изменить" aria-label="Изменить" onclick="openEdit('<%= u.id %>')"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-edit"></use></svg></button>
                   <% if (u.role !== 'admin') { %>
-                  <button class="btn btn-sm btn-outline-secondary" onclick="resetPassword('<%= u.id %>')">🔑</button>
-                  <button class="btn btn-sm btn-danger" onclick="deleteUser('<%= u.id %>')">🗑️</button>
+                  <button class="ds-btn ds-btn--ghost ds-btn--sm ds-btn--icon" type="button" title="Сбросить пароль" aria-label="Сбросить пароль" onclick="resetPassword('<%= u.id %>')"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-key"></use></svg></button>
+                  <button class="ds-btn ds-btn--danger ds-btn--sm ds-btn--icon" type="button" title="Удалить" aria-label="Удалить" onclick="deleteUser('<%= u.id %>')"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-trash"></use></svg></button>
                   <% } %>
                 </div>
               </td>
@@ -90,59 +88,68 @@
   </main>
 
   <!-- Modal: Create/Edit -->
-  <div class="modal-overlay" id="userModal">
-    <div class="modal-box">
-      <h2 class="h5 mb-3" id="modalTitle">Создать пользователя</h2>
+  <div class="ds-modal" id="userModal">
+    <div class="ds-modal__box">
+      <h2 class="ds-modal__title" id="modalTitle">Создать пользователя</h2>
       <input type="hidden" id="editId">
 
-      <label for="modalId" class="form-label">Логин</label>
-      <input type="text" id="modalId" class="form-control mb-2" placeholder="client_name" pattern="[a-zA-Z0-9_-]+" required>
-
-      <label for="modalName" class="form-label">Имя</label>
-      <input type="text" id="modalName" class="form-control mb-2" placeholder="ООО Клиент">
-
-      <label for="modalPassword" class="form-label" id="modalPasswordLabel">Пароль</label>
-      <div class="input-group mb-1">
-        <input type="text" id="modalPassword" class="form-control font-monospace" placeholder="">
-        <button class="btn btn-outline-secondary" type="button" onclick="genPassword()">🎲 Сгенерировать</button>
+      <div class="ds-field">
+        <label for="modalId" class="ds-label">Логин</label>
+        <input type="text" id="modalId" class="ds-input" placeholder="client_name" pattern="[a-zA-Z0-9_-]+" required>
       </div>
-      <div class="form-text mb-2" id="modalPasswordHint">Пусто при создании — сгенерируется автоматически.</div>
 
-      <label for="modalRole" class="form-label">Роль</label>
-      <select id="modalRole" class="form-select mb-2" onchange="toggleDashboardsField()">
-        <option value="guest">Гость</option>
-        <option value="admin">Админ</option>
-      </select>
+      <div class="ds-field">
+        <label for="modalName" class="ds-label">Имя</label>
+        <input type="text" id="modalName" class="ds-input" placeholder="ООО Клиент">
+      </div>
 
-      <div id="dashboardsField">
-        <label class="form-label">Доступ к дашбордам</label>
-        <div class="row row-cols-2 g-1" id="dashboardsCheckboxes">
+      <div class="ds-field">
+        <label for="modalPassword" class="ds-label" id="modalPasswordLabel">Пароль</label>
+        <div class="ds-row" style="flex-wrap:nowrap">
+          <input type="text" id="modalPassword" class="ds-input ds-mono" placeholder="">
+          <button class="ds-btn ds-btn--ghost" type="button" onclick="genPassword()">
+            <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-shuffle"></use></svg>Сгенерировать
+          </button>
+        </div>
+        <span class="ds-hint" id="modalPasswordHint">Если оставить пустым, пароль сгенерируется автоматически.</span>
+      </div>
+
+      <div class="ds-field">
+        <label for="modalRole" class="ds-label">Роль</label>
+        <select id="modalRole" class="ds-select" onchange="toggleDashboardsField()">
+          <option value="guest">Гость</option>
+          <option value="admin">Админ</option>
+        </select>
+      </div>
+
+      <div id="dashboardsField" class="ds-field">
+        <span class="ds-label">Доступ к дашбордам</span>
+        <div class="adm-dash-list" id="dashboardsCheckboxes">
           <% dashboards.forEach(function(d) { %>
-            <div class="col">
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input dash-chk" id="chk_<%= d.name %>" value="<%= d.name %>">
-                <label class="form-check-label" for="chk_<%= d.name %>"><%= d.label %></label>
-              </div>
-            </div>
+            <label class="ds-check" for="chk_<%= d.name %>">
+              <input type="checkbox" class="dash-chk" id="chk_<%= d.name %>" value="<%= d.name %>"><%= d.label %>
+            </label>
           <% }); %>
         </div>
-        <div class="form-text">выберите хотя бы один — иначе у гостя <b>нет доступа</b> ни к чему</div>
+        <span class="ds-hint">Выберите хотя бы один, иначе у гостя <b>нет доступа</b> ни к одному дашборду</span>
       </div>
 
-      <div id="passwordDisplay" class="alert alert-warning mt-3" style="display:none;">
-        <div class="small">🔑 Сгенерированный пароль (показывается один раз):</div>
-        <div class="fs-5 fw-bold font-monospace" id="generatedPassword"></div>
+      <div id="passwordDisplay" class="ds-alert ds-alert--warning" style="display:none;margin-top:12px">
+        <div>
+          <div style="font-size:12px">Сгенерированный пароль (показывается один раз):</div>
+          <div class="ds-mono" style="font-size:18px;font-weight:700" id="generatedPassword"></div>
+        </div>
       </div>
 
-      <div class="d-flex gap-2 justify-content-end mt-3">
-        <button class="btn btn-outline-secondary" onclick="closeModal()">Отмена</button>
-        <button class="btn btn-primary" id="modalSaveBtn" onclick="saveUser()">Сохранить</button>
+      <div class="ds-modal__actions">
+        <button class="ds-btn ds-btn--ghost" type="button" onclick="closeModal()">Отмена</button>
+        <button class="ds-btn ds-btn--primary" type="button" id="modalSaveBtn" onclick="saveUser()">Сохранить</button>
       </div>
     </div>
   </div>
 
   <!-- Toast -->
-  <div class="app-toast" id="toast"></div>
+  <div class="ds-toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
     const allDashboards = <%- JSON.stringify(dashboards.map(d => ({ name: d.name, label: d.label }))) %>;
@@ -168,18 +175,18 @@
       const cp = e.target.closest('.pw-copy');
       if (cp) {
         const pw = cp.closest('td').querySelector('.pw-mask').dataset.pw;
-        navigator.clipboard.writeText(pw).then(() => showToast('📋 Пароль скопирован'));
+        navigator.clipboard.writeText(pw).then(() => showToast('Пароль скопирован'));
       }
     });
 
     function openCreate() {
-      document.getElementById('modalTitle').textContent = '➕ Создать пользователя';
+      document.getElementById('modalTitle').textContent = 'Создать пользователя';
       document.getElementById('editId').value = '';
       document.getElementById('modalId').value = '';
       document.getElementById('modalId').disabled = false;
       document.getElementById('modalName').value = '';
       document.getElementById('modalPassword').value = '';
-      document.getElementById('modalPasswordHint').textContent = 'Пусто — сгенерируется автоматически.';
+      document.getElementById('modalPasswordHint').textContent = 'Если оставить пустым, пароль сгенерируется автоматически.';
       document.getElementById('modalRole').value = 'guest';
       document.getElementById('passwordDisplay').style.display = 'none';
       document.getElementById('generatedPassword').textContent = '';
@@ -193,7 +200,7 @@
     function openEdit(id) {
       const u = USERS.find(x => x.id === id);
       if (!u) return;
-      document.getElementById('modalTitle').textContent = '✏️ Редактировать пользователя';
+      document.getElementById('modalTitle').textContent = 'Редактировать пользователя';
       document.getElementById('editId').value = id;
       document.getElementById('modalId').value = id;
       document.getElementById('modalId').disabled = true;
@@ -203,11 +210,11 @@
       document.getElementById('modalSaveBtn').onclick = saveUser;
 
       document.getElementById('modalName').value = u.name || '';
-      // Пароль: показываем текущий (если открытый); для старого хеша — пусто с подсказкой
+      // Пароль: показываем текущий (если открытый); для старого хеша - пусто с подсказкой
       document.getElementById('modalPassword').value = u.password || '';
       document.getElementById('modalPasswordHint').textContent = u.password
-        ? 'Можно изменить. Пусто — оставить как есть.'
-        : 'Старый пароль скрыт (хеш). Введите новый или оставьте пусто.';
+        ? 'Можно изменить. Если оставить пустым, пароль не изменится.'
+        : 'Старый пароль скрыт (хеш). Введите новый или оставьте пустым.';
       document.getElementById('modalRole').value = u.role === 'admin' ? 'admin' : 'guest';
       toggleDashboardsField();
 
@@ -222,7 +229,7 @@
 
     function toggleDashboardsField() {
       const role = document.getElementById('modalRole').value;
-      document.getElementById('dashboardsField').style.display = role === 'admin' ? 'none' : 'block';
+      document.getElementById('dashboardsField').style.display = role === 'admin' ? 'none' : 'flex';
     }
 
     function closeModal() {
@@ -253,11 +260,11 @@
           body: JSON.stringify({ id, name, role, dashboards, password })
         });
         const data = await res.json();
-        if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
+        if (!data.ok) { showToast('Ошибка: ' + (data.error || 'не удалось сохранить')); return; }
 
         if (data.generatedPassword) {
           document.getElementById('generatedPassword').textContent = data.generatedPassword;
-          document.getElementById('passwordDisplay').style.display = 'block';
+          document.getElementById('passwordDisplay').style.display = 'flex';
           document.getElementById('modalSaveBtn').textContent = 'Закрыть';
           document.getElementById('modalSaveBtn').onclick = () => location.reload();
           return;
@@ -270,11 +277,11 @@
           body: JSON.stringify({ name, role, dashboards, newPassword: password })
         });
         const data = await res.json();
-        if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
+        if (!data.ok) { showToast('Ошибка: ' + (data.error || 'не удалось сохранить')); return; }
       }
 
       closeModal();
-      showToast('✅ Сохранено');
+      showToast('Сохранено');
       setTimeout(() => location.reload(), 500);
     }
 
@@ -286,8 +293,8 @@
         body: JSON.stringify({ resetPassword: true })
       });
       const data = await res.json();
-      if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
-      showToast('🔑 Новый пароль для ' + id + ': ' + data.generatedPassword, 15000);
+      if (!data.ok) { showToast('Ошибка: ' + (data.error || 'не удалось сбросить пароль')); return; }
+      showToast('Новый пароль для ' + id + ': ' + data.generatedPassword, 15000);
       setTimeout(() => location.reload(), 2500);
     }
 
@@ -296,9 +303,9 @@
 
       const res = await fetch('/api/admin/users/' + encodeURIComponent(id), { method: 'DELETE' });
       const data = await res.json();
-      if (!data.ok) { showToast('❌ ' + (data.error || 'Ошибка')); return; }
+      if (!data.ok) { showToast('Ошибка: ' + (data.error || 'не удалось удалить')); return; }
 
-      showToast('✅ Пользователь удалён');
+      showToast('Пользователь удален');
       setTimeout(() => location.reload(), 500);
     }
 

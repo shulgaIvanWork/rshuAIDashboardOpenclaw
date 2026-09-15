@@ -1,42 +1,42 @@
 {
   "drop-dashboard": {
     "label": "Дашборд отдела продаж РШУ",
-    "icon": "📈"
+    "icon": "icon-money-bag"
   },
   "rshu-dashboard": {
     "label": "Отчёт по продажам за последний месяц",
-    "icon": "📊"
+    "icon": "i-chart"
   },
   "kom-dashboard": {
     "label": "КОМ — Корпоративное обучение",
-    "icon": "🎓"
+    "icon": "icon-tenancy"
   },
   "test-dashboard": {
     "label": "Тестовый дашборд (прогноз)",
-    "icon": "🧪"
+    "icon": "icon-automation"
   },
   "rshu-management-dashboard": {
     "label": "Управленческий дашборд РШУ",
-    "icon": "📈"
+    "icon": "icon-dashboard-gear"
   },
   "participants-dashboard": {
     "label": "Участники",
-    "icon": "👥"
+    "icon": "icon-school"
   },
   "ratings-dashboard": {
     "label": "Рейтинги",
-    "icon": "🏆"
+    "icon": "icon-query-stats"
   },
   "manager-report-dev": {
     "label": "Отчёт для менеджеров (dev)",
-    "icon": "📊"
+    "icon": "icon-manage-accounts"
   },
   "plan-fact-dashboard": {
     "label": "План-факт выручки",
-    "icon": "📋"
+    "icon": "icon-balance"
   },
   "nps-dashboard": {
     "label": "NPS",
-    "icon": "😊"
+    "icon": "icon-verified-user"
   }
 }
