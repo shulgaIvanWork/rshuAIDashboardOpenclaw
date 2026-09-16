@@ -72,61 +72,6 @@ function getLostDate(d) {
   return new Date(d.CLOSEDATE.slice(0, 10));
 }
 
-// --- Отказ (дата отказа) ---
-function hasRefusalBefore(d, dateThreshold) {
-  const refusal = d[UF_REFUSAL_DATE];
-  if (!refusal) return false;
-  const refDate = new Date(refusal.slice(0, 10));
-  return refDate <= dateThreshold;
-}
-
-// --- Сделка "в работе" на указанную дату ---
-// Сделка считается в работе, если на указанную дату она:
-// - создана (существует в CRM)
-// - не выиграна (не закрыта успехом)
-// - не проиграна (не закрыта провалом)
-// - не оплачена из 1С
-// - нет даты отказа
-function isInWorkOnDate(d, date) {
-  const dDate = new Date(date);
-  
-  // Если создана позже — не в работе
-  if (!d.DATE_CREATE) return false;
-  const createdDate = new Date(d.DATE_CREATE.slice(0, 10));
-  if (createdDate > dDate) return false;
-  
-  // Технические (нулевая сумма) не считаем
-  if (parseFloat(d.OPPORTUNITY || 0) === 0) return false;
-  
-  // Выиграна до этой даты → не в работе
-  // (выигранная сделка — успех, независимо от наличия UF_DATE_PAY_1C)
-  if (d.CLOSED === 'Y' && d.STAGE_SEMANTIC_ID === 'S' && d.CLOSEDATE) {
-    const wonDate = new Date(d.CLOSEDATE.slice(0, 10));
-    if (wonDate <= dDate) return false;
-  }
-  
-  // Проиграна до этой даты → не в работе
-  if (d.CLOSED === 'Y' && d.STAGE_SEMANTIC_ID === 'F' && d.CLOSEDATE) {
-    const lostDate = new Date(d.CLOSEDATE.slice(0, 10));
-    if (lostDate <= dDate) return false;
-  }
-  
-  // Оплачена из 1С до этой даты → не в работе
-  if (d.UF_DATE_PAY_1C) {
-    const payDate = new Date(d.UF_DATE_PAY_1C.slice(0, 10));
-    if (payDate <= dDate) return false;
-  }
-  
-  // Отказ до этой даты → не в работе
-  const refusal = d[UF_REFUSAL_DATE];
-  if (refusal) {
-    const refDate = new Date(refusal.slice(0, 10));
-    if (refDate <= dDate) return false;
-  }
-  
-  return true;
-}
-
 // ===== НОВЫЕ ПРАВИЛА (для вкладки «Апрель») =====
 
 // Проверка: сделка-копия (исключаем из всех расчётов)

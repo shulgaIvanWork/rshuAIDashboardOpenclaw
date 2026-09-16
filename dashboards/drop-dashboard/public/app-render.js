@@ -498,7 +498,7 @@ async function renderPageMainNew(d) {
     if (fDirSec !== 'oom') html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
     // Продажи по менеджерам — сравнение за выбранный период (остаётся, не заменяется)
     if (d.mgr_sales) html += renderManagersBlock(d.mgr_sales);
-    // Treemap «Вклад менеджеров» + лидеры периода + скидки (на данных managers-sales)
+    // «Вклад менеджеров» (полоса) + лидеры периода + скидки (на данных managers-sales)
     if (d.mgr_sales) {
       html += renderContributionBarCard(d.mgr_sales);
       html += renderLeadersCard(d.mgr_sales);
@@ -633,34 +633,12 @@ async function renderPageMainNew(d) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Обзорный экран «Продажи»: treemap «Вклад менеджеров», лидеры периода,
+// Обзорный экран «Продажи»: полоса «Вклад менеджеров», лидеры периода,
 // «Продажи со скидками». Данные — /api/managers-sales (период «Продаж»).
 // Цвета — из действующей палитры дашборда.
 // ═══════════════════════════════════════════════════════════════════════════
 
 function fmtM(v) { v = v || 0; return v >= 1e6 ? (v / 1e6).toFixed(1) + ' млн' : v >= 1e3 ? Math.round(v / 1e3) + ' тыс' : fmt(v); }
-
-// Строки «вклад менеджеров»: действующие + агрегаты групп (Автооплаты/ОЗК/Прочее/Артефакт)
-function treemapEntries(mgr) {
-  var out = [];
-  (mgr.managers || []).forEach(function (m) {
-    out.push({ name: m.name, v: Math.round(m.postupleniya || 0), won: m.won_cnt || 0, check: m.avg_check || 0, color: '#3079D2' });
-  });
-  var g = mgr.groups || {};
-  function agg(label, color, arrs) {
-    var list = [];
-    arrs.forEach(function (a) { (a || []).forEach(function (m) { list.push(m); }); });
-    var sum = list.reduce(function (s, m) { return s + (m.postupleniya || 0); }, 0);
-    if (sum <= 0) return;
-    var won = list.reduce(function (s, m) { return s + (m.won_cnt || 0); }, 0);
-    out.push({ name: label, v: Math.round(sum), won: won, check: won ? Math.round(sum / won) : 0, color: color, group: true });
-  }
-  agg('Автооплаты', '#00897B', [g.autopay]);
-  agg('ОЗК', '#E65100', [g.ozk]);
-  agg('Прочее', '#7B1FA2', [g.other]);
-  agg('Артефакт', '#94A3B8', [g.bond, g.afanasyev, g.tech]);
-  return out.filter(function (e) { return e.v > 0; });
-}
 
 // ── Вклад менеджеров: 100% horizontal stacked bar (одна полоса = поступления отдела) ──
 // Сегменты = строки таблицы «Продажи по менеджерам» (main + Автооплаты/ОЗК/Прочее)
@@ -717,70 +695,6 @@ function renderContributionBarCard(mgr) {
     + bar
     + '<div style="display:flex;flex-wrap:wrap;margin-bottom:4px">' + legend + '</div>'
     + '<div class="filter-info">Итого по сегментам: ' + total.toLocaleString('ru-RU') + ' ₽ · ' + segs.reduce(function (s, e) { return s + e.won; }, 0) + ' оплат</div></div>';
-}
-
-function renderTreemapCard(mgr) {
-  if (!mgr || !mgr.managers || !mgr.managers.length) return '';
-  var tot = (mgr.total && mgr.total.postupleniya) || 0;
-  return '<div class="card" style="margin-top:8px"><h2>Вклад менеджеров <span style="font-size:12px;color:#475569;font-weight:400">(treemap · площадь = поступления за период · действующие — поимённо, группы — агрегатами · наведите на блок для деталей)</span></h2>'
-    + '<div id="mgrTreemap" style="position:relative;width:100%;height:420px;background:#EDEFF5;border-radius:8px;overflow:hidden"></div>'
-    + '<div class="filter-info">Итого поступлений за период: ' + fmt(tot) + ' ₽</div></div>';
-}
-
-// Раскладка treemap: бинарное деление области по сумме (slice-and-dice с балансом)
-function treemapLayout(areas, W, H) {
-  var res = [];
-  var sumOf = function (idxs) { return idxs.reduce(function (s, i) { return s + areas[i]; }, 0); };
-  function place(idxs, x, y, w, h) {
-    if (idxs.length === 1) { res[idxs[0]] = { x: x, y: y, w: w, h: h }; return; }
-    var total = sumOf(idxs);
-    // разрез, максимально близкий к половине суммы (по отсортированному списку)
-    var acc = 0, best = null;
-    for (var k = 0; k < idxs.length - 1; k++) {
-      acc += areas[idxs[k]];
-      var diff = Math.abs(total - 2 * acc);
-      if (!best || diff < best.diff) best = { k: k + 1, diff: diff };
-    }
-    var cut = best.k;
-    var left = idxs.slice(0, cut), right = idxs.slice(cut);
-    var lsum = sumOf(left);
-    if (w >= h) { // режем по вертикали
-      var lw = w * lsum / total;
-      place(left, x, y, lw, h);
-      place(right, x + lw, y, w - lw, h);
-    } else {
-      var lh = h * lsum / total;
-      place(left, x, y, w, lh);
-      place(right, x, y + lh, w, h - lh);
-    }
-  }
-  place(areas.map(function (_, i) { return i; }), 0, 0, W, H);
-  return res;
-}
-
-function renderTreemapTiles(mgr) {
-  var el = document.getElementById('mgrTreemap');
-  if (!el) return;
-  var entries = treemapEntries(mgr);
-  if (!entries.length) { el.innerHTML = '<div class="text-secondary" style="padding:12px">Нет поступлений за период</div>'; return; }
-  var W = el.clientWidth || 800, H = el.clientHeight || 420;
-  var total = entries.reduce(function (s, e) { return s + e.v; }, 0);
-  var areas = entries.map(function (e) { return e.v / total * (W * H); });
-  var rects = treemapLayout(areas, W, H);
-  var html = '';
-  entries.forEach(function (e, idx) {
-    var r = rects[idx];
-    if (!r) return;
-    var pct = total > 0 ? (e.v / total * 100) : 0;
-    var tip = e.name + ': ' + e.v.toLocaleString('ru-RU') + ' ₽ (' + pct.toFixed(1) + '%) · оплат: ' + e.won + ' · средний чек: ' + (e.check || 0).toLocaleString('ru-RU') + ' ₽';
-    var showTxt = r.w > 90 && r.h > 34;
-    var inner = showTxt
-      ? '<div style="padding:6px 8px;line-height:1.25"><div style="font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(e.name) + '</div>'
-        + '<div style="font-size:11px;color:rgba(255,255,255,.85)">' + fmtM(e.v) + ' ₽ · ' + pct.toFixed(1) + '%</div></div>'
-      : '';
-    html += '<div title="' + escapeHtml(tip) + '" style="position:absolute;left:' + Math.round(r.x + 2) + 'px;top:' + Math.round(r.y + 2) + 'px;width:' + Math.round(r.w - 4) + 'px;height:' + Math.round(r.h - 4) + 'px;background:' + e.color + ';border-radius:5px;overflow:hidden;box-sizing:border-box">' + inner + '</div>';
-  });
-  el.innerHTML = html;
 }
 
 // ── Лидеры периода: 4 компактные карточки ──

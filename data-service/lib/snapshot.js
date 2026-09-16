@@ -87,5 +87,3 @@ export function readSnapshot(dateISO) {
     return null;
   }
 }
-
-export const snapshotDir = SNAP_DIR;

@@ -8,7 +8,6 @@
 /* KPI-карточки */
 .kpi { padding: 10px 12px; }
 .kpi .lbl  { margin-bottom: 6px; }
-.kpi .lbl2 { margin: 10px 0 6px; }
 .kpi .val-big { font-size: 20px; line-height: 26px; font-weight: 700; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
 .kpi .sub  { margin-top: 6px; line-height: 1.5; }
 .kpi-header { margin: 12px 0 2px; }

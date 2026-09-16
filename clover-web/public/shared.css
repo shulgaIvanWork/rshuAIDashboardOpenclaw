@@ -1,4 +1,5 @@
-/* ── Shared dashboard styles ── */
+/* Общие стили дашбордов. Старый слой: на нем целиком живут kom, test и manager-report-dev.
+   Страницы на UI-kit подключают после него /ui-kit/ds.css, который перекрывает эти правила. */
 
 /* Reset */
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -8,8 +9,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .wrap { max-width: 1500px; margin: 0 auto; }
 .sub { color: #475569; font-size: 13px; margin-bottom: 24px; }
 
-/* Кнопки для дашбордов без Bootstrap (ratings). В Bootstrap-дашбордах
-   используйте штатные .btn .btn-outline-secondary / .btn-success. */
+/* Кнопки «Инструкция» и «Скачать Excel» (вид на UI-kit задает ds.css) */
 .btn-guide, .btn-excel { display: inline-block; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; line-height: 1.2; text-decoration: none; border: 1px solid transparent; cursor: pointer; }
 .btn-guide { background: #eef1f8; color: #093EB4; border-color: #093EB4; }
 .btn-guide:hover { background: #093EB4; color: #fff; }
@@ -34,10 +34,8 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13
 th { background: #093EB4; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; position: sticky; top: 0; border-bottom: 1px solid #093EB4; }
 td { padding: 8px 12px; border-bottom: 1px solid #E2E8F0; }
 tr:hover td { background: #F1F3F6; }
-tr.cur td { background: #F1F3F6; font-weight: 600; }
 .scroll-x { overflow-x: auto; }
 .tdleft { text-align: left; }
-.tdright { text-align: right; }
 
 /* Sortable table */
 th.sort { cursor: pointer; user-select: none; }
@@ -58,31 +56,16 @@ th.sort.desc::after { content: ' ▼'; opacity: 1; }
 .tab:hover { color: #093EB4; background: #F1F3F6; }
 .tab.active { color: #093EB4; border-bottom-color: #093EB4; background: #fff; }
 
-/* Toolbar (кнопки действий) */
-.toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
-.toolbar button { background: #093EB4; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: .2s; }
-.toolbar button:hover { background: #3079D2; }
-.toolbar button:disabled { background: #475569; cursor: wait; }
-
 /* KPI grid */
 .kpis { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin-bottom: 12px; }
 .kpis-8 { grid-template-columns: repeat(8, 1fr); }
 .kpi-wide { grid-column: span 2; }
-.kpis-9 { grid-template-columns: repeat(9, 1fr); }
 .kpi { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); min-width: 0; }
 .kpi .lbl  { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 4px; }
-.kpi .lbl2 { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin: 4px 0; }
 .kpi .val  { font-size: 18px; font-weight: 700; margin: 4px 0 2px; color: #0F172A; }
 .kpi .val-big { font-size: 21px; font-weight: 700; }
 .kpi .sub  { font-size: 12px; color: #475569; margin: 0; }
-.kpi .sub-right { text-align: right; font-size: 12px; color: #475569; margin: 4px 0; }
-.kpi .sub-sm { font-size: 11px; color: #475569; font-weight: 400; margin: 4px 0; }
-.kpi .si   { font-size: 12px; color: #475569; font-weight: 400; }
-.kpi .f12  { font-size: 12px; font-weight: 600; }
-.kpi .minmax { text-align: right; font-size: 11px; color: #475569; margin: 4px 0; }
-.kpi .row  { display: flex; justify-content: space-between; align-items: baseline; }
 .kpi-header { grid-column: 1 / -1; font-size: 15px; font-weight: 700; margin: 4px 0; }
-.kpi-dates  { font-size: 12px; color: #475569; font-weight: 400; }
 
 /* KPI colour themes */
 .kpi-total { background-color: rgba(31,42,68,.08) !important; }
@@ -102,24 +85,14 @@ th.sort.desc::after { content: ' ▼'; opacity: 1; }
 .delta-flat { color: #475569; font-size: 12px; }
 
 /* Misc helpers */
-.dt  { font-size: 11px; color: #475569; font-weight: 400; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
 .muted { color: #475569; font-size: 11px; }
 .deal-title { font-weight: 600; }
-.badge-prev { display:inline-block; background:#E8F5E9; color:#2E7D32; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px; }
 .badge-new  { display:inline-block; background:#FFF3E0; color:#E65100; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; margin-left:4px; }
 
 /* Charts */
-.chartbox    { height: 340px; position: relative; }
 .chartbox-sm { height: 240px; position: relative; }
 .twocol   { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.threecol { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-
-/* Table row accents */
-.extras td:nth-child(1) { font-weight: 600; width: 36%; }
-.extras td { text-align: right; }
-.extras td:first-child { text-align: left; }
-.sec td { background: #7A2E2E; color: #fff; font-weight: 700; letter-spacing: .05em; font-size: 12px; text-transform: uppercase; }
 
 /* Page header */
 h1 { font-size: 26px; font-weight: 700; margin: 0 0 20px; }
@@ -129,41 +102,18 @@ h1 { font-size: 26px; font-weight: 700; margin: 0 0 20px; }
 .date-filter-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
 .date-filter-bar label { font-size: 13px; font-weight: 600; color: #1f2a44; }
 .date-filter-bar input[type="date"] { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; }
-.date-sep { color: #888; font-weight: 600; }
 .filter-info { font-size: 12px; color: #475569; }
 
 /* Tab area visibility */
 .tab-area { display: none; }
 .tab-area.active { display: block; }
 
-/* Sub with tighter top spacing (inside cards) */
-.sub-tight { color: #475569; font-size: 13px; margin: -8px 0 14px; }
-
 /* Responsive */
 @media (max-width: 900px) {
   .kpis { grid-template-columns: repeat(2, 1fr); }
-  .twocol, .threecol { grid-template-columns: 1fr; }
+  .twocol { grid-template-columns: 1fr; }
   .tabs { flex-direction: column; }
 }
 
-/* ── App chrome (страницы-оболочки: вход / список дашбордов / админка) ────────
-   Вёрстка на Bootstrap; здесь только фирменная специфика, которой нет
-   в палитре Bootstrap без пересборки SCSS. Раньше жила в отдельном style.css. */
-body.app-chrome { padding: 0; }                 /* убираем глобальный body{padding:24px} для полноэкранной оболочки */
-
-/* Перекрас primary-кнопки в бренд-синий (Bootstrap primary — другой синий) */
-.btn-primary {
-  --bs-btn-bg: #093EB4; --bs-btn-border-color: #093EB4;
-  --bs-btn-hover-bg: #3079D2; --bs-btn-hover-border-color: #3079D2;
-  --bs-btn-active-bg: #3079D2; --bs-btn-active-border-color: #3079D2;
-  --bs-btn-disabled-bg: #475569; --bs-btn-disabled-border-color: #475569;
-}
-
-/* Экран входа — полноэкранный по центру на бренд-фоне (fixed перекрывает body-padding) */
-.login-page { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #093EB4; }
-
-/* Топбар-навигация */
-.app-navbar { background: #093EB4; }
-.app-navbar .navbar-brand, .app-navbar .nav-link { color: rgba(255,255,255,.8); }
-.app-navbar .nav-link:hover, .app-navbar .nav-link.active { color: #fff; background: rgba(255,255,255,.14); border-radius: 6px; }
-.app-navbar .nav-link.logout-link:hover { background: rgba(231,76,60,.18); color: #ffd; }
+/* Страницы с верхней панелью (оболочка и дашборды на UI-kit): без отступа body{padding:24px} */
+body.app-chrome { padding: 0; }

@@ -72,7 +72,7 @@ dashboards/<name>/  каждый дашборд = отдельное Express sub
 | Прочие | kom, rshu, ratings, participants, manager-report-dev, nps, test | свои /api/* |
 
 Фронтенд: `public/index.html` + `app-boot.js`/`app-core.js`/`app-data.js`/`app-render.js` (или `app.js`),
-общие хелперы `clover-web/public/shared.js` (api, fmt, escapeHtml, initTableSort, BASE_PATH), стили `shared.css`.
+общие хелперы `clover-web/public/shared.js` (api, fmt, escapeHtml, initTableSort, BASE_PATH), стили: `/ui-kit/ds.css` (UI-kit платформы) поверх старого `shared.css`.
 
 ### Пример JSON `/api/kpi` (управленческий, август 2026)
 ```json

@@ -558,38 +558,6 @@ function renderExportAnalysis() {
 }
 
 // ============ 0. Прогноз (разработка) ============
-function rb(b) {
-  if (b.sum !== undefined) {
-    var sum = typeof b.sum === 'object' ? b.sum.value : b.sum;
-    var cnt = typeof b.cnt === 'object' ? b.cnt.value : b.cnt;
-    return '<div style="background:#f8f9fc;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#888;margin-bottom:2px">'+esc(b.label)+'</div><div style="font-size:18px;font-weight:700;color:#1f2a44">'+fmt(sum)+' ₽'+(cnt!==undefined?' · '+cnt+' сд.':'')+'</div></div>';
-  }
-  return '<div style="background:#f8f9fc;border-radius:8px;padding:10px 14px"><div style="font-size:11px;color:#888;margin-bottom:2px">'+esc(b.label)+'</div><div style="font-size:18px;font-weight:700;color:#1f2a44">'+esc(String(b.value||''))+'</div></div>';
-}
-
-function renderScreenCard(s, color) {
-  var hc = '<div class="card" style="border-left:4px solid '+color+';margin-bottom:0">';
-  hc += '<div style="font-size:14px;font-weight:700;margin-bottom:8px">'+esc(s.title)+'</div>';
-  if (s.subtitle) hc += '<div style="font-size:11px;color:#888;margin-bottom:10px">'+esc(s.subtitle)+'</div>';
-  if (s.blocks) {
-    hc += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
-    for (var i=0;i<s.blocks.length;i++) hc += rb(s.blocks[i]);
-    hc += '</div>';
-  }
-  if (s.pipeline) {
-    hc += '<div style="margin-top:8px;font-size:11px;color:#888">';
-    for (var st in s.pipeline) { var d=s.pipeline[st]; if(d.cnt>0) hc += '<span style="background:#eef4ff;padding:2px 6px;border-radius:4px;margin:2px;display:inline-block"><b>'+st+'</b>: '+fmt(d.sum)+' ₽ ('+d.cnt+')</span>'; }
-    hc += '</div>';
-  }
-  if (s.recommendations) {
-    hc += '<ul style="margin:8px 0 0;padding-left:16px;font-size:11px;line-height:1.6">';
-    for (var i=0;i<s.recommendations.length;i++) hc += '<li>'+s.recommendations[i]+'</li>';
-    hc += '</ul>';
-  }
-  hc += '</div>';
-  return hc;
-}
-
 async function loadForecast() {
   var area = document.getElementById('forecast-content');
   area.innerHTML = '<div class="loading-state"><div class="spinner"></div><div>Загрузка прогноза…</div></div>';

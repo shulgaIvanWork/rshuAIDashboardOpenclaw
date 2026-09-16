@@ -15,7 +15,6 @@
 /* KPI-карточки */
 .kpi { padding: 10px 12px; }
 .kpi .lbl  { margin-bottom: 6px; }
-.kpi .lbl2 { margin: 10px 0 6px; }
 .kpi .val-big { font-size: 20px; font-weight: 700; line-height: 26px; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
 .kpi .sub  { margin-top: 6px; line-height: 1.5; }
 .pp-val { margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
@@ -62,7 +61,6 @@
 @media (max-width: 1200px) { .kpis-kpi { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 600px)  { .kpis-kpi { grid-template-columns: 1fr; } }
 .kpis-kpi .kpi { min-height: 118px; }
-.kpis-kpi .delta { margin-top: 6px; font-weight: 600; }
 
 /* Вкладка «Воронка продаж».
    Цвет этапа приходит из данных: поле color в STAGE_KEYS / QUAL_KEYS (app-funnel.js) подставляется

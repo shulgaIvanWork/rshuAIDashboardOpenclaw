@@ -20,6 +20,8 @@
     .pv-icon { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-muted); }
     .pv-icon .ds-icon { width: 22px; height: 22px; color: var(--color-primary); }
     .pv-stack > * + * { margin-top: 10px; }
+    .pv-num { text-align: right; }
+    .pv-total td { background: var(--color-bg-accent); font-weight: 600; }
   </style>
 </head>
 <body class="app-chrome">
@@ -128,12 +130,12 @@
       <h2 class="pv-h">Таблица</h2>
       <div class="scroll-x">
         <table>
-          <thead><tr><th class="sort desc">Продукт</th><th class="sort tdright">Сделки</th><th class="sort tdright">Выставленные счета, ₽</th><th class="sort tdright">Поступления, ₽</th><th>Статус</th></tr></thead>
+          <thead><tr><th class="sort desc">Продукт</th><th class="sort pv-num">Сделки</th><th class="sort pv-num">Выставленные счета, ₽</th><th class="sort pv-num">Поступления, ₽</th><th>Статус</th></tr></thead>
           <tbody>
-            <tr><td>Mini MBA. Классический</td><td class="tdright">5</td><td class="tdright">1 210 000</td><td class="tdright">1 051 500</td><td><span class="ds-badge ds-badge--success">Оплачено</span></td></tr>
-            <tr><td>Директор по производству</td><td class="tdright">12</td><td class="tdright">964 000</td><td class="tdright">812 300</td><td><span class="ds-badge ds-badge--warning">Частично</span></td></tr>
-            <tr><td>Клиентский сервис</td><td class="tdright">0</td><td class="tdright">80 000</td><td class="tdright">0</td><td><span class="ds-badge ds-badge--danger">Нет оплат</span></td></tr>
-            <tr class="cur"><td>ИТОГО</td><td class="tdright">17</td><td class="tdright">2 254 000</td><td class="tdright">1 863 800</td><td></td></tr>
+            <tr><td>Mini MBA. Классический</td><td class="pv-num">5</td><td class="pv-num">1 210 000</td><td class="pv-num">1 051 500</td><td><span class="ds-badge ds-badge--success">Оплачено</span></td></tr>
+            <tr><td>Директор по производству</td><td class="pv-num">12</td><td class="pv-num">964 000</td><td class="pv-num">812 300</td><td><span class="ds-badge ds-badge--warning">Частично</span></td></tr>
+            <tr><td>Клиентский сервис</td><td class="pv-num">0</td><td class="pv-num">80 000</td><td class="pv-num">0</td><td><span class="ds-badge ds-badge--danger">Нет оплат</span></td></tr>
+            <tr class="pv-total"><td>ИТОГО</td><td class="pv-num">17</td><td class="pv-num">2 254 000</td><td class="pv-num">1 863 800</td><td></td></tr>
           </tbody>
         </table>
       </div>

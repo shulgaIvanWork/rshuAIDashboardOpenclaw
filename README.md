@@ -18,7 +18,7 @@ clover-web/     ← оболочка (порт 3000)
   data/users.json     пользователи (gitignored, plaintext-чувствительно)
   data/dashboards.json меты дашбордов (label, icon)
   public/shared.js    общие фронт-хелперы: api(), fmt(), escapeHtml(), initTableSort(), shortCompany(), BASE_PATH
-  public/shared.css   общие стили + .btn-guide/.btn-excel/.rc-input
+  public/shared.css   старый общий слой стилей (kom, test, manager-report-dev целиком на нем)
   public/ui-kit/      внешний стиль платформы на RSU/UI-kit: ds.css, ds.js, icons.svg, шрифт (см. SOURCE.md, образец preview.html)
   public/vendor/      bootstrap, range-calendar (кастомный виджет периода)
 
@@ -78,10 +78,12 @@ dashboards/<name>/  ← каждый дашборд = отдельное Express
   `<thead>`, а вызывать `initTableSort()` нужно ПОСЛЕ отрисовки ВСЕХ таблиц. Итоговые строки, которые должны
   оставаться статичными, кладём в `<thead>` (верхний ИТОГО) и `<tfoot>` (нижние Остальные/ИТОГО), не в `<tbody>`.
 
-- **shared.js / shared.css грузят не все**: participants и plan-fact — Bootstrap + свой styles.css (без shared.css);
-  ratings — только shared.css (без Bootstrap, у него кастомная вёрстка — Bootstrap-reboot её ломает);
-  management — и Bootstrap, и shared.css. 5 «сырых» дашбордов (drop, kom, rshu, test, manager-report-dev) — в разработке.
-  НЕ форсить shared.js/shared.css в дашборды со своими хелперами/вёрсткой — конфликтует.
+- **Стили грузятся по-разному**: порядок всегда bootstrap -> shared.css -> /ui-kit/ds.css -> styles.css дашборда.
+  На UI-kit (ds.css): оболочка, management, participants, ratings, drop, plan-fact, nps. Из них participants и plan-fact
+  без shared.css, ratings без Bootstrap (reboot ломает кастомную верстку). На старом shared.css без ds.css: kom, test,
+  manager-report-dev; rshu-dashboard - все стили внутри index.html. Правило из shared.css удалять, только если класс
+  не встречается ни на одной странице, которая подключает shared.css.
+  НЕ форсить shared.js/shared.css в дашборды со своими хелперами/версткой - конфликтует.
 
 - **catch-all** в каждом `server.js`: `app.get(/(.*)/)` отдаёт `index.html` только для путей БЕЗ расширения.
   Путь с расширением (`.pdf`, `.js`…) → 404, иначе браузер качает HTML-заглушку вместо реального файла.

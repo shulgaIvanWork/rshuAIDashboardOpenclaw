@@ -14,7 +14,7 @@
  *   GET /api/artifacts  — аномалии данных;
  *   catch-all — index.html только на путях БЕЗ расширения.
  *
- * ВЁРСТКА: Bootstrap + shared.css + кастомный виджет периода (/vendor/range-calendar/).
+ * ВЕРСТКА: Bootstrap + shared.css + /ui-kit/ds.css + кастомный виджет периода (/vendor/range-calendar/).
  */
 
 import express from 'express';

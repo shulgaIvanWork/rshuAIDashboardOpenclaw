@@ -13,7 +13,7 @@
  *   POST /api/export        — выгрузка текущего среза в Excel;
  *   catch-all — index.html только на путях БЕЗ расширения.
  *
- * ВЁРСТКА: только shared.css (без Bootstrap — reboot ломает кастомную вёрстку).
+ * ВЕРСТКА: shared.css + /ui-kit/ds.css, без Bootstrap (reboot ломает кастомную верстку).
  */
 
 import express from 'express';
