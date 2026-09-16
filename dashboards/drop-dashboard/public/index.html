@@ -10,9 +10,11 @@
   <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/vendor/range-calendar/range-calendar.css">
   <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="/ui-kit/ds.css">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+  <script src="/ui-kit/ds.js"></script>
   <script src="/vendor/range-calendar/range-calendar.js"></script>
   <script src="/shared.js" defer></script>
   <!-- app.js разбит на модули (<script defer>, общий global-scope). Порядок важен:
@@ -24,24 +26,37 @@
   <script src="app-funnel.js" defer></script>
   <script src="app-boot.js" defer></script>
 </head>
-<body>
-<div class="container-fluid p-4">
-  <div class="d-flex align-items-center justify-content-between mb-2">
-    <h1 class="mb-0">Дашборд отдела продаж РШУ 2026 <span id="updateDate" class="page-title-meta"></span></h1>
-    <a href="guide.pdf" download class="btn-guide">📄 Инструкция</a>
+<body class="app-chrome">
+<nav class="ds-topbar">
+  <a href="/dashboards" aria-label="Все дашборды"><img class="ds-topbar__logo" src="/ui-kit/logo-white.svg" alt="Российская школа управления"></a>
+  <div class="ds-topbar__nav" style="margin-left:auto">
+    <a href="/dashboards" class="ds-topbar__link" title="Все дашборды">
+      <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-dashboard"></use></svg><span class="ds-topbar__label">Все дашборды</span>
+    </a>
+  </div>
+</nav>
+<main class="ds-page dr-page">
+  <div class="ds-page-head">
+    <div>
+      <h1 class="ds-title">Дашборд отдела продаж РШУ 2026</h1>
+      <p class="ds-subtitle" id="updateDate"></p>
+    </div>
+    <a href="guide.pdf" download class="btn-guide">
+      <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-file"></use></svg>Инструкция
+    </a>
   </div>
   <!-- Фильтры всего листа: применяются ко всем вкладкам и всем блокам -->
-  <div class="date-filter-bar" id="dashFilterBar" style="margin-bottom:8px">
+  <div class="date-filter-bar ds-card dr-filters" id="dashFilterBar">
     <div class="date-filter-group">
       <div class="date-filter-row">
-        <label>🧭 Тип направления:</label>
-        <select id="dashDirFilter" class="rc-input" style="width:auto" onchange="window.applyDashFilters()">
+        <label for="dashDirFilter"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-filter"></use></svg> Тип направления:</label>
+        <select id="dashDirFilter" class="ds-select" onchange="window.applyDashFilters()">
           <option value="all">Все</option>
           <option value="oom">ООМ</option>
           <option value="kom">КОМ</option>
         </select>
-        <label style="margin-left:16px">🚦 Тип трафика:</label>
-        <select id="dashTrafficFilter" class="rc-input" style="width:auto" onchange="window.applyDashFilters()">
+        <label for="dashTrafficFilter" class="dr-gap">Тип трафика:</label>
+        <select id="dashTrafficFilter" class="ds-select" onchange="window.applyDashFilters()">
           <option value="all">Весь</option>
           <option value="internal">Внутренняя база</option>
           <option value="market">Маркетинговый</option>
@@ -50,16 +65,16 @@
       </div>
     </div>
   </div>
-  <div class="kpi-tabs mb-2">
-    <button class="kpi-tab active" data-tab="sales" onclick="window.switchDashTab('sales')">📊 Продажи</button>
-    <button class="kpi-tab" data-tab="kpi" onclick="window.switchDashTab('kpi')">🎯 КПЭ</button>
-    <button class="kpi-tab" data-tab="funnel" onclick="window.switchDashTab('funnel')">🧲 Воронка продаж</button>
-    <button class="kpi-tab" data-tab="dev" onclick="window.switchDashTab('dev')">🧪 В разработке</button>
+  <div class="kpi-tabs">
+    <button class="kpi-tab active" data-tab="sales" onclick="window.switchDashTab('sales')">Продажи</button>
+    <button class="kpi-tab" data-tab="kpi" onclick="window.switchDashTab('kpi')">КПЭ</button>
+    <button class="kpi-tab" data-tab="funnel" onclick="window.switchDashTab('funnel')">Воронка продаж</button>
+    <button class="kpi-tab" data-tab="dev" onclick="window.switchDashTab('dev')">В разработке</button>
   </div>
-  <div class="date-filter-bar" id="salesFilterBar">
+  <div class="date-filter-bar ds-card dr-filters" id="salesFilterBar">
     <div class="date-filter-group">
       <div class="date-filter-row">
-        <label>📅 Период:</label>
+        <label for="periodDisplay"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-calendar"></use></svg> Период:</label>
         <input type="text" id="periodDisplay" class="rc-input" readonly autocomplete="off">
         <input type="hidden" id="dateFrom">
         <input type="hidden" id="dateTo">
@@ -68,21 +83,21 @@
     </div>
     <div class="date-filter-group">
       <div class="date-filter-row">
-        <label>🔁 Сравнить с:</label>
+        <label for="compareDisplay"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-refresh"></use></svg> Сравнить с:</label>
         <input type="text" id="compareDisplay" class="rc-input" readonly autocomplete="off">
         <input type="hidden" id="compareFrom">
       </div>
-      <div class="filter-info">(по умолчанию — предыдущий период той же длины; можно задать свою дату начала)</div>
+      <div class="filter-info">по умолчанию предыдущий период той же длины; можно задать свою дату начала</div>
     </div>
   </div>
   <div id="kpiTab" style="display:none">
-    <div class="date-filter-bar">
+    <div class="date-filter-bar ds-card dr-filters">
       <div class="date-filter-group">
         <div class="date-filter-row">
-          <label>📅 Месяц:</label>
-          <select id="kpiMonthSelect" class="rc-input" style="width:auto"></select>
-          <label style="margin-left:12px">👤 Менеджер:</label>
-          <select id="kpiMgrSelect" class="rc-input" style="width:auto"></select>
+          <label for="kpiMonthSelect"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-calendar"></use></svg> Месяц:</label>
+          <select id="kpiMonthSelect" class="ds-select"></select>
+          <label for="kpiMgrSelect" class="dr-gap"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-users"></use></svg> Менеджер:</label>
+          <select id="kpiMgrSelect" class="ds-select"></select>
           <span id="kpiWorkdaysInfo" class="filter-info"></span>
         </div>
       </div>
@@ -97,7 +112,9 @@
         <span id="kpiPlanTotalHint" class="filter-info" style="margin-left:12px"></span>
       </div>
       <div id="kpiPlanMgrs" style="margin-top:10px;max-width:560px"></div>
-      <button class="btn btn-primary btn-sm" onclick="window.saveKpiPlan()">💾 Сохранить все</button>
+      <button class="ds-btn ds-btn--primary ds-btn--sm" type="button" onclick="window.saveKpiPlan()">
+        <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-check"></use></svg>Сохранить все
+      </button>
     </div>
     <div class="kpis kpis-kpi" id="kpiCards">
       <div class="text-center text-secondary py-5" style="grid-column:1/-1"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка…</div></div>
@@ -106,15 +123,15 @@
     <div id="newArtifactsBlock" style="margin-top:12px"></div>
   </div>
   <div id="funnelTab" style="display:none">
-    <div class="date-filter-bar">
+    <div class="date-filter-bar ds-card dr-filters">
       <div class="date-filter-group">
         <div class="date-filter-row">
-          <label>📅 Период (дата создания):</label>
+          <label for="funnelPeriod"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-calendar"></use></svg> Период (дата создания):</label>
           <input type="text" id="funnelPeriod" class="rc-input" readonly autocomplete="off">
-          <label style="margin-left:16px">⚡ Месяц:</label>
-          <select id="funnelMonthQuick" class="rc-input" style="width:auto"></select>
-          <label style="margin-left:16px">👤 Менеджер:</label>
-          <select id="funnelMgrSelect" class="rc-input" style="width:auto"></select>
+          <label for="funnelMonthQuick" class="dr-gap">Месяц:</label>
+          <select id="funnelMonthQuick" class="ds-select"></select>
+          <label for="funnelMgrSelect" class="dr-gap"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-users"></use></svg> Менеджер:</label>
+          <select id="funnelMgrSelect" class="ds-select"></select>
           <span id="funnelInfo" class="filter-info"></span>
         </div>
       </div>
@@ -127,9 +144,12 @@
     <div class="text-center text-secondary py-5" id="loadingStateNew"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка данных…</div></div>
   </div>
   <div id="devTab" style="display:none">
-    <div class="filter-info" style="margin:4px 0 10px">🧪 Вкладка в разработке: сюда переносятся блоки с «Продаж», которые не потеряем, но убрали из основного вида. Период и сравнение — как на вкладке «Продажи».</div>
+    <div class="ds-alert ds-alert--warning" style="margin:4px 0 10px">
+      <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-info"></use></svg>
+      <span>Вкладка в разработке: сюда переносятся блоки с «Продаж», которые не потеряем, но убрали из основного вида. Период и сравнение как на вкладке «Продажи».</span>
+    </div>
     <div id="devAreaNew"></div>
   </div>
-</div>
+</main>
 </body>
 </html>

@@ -1,131 +1,115 @@
-/* Dashboard-specific: management */
+/* Dashboard-specific: drop (отдел продаж). Подключается после /ui-kit/ds.css: шрифт, кнопки, поля,
+   карточки, таблицы и KPI берутся оттуда, здесь раскладка и палитра дашборда. */
 
-/* shared.css задаёт body{padding:24px} для трёх ещё не мигрировавших дашбордов
-   (kom/ratings/manager-report-dev) — здесь отступ уже даёт container-fluid p-4,
-   поэтому body-padding отменяем, чтобы не удвоился */
-body { padding: 0 !important; }
+.dr-page { max-width: 1600px; }
 
-/* Увеличенные карточки KPI */
-.kpi { padding: 7px 8px !important; }
-.kpi .lbl  { margin-bottom: 6px !important; }
-.kpi .lbl2 { margin: 10px 0 6px !important; }
-.kpi .val-big { font-size: 19px; font-weight: 700; line-height: 1.3; margin-bottom: 4px; }
-.kpi .sub  { margin-top: 6px !important; line-height: 1.5; }
-.pp-val { margin-top: 6px; font-size: 15px; font-weight: 600; color: #000; }
+/* Фильтры листа и вкладок */
+.dr-filters { padding: 14px 20px; margin-bottom: 12px; }
+.dr-filters.date-filter-bar { align-items: flex-start; gap: 16px 32px; }
+.date-filter-group { display: flex; flex-direction: column; gap: 6px; }
+.date-filter-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.date-filter-row label { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.date-filter-row .ds-icon { color: var(--color-primary); }
+.dr-gap { margin-left: 12px !important; }
 
-/* Недельная таблица использует bootstrap .table — составные селекторы Bootstrap
-   (.table th) перебивают общий th{...} из shared.css, поэтому нужен явный
-   оверрайд (тот же приём, что в participants-dashboard) */
+/* KPI-карточки */
+.kpi { padding: 10px 12px; }
+.kpi .lbl  { margin-bottom: 6px; }
+.kpi .lbl2 { margin: 10px 0 6px; }
+.kpi .val-big { font-size: 20px; font-weight: 700; line-height: 26px; margin-bottom: 2px; font-variant-numeric: tabular-nums; }
+.kpi .sub  { margin-top: 6px; line-height: 1.5; }
+.pp-val { margin-top: 4px; font-size: 14px; font-weight: 600; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
+/* Таблицы на bootstrap .table: закрепленная шапка, строка ИТОГО */
 .table { border-collapse: separate; border-spacing: 0; }
-.table > :not(caption) > * > * { border-bottom: 1px solid var(--bs-border-color); }
-.table thead th { background: #093EB4; color: #fff; border-bottom-color: #093EB4; position: sticky; top: 0; }
+.table > :not(caption) > * > * { border-bottom: 1px solid var(--ds-line); }
+.table thead th { position: sticky; top: 0; z-index: 1; }
+.table > tbody > tr.dr-total > td, tr.dr-total > td { background: var(--color-bg-accent); font-weight: 700; }
 
 /* Строки-группы в таблице менеджеров (Автооплаты/ОЗК/Прочие) */
-.mgr-group-row td { background: #f5f6fa; color: #475569; font-weight: 600; }
+.mgr-group-row td { background: var(--color-bg-secondary); color: var(--color-text-muted); font-weight: 600; }
 
-/* Отчёт по менеджерам: бейдж конверсии (Таблица 1) и подсветка отклонений (Таблица 2) */
-.mgr-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-.mgr-badge-green  { background: #e8f5e9; color: #2e7d32; }
-.mgr-badge-red    { background: #ffebee; color: #c62828; }
-.mgr-badge-yellow { background: #fff8e1; color: #e65100; }
-.mgr-hl-green  { color: #2e7d32; }
-.mgr-hl-red    { color: #c62828; }
-.mgr-hl-yellow { color: #e65100; }
+/* Отчет по менеджерам: бейдж конверсии (Таблица 1) и подсветка отклонений (Таблица 2) */
+.mgr-badge { display: inline-block; padding: 2px 8px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; }
+.mgr-badge-green  { background: var(--ds-success-bg); color: var(--ds-success-text); }
+.mgr-badge-red    { background: var(--ds-danger-bg); color: var(--ds-danger-text); }
+.mgr-badge-yellow { background: var(--ds-warning-bg); color: var(--ds-warning-text); }
+.mgr-hl-green  { color: var(--ds-up); }
+.mgr-hl-red    { color: var(--ds-down); }
+.mgr-hl-yellow { color: #b35c00; }
 
-/* Поля дат (RangeCalendar/только для отображения) — тот же вид, что раньше был
-   у input[type=date] в shared.css */
-.rc-input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; font-family: inherit; width: 200px; cursor: pointer; background: #fff; }
-.rc-input:disabled { background: #f1f3f6; color: #94A3B8; cursor: default; }
-
-/* Период + Сравнение — в одну строку, подсказки под ними (переопределяет
-   выравнивание .date-filter-bar из shared.css: там align-items:center
-   на плоский список, здесь — колонки с двумя внутренними строками) */
-.date-filter-bar { align-items: flex-start; }
-.date-filter-group { display: flex; flex-direction: column; gap: 4px; }
-.date-filter-row { display: flex; align-items: center; gap: 12px; }
-
-/* ── Вкладки «Продажи / КПЭ» ─────────────────────────────────────────────── */
-.kpi-tabs { display: flex; gap: 8px; }
+/* Вкладки «Продажи / КПЭ / Воронка / В разработке» (кит: tabs pills) */
+.kpi-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
 .kpi-tab {
-  padding: 8px 18px;
-  border: 1px solid #d5dbe8;
-  border-radius: 8px;
+  height: var(--ds-control-h);
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--ds-control-radius);
   background: #fff;
+  font-family: var(--font-family);
   font-size: 14px;
   font-weight: 600;
-  color: #475569;
+  color: var(--color-primary);
   cursor: pointer;
-  transition: all .15s ease;
+  transition: background .18s ease-in-out, color .18s ease-in-out;
 }
-.kpi-tab:hover { border-color: #093EB4; color: #093EB4; }
-.kpi-tab.active { background: #093EB4; border-color: #093EB4; color: #fff; }
+.kpi-tab:hover { background: #e8edf9; }
+.kpi-tab.active { background: var(--color-primary); color: #fff; }
+.kpi-tab:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 
-/* ── Вкладка «КПЭ»: карточки ─────────────────────────────────────────────── */
+/* Вкладка «КПЭ»: карточки */
 .kpis-kpi { grid-template-columns: repeat(4, 1fr); }
 @media (max-width: 1200px) { .kpis-kpi { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 600px)  { .kpis-kpi { grid-template-columns: 1fr; } }
 .kpis-kpi .kpi { min-height: 118px; }
 .kpis-kpi .delta { margin-top: 6px; font-weight: 600; }
 
-
-/* ── Вкладка «Воронка продаж» ─────────────────────────────────────────────── */
-/* Типографика: заголовки 20px · этап 16/600 · число этапа 24/700 ·
-   конверсии 14px · таблица 14px · вторичный 12px · th 13/600 ·
-   строка таблицы ≥48px · фильтры 14px */
+/* Вкладка «Воронка продаж».
+   Цвет этапа приходит из данных: поле color в STAGE_KEYS / QUAL_KEYS (app-funnel.js) подставляется
+   инлайном в .fbar-fill, .fstage-num и .dot-st. Правил по классам st-* нет намеренно: безусловный
+   .st-* { background-color } красил строку этапа целиком, а ключей PreSale в CSS не было. */
 .funnel-card h2.funnel-h { font-size: 20px; margin: 0 0 4px; }
-.funnel-sub { font-size: 13px; color: #888; font-weight: 400; }
-
-/* Цвет этапа приходит из данных: поле color в STAGE_KEYS / QUAL_KEYS
-   (app-funnel.js) подставляется инлайном в .fbar-fill, .fstage-num и .dot-st.
-   Здесь правил по классам st-* нет намеренно. Раньше палитра дублировалась
-   в CSS, и это дало две поломки: безусловный .st-* { background-color } красил
-   строку .funnel-stage целиком (число этапа сливалось с фоном, а дорожка .fbar
-   читалась как пустая полоса поверх заливки), а ключи воронки PreSale
-   (work / warm / qualified / handoff) в CSS отсутствовали вовсе — их полосы
-   и точки оставались бесцветными. Классы st-* на элементах сохранены как
-   смысловые хуки. */
+.funnel-sub { font-size: 13px; color: var(--color-text-muted); font-weight: 400; }
 
 .funnel-bars { display: flex; flex-direction: column; gap: 2px; }
 .fstage-head { display: flex; align-items: baseline; gap: 12px; }
-.fstage-head b { min-width: 150px; font-size: 16px; font-weight: 600; color: #1f2a44; }
+.fstage-head b { min-width: 150px; font-size: 16px; font-weight: 600; color: var(--color-text-primary); }
 .fstage-num { font-size: 24px; font-weight: 700; }
-.fbar { height: 26px; background: #eef1f6; border-radius: 6px; margin: 6px 0 4px; overflow: hidden; }
-.fbar-fill { height: 100%; border-radius: 6px; min-width: 2px; transition: width .3s; }
-.fstage-meta { font-size: 14px; color: #475569; }
-.fstage-meta b { color: #1f2a44; }
-.funnel-note { font-size: 12px; color: #64748B; margin-top: 6px; line-height: 1.5; }
+.fbar { height: 26px; background: var(--color-bg-secondary); border-radius: 8px; margin: 6px 0 4px; overflow: hidden; }
+.fbar-fill { height: 100%; border-radius: 8px; min-width: 2px; transition: width .3s; }
+.fstage-meta { font-size: 14px; color: var(--color-text-muted); }
+.fstage-meta b { color: var(--color-text-primary); }
+.funnel-note { font-size: 12px; color: var(--color-text-muted); margin-top: 6px; line-height: 1.5; }
+.funnel-note .ds-icon { color: var(--color-primary); }
 
 /* Таблицы воронки */
 #funnelContent .table { font-size: 14px; }
 #funnelContent .table thead th { font-size: 13px; font-weight: 600; white-space: nowrap; }
 #funnelContent .table td { height: 48px; vertical-align: middle; }
 #funnelContent .table td .cnt { font-size: 14px; font-weight: 600; }
-.cell-conv { font-size: 12px; color: #94A3B8; font-weight: 400; }
-.cell-sub { font-size: 12px; color: #94A3B8; font-weight: 400; }
+.cell-conv { font-size: 12px; color: var(--color-text-muted); font-weight: 400; }
+.cell-sub { font-size: 12px; color: var(--color-text-muted); font-weight: 400; }
 .dot-st { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: baseline; }
 
-/* Фильтры вкладки — 14px */
-#funnelTab .rc-input { font-size: 14px; }
-#funnelTab select.rc-input { font-size: 14px; padding: 6px 8px; }
-
 /* Блок артефактов */
-.funnel-artifacts { font-size: 14px; background: #F1F3F6; border-radius: 8px; padding: 12px; }
+.funnel-artifacts { font-size: 14px; background: var(--color-bg-secondary); border-radius: 12px; padding: 12px; }
 .funnel-artifacts table td { height: auto; }
 
 /* Sankey: контрольный баланс и артефакты под блоком */
 .pf-balance {
   display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
-  border: 1px solid #D1E7D6; background: #F3FAF4;
-  border-radius: 10px; padding: 12px 16px; margin: 10px 0 12px;
-  font-size: 14px; color: #1f2a44;
+  border: 1px solid var(--ds-success-bg); background: #f3faf6;
+  border-radius: 12px; padding: 12px 16px; margin: 10px 0 12px;
+  font-size: 14px; color: var(--color-text-primary);
 }
 .pf-balance-side { display: flex; flex-direction: column; gap: 3px; font-weight: 600; }
-.pf-balance-num { font-size: 13px; font-weight: 400; color: #475569; }
-.pf-balance-sign { font-size: 22px; font-weight: 800; }
+.pf-balance-num { font-size: 13px; font-weight: 400; color: var(--color-text-muted); }
+.pf-balance-sign { display: inline-flex; align-items: center; gap: 6px; font-size: 22px; font-weight: 800; }
+.pf-balance-sign .ds-icon { width: 22px; height: 22px; }
 .pf-artifact {
-  font-size: 13px; color: #475569; background: #FFF8E1;
-  border: 1px solid #FDE68A; border-radius: 8px; padding: 8px 12px;
+  font-size: 13px; color: var(--color-text-muted); background: var(--ds-warning-bg);
+  border-radius: 12px; padding: 8px 12px;
   margin-top: 10px; line-height: 1.5;
 }
-.pf-artifact b { color: #1f2a44; }
-.pf-note2 { font-size: 12.5px; color: #64748B; margin-top: 10px; line-height: 1.6; }
+.pf-artifact b { color: var(--color-text-primary); }
+.pf-note2 { font-size: 12.5px; color: var(--color-text-muted); margin-top: 10px; line-height: 1.6; }

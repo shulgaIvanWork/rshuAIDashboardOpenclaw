@@ -126,7 +126,7 @@ function loadKpi() {
     cards.innerHTML = renderKpiCards(d, isPersonal);
     loadArtifacts(mgr); // блок «Аномалии данных» (баги выбранного менеджера или отдела)
   }).catch(function (e) {
-    cards.innerHTML = '<div class="alert alert-danger" style="grid-column:1/-1">⚠️ Ошибка: ' + escapeHtml(e.message || e) + '</div>';
+    cards.innerHTML = '<div class="alert alert-danger" style="grid-column:1/-1">Ошибка: ' + escapeHtml(e.message || e) + '</div>';
   });
   // 4 среза: покрытие / недели / менеджеры / календарь
   var slicesEl = document.getElementById('kpiSlices');
@@ -136,7 +136,7 @@ function loadKpi() {
   dashApi('/api/kpi-slices?month=' + sel.value + '&mgr=' + encodeURIComponent(mgr)).then(function (d) {
     renderSlices(d, isPersonal);
   }).catch(function (e) {
-    slicesEl.innerHTML = '<div class="alert alert-danger">⚠️ Срезы: ' + escapeHtml(e.message || e) + '</div>';
+    slicesEl.innerHTML = '<div class="alert alert-danger">Срезы: ' + escapeHtml(e.message || e) + '</div>';
   });
 }
 
@@ -356,7 +356,7 @@ function renderSlices(d, isPersonal) {
     + '<div class="card" style="margin-top:14px"><h2>План-факт по неделям месяца</h2>' + weeksNote(d) + '<div style="height:340px;position:relative"><canvas id="kpiChWeeks"></canvas></div></div>'
     + (hideManagers ? '' : '<div class="card" style="margin-top:14px"><h2>Факт и ожидания по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(основные — персонально; автооплаты/ОЗК/bond/afanasyev — строками; «Артефакт» — уволенные и тех. аккаунты)</span></h2><div style="position:relative"><canvas id="kpiChManagers"></canvas></div><div id="mgrZeroDrill" style="display:none;margin-top:8px;font-size:12px;color:#475569"></div></div>')
     + renderOverdueBlock(d.overdue)
-    + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(весь месяц · 🟢 пришло · 🔴 ждали, но просрочка · 🟣 ожидаем)</span></h2>' + calendarBody(d) + '</div>'
+    + '<div class="card" style="margin-top:14px"><h2>Календарь ожидаемых оплат <span style="font-size:12px;color:#475569;font-weight:400">(весь месяц · <i class="ds-dot" style="background:#2E7D32"></i>пришло · <i class="ds-dot" style="background:#C62828"></i>ждали, но просрочка · <i class="ds-dot" style="background:#9C27B0"></i>ожидаем)</span></h2>' + calendarBody(d) + '</div>'
     + renderExpectDistBlock(d);
 
   // Расшифровку заполняем ПОСЛЕ вставки разметки: раньше fillOverdueDrill вызывался
@@ -535,7 +535,7 @@ function renderManagersChart(d) {
 function renderOverdueBlock(ovd) {
   if (!ovd || !ovd.cnt) return '';
   var h = '<div class="card" style="margin-top:14px;border-left:4px solid ' + KPI_COLORS.overdue + '">'
-    + '<h2>⏰ Просроченные ожидания <span style="font-size:12px;color:#475569;font-weight:400">(согласованная дата оплаты уже прошла, оплаты нет — переходят между месяцами)</span></h2>'
+    + '<h2>Просроченные ожидания <span style="font-size:12px;color:#475569;font-weight:400">(согласованная дата оплаты уже прошла, оплаты нет — переходят между месяцами)</span></h2>'
     + '<div class="date-filter-row"><span style="font-size:16px;font-weight:700;color:' + KPI_COLORS.overdue + '">' + ovd.cnt + ' шт · ' + fmt(ovd.sum) + ' ₽</span>'
     + '<button id="overdueDrillBtn" class="btn btn-primary btn-sm" onclick="window.toggleOverdueDrill()">' + (window._overdueOpen ? 'Скрыть' : 'Расшифровать') + '</button></div>'
     + '<div id="overdueDrill" style="' + (window._overdueOpen ? '' : 'display:none') + ';margin-top:10px"></div>'
@@ -565,9 +565,9 @@ function fillOverdueDrill(ovd) {
 
 // ── 4. Календарь оплат и ожиданий: весь месяц, 3 датасета (пришло/просрочка/ожидаем) ──
 var CAL_COLORS = {
-  fact: '#2E7D32',   // 🟢 пришло — оплаты по дате 1С
-  ovd:  '#C62828',   // 🔴 просрочка — ждали к дате, день прошёл, оплаты нет
-  exp:  '#9C27B0',   // 🟣 ожидаем — будущие согласованные даты
+  fact: '#2E7D32',   // пришло — оплаты по дате 1С
+  ovd:  '#C62828',   // просрочка — ждали к дате, день прошёл, оплаты нет
+  exp:  '#9C27B0',   // ожидаем — будущие согласованные даты
 };
 var CAL_SETS = [
   { key: 'fact', label: 'Пришло', color: CAL_COLORS.fact },
@@ -672,7 +672,7 @@ function renderExpectDistBlock(d) {
   // Просроченные — в начале
   if (e.overdue && e.overdue.cnt) {
     h += '<div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin:10px 0 4px;padding:10px 14px;background:#FFF3E0;border:1px solid #FFE0B2;border-radius:8px">'
-      + '<span style="font-size:15px;font-weight:700;color:#E65100">⏰ Просроченные ожидания</span>'
+      + '<span style="font-size:15px;font-weight:700;color:#E65100">Просроченные ожидания</span>'
       + '<span style="font-size:14px">' + fmt(e.overdue.cnt) + ' сделок · <b>' + fmt(e.overdue.sum) + ' ₽</b></span>'
       + '<span style="font-size:12px;color:#475569">согласованная дата уже прошла, оплаты нет — переходят между месяцами (детали — в блоке «Просроченные ожидания» выше)</span>'
       + '</div>';
@@ -686,7 +686,7 @@ function renderExpectDistBlock(d) {
     var ok = (curSum + ovdSum) === cardSum;
     h += '<div style="margin:6px 2px 8px;font-size:13px;color:' + (ok ? '#2E7D32' : '#C62828') + '">'
       + 'Контроль: столбец «' + expectMonthLabel(months[0].m) + '» (' + fmt(curSum) + ' ₽) + просроченные (' + fmt(ovdSum) + ' ₽) = карточка «Ожидания» (' + fmt(cardSum) + ' ₽) — '
-      + (ok ? '✅ сходится' : '⚠️ расхождение ' + fmt(cardSum - curSum - ovdSum) + ' ₽') + '</div>';
+      + (ok ? '<span class="ds-badge ds-badge--success">сходится</span>' : '<span class="ds-badge ds-badge--danger">расхождение ' + fmt(cardSum - curSum - ovdSum) + ' ₽</span>') + '</div>';
   }
   h += '<div style="height:320px;position:relative"><canvas id="kpiChExpect"></canvas></div>';
   return h + '</div>';

@@ -86,7 +86,7 @@ function renderManagersBlock(mgr) {
   var totDurV = totCnt ? Math.round(totDur / totCnt * 10) / 10 : 0;
   var h = '<div class="card" style="margin-top:8px"><h2>Продажи по менеджерам <span style="font-size:12px;color:#475569;font-weight:400">(за выбранный период · пред.: ' + mgr.prev_period.from + ' — ' + mgr.prev_period.to + ')</span></h2>';
   h += '<div class="scroll-x"><table class="table table-sm sortable" id="mgrTableMain" style="font-size:11px;margin-bottom:0"><thead>' + head + '</thead><tbody>';
-  h += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td>ИТОГО</td><td>' + fmt(totCnt) + '</td><td>' + fmt(totSum) + ' ₽</td><td>' + fmt(totCnt ? Math.round(totSum / totCnt) : 0) + ' ₽</td><td>' + totDurV.toFixed(1) + '</td><td>' + fmt(totLeads) + '</td><td>' + fmt(totMql) + '</td><td>—</td><td>100%</td></tr>';
+  h += '<tr class="total-row dr-total"><td>ИТОГО</td><td>' + fmt(totCnt) + '</td><td>' + fmt(totSum) + ' ₽</td><td>' + fmt(totCnt ? Math.round(totSum / totCnt) : 0) + ' ₽</td><td>' + totDurV.toFixed(1) + '</td><td>' + fmt(totLeads) + '</td><td>' + fmt(totMql) + '</td><td>—</td><td>100%</td></tr>';
   rows.forEach(function (r) { h += r; });
   h += '</tbody></table></div></div>';
   return h;
@@ -172,7 +172,7 @@ function renderMgrReportBlock(rep, mode) {
   var t1 = '<table class="table table-sm sortable" id="mgrTab1" style="font-size:11px"><thead><tr>';
   cols1.forEach(function (c, i) { t1 += '<th class="sort" data-col="' + i + '">' + c.l + '</th>'; });
   t1 += '</tr></thead><tbody>';
-  t1 += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>ИТОГО</b></td>';
+  t1 += '<tr class="total-row dr-total"><td><b>ИТОГО</b></td>';
   cols1.forEach(function (c) { if (c.k !== 'name') t1 += '<td>' + cell1(c.k, T1[c.k]) + '</td>'; });
   t1 += '</tr>';
   mgrs.forEach(function (m) {
@@ -211,7 +211,7 @@ function renderMgrReportBlock(rep, mode) {
   var t2 = '<table class="table table-sm sortable" id="mgrTab2" style="font-size:11px"><thead><tr>';
   cols2.forEach(function (c, i) { t2 += '<th class="sort" data-col="' + i + '" style="font-size:9px">' + c.l + '</th>'; });
   t2 += '</tr></thead><tbody>';
-  t2 += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>СРЕДНЕЕ</b></td>';
+  t2 += '<tr class="total-row dr-total"><td><b>СРЕДНЕЕ</b></td>';
   cols2.forEach(function (c) { if (c.k !== 'name') t2 += '<td><b>' + cell2(c.k, st[c.k]) + '</b></td>'; });
   t2 += '</tr>';
   mgrs.forEach(function (m) {
@@ -321,7 +321,7 @@ function buildWeekTableHtml(buckets, monthsMode) {
   var s = '<table class="table table-sm sortable" style="font-size:11px"><thead><tr>';
   colHeaders.forEach(function(h,i){ s += '<th class="sort" data-col="'+i+'">'+h.l+'</th>'; });
   s += '</tr></thead><tbody>';
-  s += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
+  s += '<tr class="total-row dr-total"><td><b>ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
   for (var j=buckets.length-1;j>=0;j--){
     var w = buckets[j];
     s += '<tr><td>'+(w.label_dates||'Неделя'+String(w.week).padStart(2,'0'))+'</td><td>'+(w.leads||0)+'</td><td>'+(w.mql||0)+'</td><td>'+(w.sql||0)+'</td><td>'+(w.invoice_cnt||0)+'</td><td>'+(w.oplata||0)+'</td><td>'+fmt(w.postupleniya)+'</td><td>'+fmt(w.avg_check||0)+'</td><td>'+(w.avg_dur||0).toFixed(1)+'</td><td>'+(w.conv_lead_mql||0).toFixed(1)+'%</td><td>'+(w.conv_mql_sql||0).toFixed(1)+'%</td><td>'+(w.conv_sql_invoice||0).toFixed(1)+'%</td><td>'+(w.conv_invoice_oplata||0).toFixed(1)+'%</td><td>'+((w.leads||0)>0?(w.oplata/w.leads*100).toFixed(1):'0.0')+'%</td></tr>';
@@ -452,8 +452,8 @@ async function renderPageMainNew(d) {
     function isMonths(block) { return window.periodModes[block] === 'months' && monthsArr.length > 0; }
     function perToggle(block, withDays) {
       var mode = window.periodModes[block];
-      function btn(m, l) { return "<button class=\"tab"+(mode===m?' active':'')+"\" style=\"padding:4px 12px;font-size:12px\" onclick=\"setPeriodMode('"+block+"','"+m+"')\">"+l+"</button>"; }
-      return '<span style="float:right;font-weight:400">'
+      function btn(m, l) { return "<button type=\"button\" class=\"ds-segment__btn"+(mode===m?' is-active':'')+"\" onclick=\"setPeriodMode('"+block+"','"+m+"')\">"+l+"</button>"; }
+      return '<span class="ds-segment" role="group" style="float:right">'
         + (withDays ? btn('days', 'Дни') : '')
         + btn('weeks', 'Недели') + btn('months', 'Месяцы')
         + '</span>';
@@ -496,7 +496,7 @@ async function renderPageMainNew(d) {
     if (fDirSec === 'all') html += section('ИТОГО В ПЕРИОДЕ (все типы и форматы)', d.ytd, wkCurData, wkPrevData, null, d.leads_ytd, wkCurLeads, wkPrevLeads, d.qual_lead_ytd, wkCur.mql || 0, wkPrev.mql || 0, d.pp && d.pp.ytd, d.pp && d.pp.leads_ytd, d.pp && d.pp.qual_lead_ytd);
     if (fDirSec !== 'kom') html += section('Открытое обучение (очное, онлайн и видеокурсы)', d.oom_ytd, oomCurData, oomPrevData, 'oom', d.oom_leads_ytd, wkCur.oom_leads || 0, wkPrev.oom_leads || 0, d.oom_qual_lead_ytd, oomMqlCur, oomMqlPrev, d.pp && d.pp.oom_ytd, d.pp && d.pp.oom_leads_ytd, d.pp && d.pp.oom_qual_lead_ytd);
     if (fDirSec !== 'oom') html += section('Корпоративное обучение (КОМ)', d.kom_ytd, komCurData, komPrevData, 'kom', d.kom_leads_ytd, (wkCur.leads||0) - (wkCur.oom_leads||0), (wkPrev.leads||0) - (wkPrev.oom_leads||0), d.kom_qual_lead_ytd, komMqlCur, komMqlPrev, d.pp && d.pp.kom_ytd, d.pp && d.pp.kom_leads_ytd, d.pp && d.pp.kom_qual_lead_ytd);
-    // 👥 Продажи по менеджерам — сравнение за выбранный период (остаётся, не заменяется)
+    // Продажи по менеджерам — сравнение за выбранный период (остаётся, не заменяется)
     if (d.mgr_sales) html += renderManagersBlock(d.mgr_sales);
     // Treemap «Вклад менеджеров» + лидеры периода + скидки (на данных managers-sales)
     if (d.mgr_sales) {
@@ -506,7 +506,7 @@ async function renderPageMainNew(d) {
     // Структура среднего чека (распределение оплат по диапазонам; данные /api/kpi → check_dist)
     if (d.check_dist) html += renderCheckDistCard(d.check_dist);
     if (d.mgr_sales) html += renderDiscountsCard(d.mgr_sales);
-    // 📋 Отчёт по менеджерам: на «Продажах» остаются СРЕЗЫ; Таблицы 1/2 и воронки — на dev-вкладке
+    // Отчёт по менеджерам: на «Продажах» остаются СРЕЗЫ; Таблицы 1/2 и воронки — на dev-вкладке
     if (d.mgr_report) html += renderMgrReportBlock(d.mgr_report, 'slices');
     // Поступления по неделям/месяцам (на всю ширину) + переключатель
     var posTitle = posMode==='days' ? 'по дням' : (isMonths('pos') ? 'по месяцам' : 'по неделям');
@@ -523,7 +523,7 @@ async function renderPageMainNew(d) {
     }
     html += '<div class="card"><h2>'+(isMonths('table')?'Таблица по месяцам':'Недельная таблица')+mgrWeekSelectHtml(d)+perToggle('table')+'</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
-    // ── Вкладка «🧪 В разработке»: перенесённые с «Продаж» блоки (не теряем):
+    // ── Вкладка «В разработке»: перенесённые с «Продаж» блоки (не теряем):
     //    Таблицы 1/2 (отчёт менеджеров) + 2 воронки. Период/сравнение — как у «Продаж». ──
     var devEl = document.getElementById('devAreaNew');
     if (devEl) {
@@ -563,7 +563,7 @@ async function renderPageMainNew(d) {
         + '<div style="display:flex;gap:24px"><div style="flex:1">'+(delta1||'')+'</div><div style="flex:1">'+(delta2||'')+'</div></div>'
         + '</div>';
     }
-    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>'
+    var regKpis = '<div class="kpi-header c-reg">Динамика по источнику «Регистрация»</div>'
       + regCardPair(
           'Регистраций пришло, шт.', '₽',
           fmt(reg.total), pp_reg?delta(reg.total,pp_reg.total):'', pp_reg?fmt(pp_reg.total):'',
@@ -627,7 +627,7 @@ async function renderPageMainNew(d) {
     }, 100);
 
   } catch(e) {
-    areaNew.innerHTML = '<div class="alert alert-danger" style="cursor:pointer" onclick="this.style.display=\'none\'\">\u274c <b>Ошибка вкладки «Новая логика»</b><br>'+escapeHtml(e.message)+'<br><br><small style="color:#999">(нажмите чтобы закрыть, время: ' + new Date().toLocaleTimeString('ru-RU') + ')</small></div>';
+    areaNew.innerHTML = '<div class="alert alert-danger" style="cursor:pointer" onclick="this.style.display=\'none\'\">\<b>Ошибка вкладки «Новая логика»</b><br>'+escapeHtml(e.message)+'<br><br><small style="color:#999">(нажмите чтобы закрыть, время: ' + new Date().toLocaleTimeString('ru-RU') + ')</small></div>';
     console.error('renderPageMainNew error:', e);
   }
 }

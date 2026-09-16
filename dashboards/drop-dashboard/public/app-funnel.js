@@ -117,7 +117,7 @@ function loadFunnel() {
     if (!funnelMgrReady) fillMgrSelect(d.managers || []);
     renderFunnel(d, rs[1]);
   }).catch(function (e) {
-    content.innerHTML = '<div class="alert alert-danger" style="margin-top:10px">⚠️ Ошибка расчёта воронки: ' + escapeHtml(e.message || e) + '</div>';
+    content.innerHTML = '<div class="alert alert-danger" style="margin-top:10px">Ошибка расчёта воронки: ' + escapeHtml(e.message || e) + '</div>';
   });
 }
 
@@ -258,8 +258,8 @@ function mgrGroupTableHtml(built, keys, opt) {
   var html = '<table class="table table-sm" style="margin:0">'
     + '<thead>' + thHtml(keys) + '</thead><tbody>';
   // 1) ИТОГО
-  html += '<tr class="total-row" style="background:#fff8e1;font-weight:700">'
-    + '<td>📊 ИТОГО</td>';
+  html += '<tr class="total-row dr-total">'
+    + '<td>ИТОГО</td>';
   keys.forEach(function (k, i) {
     var prev = i > 0 ? (built.total[keys[i - 1].key] || 0) : null;
     html += cellHtml(k, built.total[k.key] || 0, prev);
@@ -293,7 +293,7 @@ function mgrTableHtml(byManager, stages) {
   var built = buildMgrRows(byManager || [], keys);
   var note = ''
     + 'Контроль: действующие + Автооплаты + ОЗК + Прочее + Артефакт = ИТОГО. '
-    + '⚠ «Артефакт» — технические/служебные аккаунты (tech). '
+    + '«Артефакт» — технические/служебные аккаунты (tech). '
     + 'Тех. WON (&lt;11 ₽, создаются ботом) исключены из «Создано»: ' + fmt(stages.tech_won || 0) + ' шт.';
   return mgrGroupTableHtml(built, keys, { note: note });
 }
@@ -305,15 +305,15 @@ function artifactsHtml(a) {
     var v = a[key];
     if (v && v.cnt) rows.push('<tr><td>' + label + '</td><td style="text-align:right"><b>' + fmt(v.cnt) + '</b> шт.</td><td style="text-align:right;color:#C62828">' + fmt(Math.round(v.sum || 0)) + ' ₽</td></tr>');
   }
-  add('tech_won', '🤖 Технические WON (исключены из «Создано»)');
-  add('returns', '🔙 Возвраты (оплата + закрыты отказом)');
-  add('refuse_no_lose', '🗓 Дата отказа заполнена, стадия не LOSE');
-  add('won_no_pay', '✅ WON «Счёт оплачен» без даты оплаты 1С');
-  add('paid_no_inv', '🧾 Оплата без даты счёта');
-  add('paid_in_progress', '📌 Оплата, но сделка «в работе»');
-  add('neg_dur', '⏪ Оплата раньше создания');
-  if (!rows.length) return '<div class="funnel-note" style="padding:8px 0">Аномалий в когорте нет ✅</div>';
-  return '<div class="funnel-artifacts"><b>⚠ Артефакты данных</b><table style="width:100%;margin-top:8px;font-size:14px;border-collapse:collapse">'
+  add('tech_won', 'Технические WON (исключены из «Создано»)');
+  add('returns', 'Возвраты (оплата + закрыты отказом)');
+  add('refuse_no_lose', 'Дата отказа заполнена, стадия не LOSE');
+  add('won_no_pay', 'WON «Счёт оплачен» без даты оплаты 1С');
+  add('paid_no_inv', 'Оплата без даты счёта');
+  add('paid_in_progress', 'Оплата, но сделка «в работе»');
+  add('neg_dur', 'Оплата раньше создания');
+  if (!rows.length) return '<div class="funnel-note" style="padding:8px 0"><span class="ds-badge ds-badge--success">Аномалий в когорте нет</span></div>';
+  return '<div class="funnel-artifacts"><b>Артефакты данных</b><table style="width:100%;margin-top:8px;font-size:14px;border-collapse:collapse">'
     + rows.join('') + '</table></div>';
 }
 
@@ -421,7 +421,7 @@ function renderFunnel(d, pf) {
   // Дисклеймер
   html += '<div class="card funnel-card" style="margin-top:8px;padding:14px 20px;background:#f8f9ff">';
   html += '<div class="funnel-note" style="line-height:1.7;color:#475569">'
-    + 'ℹ️ <b>Расчёт по максимальному восстанавливаемому этапу, без истории переходов.</b> '
+    + '<svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-info"></use></svg> <b>Расчёт по максимальному восстанавливаемому этапу, без истории переходов.</b> '
     + 'MQL/SQL определяются по текущей/финальной стадии сделки; «Счёт» = дата «Счёт отправлен» '
     + 'или стадия «Счёт отправлен»/«Частично оплачен»/«Постоплата» или фактическая оплата; '
     + '«Оплачено» = только фактическая оплата из 1С (сумма ≥ 11 ₽, дата оплаты может быть позже периода). '
@@ -492,7 +492,7 @@ function balanceHtml(pf) {
   var Rcnt = n.paid.cnt + n.refused.cnt + n.end.cnt, Rsum = n.paid.sum + n.refused.sum + n.end.sum;
   var diffCnt = Rcnt - Lcnt, diffSum = Rsum - Lsum;
   var ok = diffCnt === 0 && diffSum === 0;
-  var sign = ok ? '✅' : '⚠️';
+  var sign = window.DS ? DS.icon(ok ? 'i-check' : 'i-warning') : '';
   var signColor = ok ? '#2E7D32' : '#C62828';
   return '<div class="pf-balance" style="' + (ok ? '' : 'border-color:#FECACA;background:#FEF2F2;') + '">'
     + '<div class="pf-balance-side">Остаток на начало + Создано'
@@ -509,15 +509,15 @@ function sankeyArtifactsHtml(pf) {
   var n = pf.nodes;
   var meta = pf.meta || {};
   if (n.reopened && n.reopened.cnt > 0) {
-    rows.push('<div class="pf-artifact">🔁 Возвращены в работу из отказов (закрыты до периода, лид-менеджер вернул, продажи обрабатывают): '
+    rows.push('<div class="pf-artifact">Возвращены в работу из отказов (закрыты до периода, лид-менеджер вернул, продажи обрабатывают): '
       + '<b>' + fmt(n.reopened.cnt) + ' шт</b> · ' + fmt(n.reopened.sum) + ' ₽ — показаны отдельным потоком, в баланс «Остаток на начало + Создано» не входят</div>');
   }
   if (meta.tech_purge && meta.tech_purge.cnt) {
-    rows.push('<div class="pf-artifact">🧹 Технические зачистки (массовое закрытие старого хвоста: день с &gt;30 закрытиями LOSE, возраст &gt;180 дн — напр. 24.08.2026): '
+    rows.push('<div class="pf-artifact">Технические зачистки (массовое закрытие старого хвоста: день с &gt;30 закрытиями LOSE, возраст &gt;180 дн — напр. 24.08.2026): '
       + '<b>' + fmt(meta.tech_purge.cnt) + ' шт</b> · ' + fmt(meta.tech_purge.sum) + ' ₽ — исключены из портфеля целиком</div>');
   }
   if (meta.ignored && meta.ignored.cnt) {
-    rows.push('<div class="pf-artifact">⚠️ Исключено аномалий с противоречивыми датами (созданы в периоде, но закрыты до его начала): '
+    rows.push('<div class="pf-artifact">Исключено аномалий с противоречивыми датами (созданы в периоде, но закрыты до его начала): '
       + '<b>' + fmt(meta.ignored.cnt) + ' шт</b> · ' + fmt(meta.ignored.sum) + ' ₽</div>');
   }
   var src = pf.breakdownSource || '';
