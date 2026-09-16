@@ -20,7 +20,7 @@
     <% } else { %>
       <div class="ds-grid">
         <% dashboards.forEach(function(d) { %>
-          <a href="<%= d.url %>" target="_blank" class="ds-tile">
+          <a href="<%= d.url %>" target="_blank" class="ds-tile ds-tile--<%= d.tone || 'blue' %>">
             <span class="ds-tile__icon"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#<%= d.icon %>"></use></svg></span>
             <span class="ds-tile__title"><%= d.description %></span>
             <svg class="ds-icon ds-tile__arrow" aria-hidden="true"><use href="/ui-kit/icons.svg#i-chevron-right"></use></svg>

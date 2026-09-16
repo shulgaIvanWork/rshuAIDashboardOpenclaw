@@ -380,6 +380,8 @@ function getAvailableDashboards(user) {
           description: meta ? meta.label : entry.name,
           // id символа из /ui-kit/icons.svg (icon-* кита или i-* платформы)
           icon: (meta && meta.icon) || 'i-dashboard',
+          // тон плитки: blue | orange | green | sky | slate | rose (ds.css, .ds-tile--*)
+          tone: (meta && meta.tone) || 'blue',
           url: kp.url
         });
       }

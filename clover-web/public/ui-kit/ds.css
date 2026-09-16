@@ -225,6 +225,17 @@ th.sort.asc::after, th.sort.desc::after { color: var(--color-primary); opacity: 
 .ds-tile:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 .ds-tile__icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--color-bg-accent); color: var(--color-primary); }
 .ds-tile__icon .ds-icon { width: 24px; height: 24px; }
+/* Тон плитки: цвет иконки и подложки; задается у дашборда в dashboards.json (tone) */
+.ds-tile--orange .ds-tile__icon { background: var(--ds-tone-orange-bg); color: var(--ds-tone-orange); }
+.ds-tile--green .ds-tile__icon { background: var(--ds-tone-green-bg); color: var(--ds-tone-green); }
+.ds-tile--sky .ds-tile__icon { background: var(--ds-tone-sky-bg); color: var(--ds-tone-sky); }
+.ds-tile--slate .ds-tile__icon { background: var(--ds-tone-slate-bg); color: var(--ds-tone-slate); }
+.ds-tile--rose .ds-tile__icon { background: var(--ds-tone-rose-bg); color: var(--ds-tone-rose); }
+.ds-tile--orange:hover { border-color: var(--ds-tone-orange-bg); }
+.ds-tile--green:hover { border-color: var(--ds-tone-green-bg); }
+.ds-tile--sky:hover { border-color: var(--ds-tone-sky-bg); }
+.ds-tile--slate:hover { border-color: var(--ds-tone-slate-bg); }
+.ds-tile--rose:hover { border-color: var(--ds-tone-rose-bg); }
 .ds-tile__title { font-size: 15px; line-height: 20px; font-weight: 600; }
 .ds-tile__arrow { margin-left: auto; color: var(--color-text-muted); }
 

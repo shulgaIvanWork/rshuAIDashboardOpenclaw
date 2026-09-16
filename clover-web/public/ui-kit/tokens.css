@@ -68,6 +68,15 @@
   --ds-up: #16803c;
   --ds-down: #d62839;
 
+  /* ── Платформа: тона плиток и иконок (цвет из палитры кита на светлой подложке;
+     оранжевый и зеленый затемнены для контраста иконки) ── */
+  --ds-tone-blue: #093eb4;    --ds-tone-blue-bg: #eaeffc;
+  --ds-tone-orange: #ec561c;  --ds-tone-orange-bg: #ffece5;
+  --ds-tone-green: #1f9a00;   --ds-tone-green-bg: #e4f7dc;
+  --ds-tone-sky: #2f86c1;     --ds-tone-sky-bg: #e3f1fb;
+  --ds-tone-slate: #3b475a;   --ds-tone-slate-bg: #eef1f5;
+  --ds-tone-rose: #e5283c;    --ds-tone-rose-bg: #ffe3e6;
+
   /* ── Платформа: плотность элементов управления ── */
   --ds-control-h: 36px;
   --ds-control-radius: 12px;

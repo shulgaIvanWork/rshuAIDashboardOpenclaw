@@ -1,42 +1,52 @@
 {
   "drop-dashboard": {
     "label": "Дашборд отдела продаж РШУ",
-    "icon": "icon-money-bag"
+    "icon": "icon-money-bag",
+    "tone": "green"
   },
   "rshu-dashboard": {
     "label": "Отчёт по продажам за последний месяц",
-    "icon": "i-chart"
+    "icon": "i-chart",
+    "tone": "sky"
   },
   "kom-dashboard": {
     "label": "КОМ — Корпоративное обучение",
-    "icon": "icon-tenancy"
+    "icon": "icon-tenancy",
+    "tone": "slate"
   },
   "test-dashboard": {
     "label": "Тестовый дашборд (прогноз)",
-    "icon": "icon-automation"
+    "icon": "icon-automation",
+    "tone": "orange"
   },
   "rshu-management-dashboard": {
     "label": "Управленческий дашборд РШУ",
-    "icon": "icon-dashboard-gear"
+    "icon": "icon-dashboard-gear",
+    "tone": "blue"
   },
   "participants-dashboard": {
     "label": "Участники",
-    "icon": "icon-school"
+    "icon": "icon-school",
+    "tone": "sky"
   },
   "ratings-dashboard": {
     "label": "Рейтинги",
-    "icon": "icon-query-stats"
+    "icon": "icon-query-stats",
+    "tone": "orange"
   },
   "manager-report-dev": {
     "label": "Отчёт для менеджеров (dev)",
-    "icon": "icon-manage-accounts"
+    "icon": "icon-manage-accounts",
+    "tone": "slate"
   },
   "plan-fact-dashboard": {
     "label": "План-факт выручки",
-    "icon": "icon-balance"
+    "icon": "icon-balance",
+    "tone": "green"
   },
   "nps-dashboard": {
     "label": "NPS",
-    "icon": "icon-verified-user"
+    "icon": "icon-verified-user",
+    "tone": "rose"
   }
 }

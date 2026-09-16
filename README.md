@@ -36,8 +36,9 @@ dashboards/<name>/  ← каждый дашборд = отдельное Express
 
 1. **Положить папку** `dashboards/my-dashboard/` с `server.js` (экспорт `default` app/Router).
 2. **Добавить запись** в `clover-web/data/dashboards.json`:
-   `"my-dashboard": { "label": "...", "icon": "icon-school" }`, где `icon` - id символа из
-   `clover-web/public/ui-kit/icons.svg` (эмодзи не использовать).
+   `"my-dashboard": { "label": "...", "icon": "icon-school", "tone": "green" }`, где `icon` - id символа из
+   `clover-web/public/ui-kit/icons.svg` (эмодзи не использовать), `tone` - цвет плитки в списке:
+   `blue`, `orange`, `green`, `sky`, `slate`, `rose`.
 
 Всё остальное автоматически: `clover-web/server.js` по ключам `dashboards.json`
 монтирует sub-app (`requireDashboardAccess` + `lazyApp`) и строит список для пользователей.
