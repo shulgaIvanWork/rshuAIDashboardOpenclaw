@@ -245,7 +245,7 @@ async function loadAll() {
   try {
     dataCache = await api('/api/data');
     if (dataCache.error) {
-      wrap.innerHTML = '<div class="alert alert-danger">❌ ' + escapeHtml(dataCache.error) + '</div>';
+      wrap.innerHTML = '<div class="alert alert-danger">' + escapeHtml(dataCache.error) + '</div>';
       return;
     }
     var dateEl = document.getElementById('updateDate');
@@ -255,7 +255,7 @@ async function loadAll() {
     }
     showTab(currentTab);
   } catch (e) {
-    wrap.innerHTML = '<div class="alert alert-danger">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
+    wrap.innerHTML = '<div class="alert alert-danger">Ошибка: ' + escapeHtml(e.message) + '</div>';
   }
 }
 
