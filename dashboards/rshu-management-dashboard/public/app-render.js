@@ -78,9 +78,9 @@ async function renderPageMainNew(d) {
     function isMonths(block) { return window.periodModes[block] === 'months' && monthsArr.length > 0; }
     function perToggle(block) {
       var m = isMonths(block);
-      return '<span style="float:right;font-weight:400">'
-        + "<button class=\"tab"+(m?'':' active')+"\" style=\"padding:4px 12px;font-size:12px\" onclick=\"setPeriodMode('"+block+"','weeks')\">Недели</button>"
-        + "<button class=\"tab"+(m?' active':'')+"\" style=\"padding:4px 12px;font-size:12px\" onclick=\"setPeriodMode('"+block+"','months')\">Месяцы</button>"
+      return '<span class="ds-segment" role="group">'
+        + "<button type=\"button\" class=\"ds-segment__btn"+(m?'':' is-active')+"\" onclick=\"setPeriodMode('"+block+"','weeks')\">Недели</button>"
+        + "<button type=\"button\" class=\"ds-segment__btn"+(m?' is-active':'')+"\" onclick=\"setPeriodMode('"+block+"','months')\">Месяцы</button>"
         + '</span>';
     }
     var posBuckets = isMonths('pos') ? monthsArr : weeks, posLabels = mkLabels(posBuckets);
@@ -120,12 +120,12 @@ async function renderPageMainNew(d) {
     // Оговорка к разбивке лидов: у части лидов формат не указан, и они попадают
     // в «Открытое» по умолчанию, занижая его конверсию и завышая долю СДО.
     if (d.leads_without_format) {
-      html += '<div style="margin:2px 0 8px;font-size:12px;color:#475569">Из лидов периода у <b>'
-        + d.leads_without_format + '</b> формат не указан — они отнесены к «Открытому обучению» по умолчанию, '
+      html += '<div class="mg-note">Из лидов периода у <b>'
+        + d.leads_without_format + '</b> формат не указан, они отнесены к «Открытому обучению» по умолчанию, '
         + 'поэтому его конверсия занижена, а доля СДО по лидам занижена тем же числом.</div>';
     }
     // Поступления по неделям/месяцам (на всю ширину) + переключатель
-    html += '<div class="card" style="margin-top:8px"><h2>Поступления '+(isMonths('pos')?'по месяцам':'по неделям')+perToggle('pos')+'</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
+    html += '<div class="card" style="margin-top:8px"><h2 class="mg-card-head"><span>Поступления '+(isMonths('pos')?'по месяцам':'по неделям')+'</span>'+perToggle('pos')+'</h2><div style="height:440px;position:relative"><canvas id="newChPos"></canvas></div></div>';
     // Форматы + Тип обучения
     html += '<div class="twocol" style="margin-top:8px">';
     html += '<div class="card"><h2>Поступления по форматам</h2><div class="chartbox-sm"><canvas id="newChFmt"></canvas></div><div id="newFmtTableUnderChart" style="margin-top:8px"></div></div>';
@@ -142,7 +142,7 @@ async function renderPageMainNew(d) {
     // Строка таблицы разбивки: период/пред.период
     function splitRow(label, dotColor, name, row, tot, dashed) {
       var avg = row.cnt > 0 ? Math.round(row.sum / row.cnt) : 0;
-      return '<tr'+(dashed?' style="border-top:1px dashed #ccc"':'')+'><td>'+label+'</td><td><span class="dot" style="background:'+dotColor+'"></span>'+name+'</td><td>'+row.cnt+'</td><td>'+fmt(row.sum)+'</td><td>'+fmt(avg)+'</td><td>'+(row.sum/tot*100).toFixed(1)+'%</td></tr>';
+      return '<tr'+(dashed?' style="border-top:1px dashed var(--ds-line-strong)"':'')+'><td>'+label+'</td><td><span class="dot" style="background:'+dotColor+'"></span>'+name+'</td><td>'+row.cnt+'</td><td>'+fmt(row.sum)+'</td><td>'+fmt(avg)+'</td><td>'+(row.sum/tot*100).toFixed(1)+'%</td></tr>';
     }
     var ppSplits = (d.pp && d.pp.splits) || null;
     var ppLbl = 'Пред. период' + (d.pp && d.pp.label ? '<br><span class="muted">' + d.pp.label + '</span>' : '');
@@ -177,7 +177,7 @@ async function renderPageMainNew(d) {
 
     // Регистрация — над недельной таблицей
     html += '<div class="kpis kpis-8" id="newRegKpis" style="margin-top:16px"></div>';
-    html += '<div class="card"><h2>'+(isMonths('table')?'Таблица по месяцам':'Недельная таблица')+perToggle('table')+'</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
+    html += '<div class="card"><h2 class="mg-card-head"><span>'+(isMonths('table')?'Таблица по месяцам':'Недельная таблица')+'</span>'+perToggle('table')+'</h2><div class="scroll-x"><div id="newWeekTable"></div></div></div>';
 
     // --- Ключевые выводы ---
     var weeks = d.weeks || [];
@@ -214,11 +214,11 @@ async function renderPageMainNew(d) {
     var topFmtSum = fmtSumSorted.length > 0 ? fmtSumSorted[0] : null;
     var topFmtCnt = fmtCntSorted.length > 0 ? fmtCntSorted[0] : null;
 
-    html += '<div class="card" style="background:linear-gradient(135deg,#f8f9ff,#eef1f8)">';
-    html += '<h2>📋 Ключевые выводы</h2>';
-    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">';
+    html += '<div class="card mg-insights">';
+    html += '<h2>Ключевые выводы</h2>';
+    html += '<div class="mg-insights-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:13px;line-height:1.6">';
     // Выбранный период
-    html += '<div><b>📊 В выбранном периоде:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<div><b>В выбранном периоде:</b><ul>';
     html += '<li>Поступления: <b>'+fmt(ytd.postupleniya)+' ₽</b> ('+ytd.won_relevant_cnt+' сделок)</li>';
     html += '<li>Средний чек: <b>'+fmt(ytd.avg_check)+' ₽</b></li>';
     html += '<li>Медиана закрытия: <b>'+(ytd.median_close_days_won||0)+' дн.</b> · Взвешенный: <b>'+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн.</b></li>';
@@ -228,17 +228,17 @@ async function renderPageMainNew(d) {
     // Неделя
     var wkLabel = '№'+String(last.week||'');
     var wkDates = last.label_dates || '';
-    html += '<div><b>📈 Текущая неделя '+wkLabel+' ('+wkDates+'):</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> '+(wkDelta>=0?'📈 +':'📉 ')+Math.abs(wkDelta).toFixed(1)+'% к прошлой</li>';
+    html += '<div><b>Текущая неделя '+wkLabel+' ('+wkDates+'):</b><ul>';
+    html += '<li>Поступления: <b>'+fmt(last.postupleniya)+' ₽</b> <span class="'+(wkDelta>=0?'delta-up':'delta-down')+'">'+(wkDelta>=0?'↑ +':'↓ ')+Math.abs(wkDelta).toFixed(1)+'%</span> к прошлой</li>';
     html += '<li>Сделок: <b>'+(last.won_cnt||0)+'</b> · Лидов: <b>'+(last.leads||0)+'</b></li>';
     html += '</ul></div>';
     // Регистрация
-    html += '<div><b>📥 Регистрация:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<div><b>Регистрация:</b><ul>';
     html += '<li>Пришло: <b>'+fmt(regTotal)+'</b> · Оплачено: <b>'+regPaid+'</b> (<b>'+regConv+'%</b>)</li>';
     html += '<li>Средний чек: <b>'+fmt(reg.avg_check || 0)+' ₽</b> · Цикл: <b>'+(reg.avg_dur||0).toFixed(1)+' дн.</b></li>';
     html += '</ul></div>';
     // Лидеры
-    html += '<div><b>🏆 Лидеры:</b><ul style="margin:6px 0 0 18px;color:#444">';
+    html += '<div><b>Лидеры:</b><ul>';
     html += '<li>Формат: <b>'+(topFmtSum ? escapeHtml(topFmtSum[0]) : '-')+'</b> ('+fmt(topFmtSum ? topFmtSum[1].sum : 0)+' ₽)'+(topFmtCnt && topFmtCnt[0] !== topFmtSum[0] ? ' · <b>'+escapeHtml(topFmtCnt[0])+'</b> ('+topFmtCnt[1].cnt+' сд.)' : '')+'</li>';
     // src_rating отсортирован по сумме ([0] — ИТОГО); Регистрацию ищем по имени,
     // а не по индексу — её место в рейтинге меняется
@@ -247,21 +247,21 @@ async function renderPageMainNew(d) {
     html += '<li>'+(mgrTop.length > 0 ? 'Менеджер: <b>'+escapeHtml(mgrTop[0].name)+'</b> ('+fmt(mgrTop[0].postupleniya)+' ₽)' : '')+'</li>';
     html += '</ul></div>';
     // Выводы
-    html += '<div style="grid-column:1/-1"><b>💡 Выводы:</b><ul style="margin:6px 0 0 18px;color:#444">';
-    html += '<li>🔵 Медиана закрытия <b>'+(ytd.median_close_days_won||0)+' дн.</b> — быстрые сделки, но взвешенный '+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн. — крупные КОМ растягивают среднюю</li>';
-    html += '<li>🟢 Регистрация: <b>'+regConv+'%</b> конверсии в сделку — лучшая среди всех источников</li>';
+    html += '<div style="grid-column:1/-1"><b>Выводы:</b><ul>';
+    html += '<li><i class="ds-dot ds-dot--info"></i>Медиана закрытия <b>'+(ytd.median_close_days_won||0)+' дн.</b>: быстрые сделки, но взвешенный '+(ytd.avg_close_days_won_weighted||ytd.avg_close_days_won||0).toFixed(1)+' дн., крупные КОМ растягивают среднюю</li>';
+    html += '<li><i class="ds-dot ds-dot--success"></i>Регистрация: <b>'+regConv+'%</b> конверсии в сделку, лучшая среди всех источников</li>';
     if (wkDelta < -20) {
-      html += '<li>🔴 Резкое падение ('+Math.abs(wkDelta).toFixed(0)+'% к прошлой неделе) — на фоне '+(last.leads||0)+' лидов может быть эффектом конца периода, а не просадкой спроса</li>';
+      html += '<li><i class="ds-dot ds-dot--danger"></i>Резкое падение ('+Math.abs(wkDelta).toFixed(0)+'% к прошлой неделе) на фоне '+(last.leads||0)+' лидов может быть эффектом конца периода, а не просадкой спроса</li>';
     }
-    html += '<li>📌 <b>'+escapeHtml(topFmtSum?topFmtSum[0]:'')+'</b> лидирует по сумме, <b>'+escapeHtml(topFmtCnt?topFmtCnt[0]:'')+'</b> — по количеству ('+(topFmtCnt?topFmtCnt[1].cnt:0)+' сд.)</li>';
+    html += '<li><i class="ds-dot"></i><b>'+escapeHtml(topFmtSum?topFmtSum[0]:'')+'</b> лидирует по сумме, <b>'+escapeHtml(topFmtCnt?topFmtCnt[0]:'')+'</b> по количеству ('+(topFmtCnt?topFmtCnt[1].cnt:0)+' сд.)</li>';
     if (ytd.conv_deal_pct < 25) {
-      html += '<li>🎯 Конверсия лид→сделка <b>'+(ytd.conv_deal_pct||0).toFixed(1)+'%</b> — ниже 25%, потенциал в улучшении качества лидов</li>';
+      html += '<li><i class="ds-dot ds-dot--warning"></i>Конверсия лид→сделка <b>'+(ytd.conv_deal_pct||0).toFixed(1)+'%</b> ниже 25%, потенциал в улучшении качества лидов</li>';
     }
     html += '</ul></div>';
     html += '</div></div>';
 
     // Блок артефактов — виден только admin (403 для остальных обрабатывается внутри loadArtifacts)
-    html += '<div class="card"><h2>⚠️ Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="text-center text-secondary py-4"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка...</div></div></div></div>';
+    html += '<div class="card"><h2>Артефакты данных</h2><div class="sub" style="margin:-8px 0 14px">Аномалии, требующие проверки</div><div id="newArtifactsBlock"><div class="text-center text-secondary py-4"><div class="spinner-border text-primary mb-2" role="status"></div><div>Загрузка...</div></div></div></div>';
 
     // Batch update all at once
     areaNew.innerHTML = html;
@@ -311,7 +311,7 @@ async function renderPageMainNew(d) {
         + '<div style="display:flex;gap:24px"><div style="flex:1">'+(delta1||'')+'</div><div style="flex:1">'+(delta2||'')+'</div></div>'
         + '</div>';
     }
-    var regKpis = '<div class="kpi-header c-reg">📥 Динамика по источнику «Регистрация»</div>'
+    var regKpis = '<div class="kpi-header c-reg">Динамика по источнику «Регистрация»</div>'
       + regCardPair(
           'Регистраций пришло, шт.', '₽',
           fmt(reg.total), pp_reg?delta(reg.total,pp_reg.total):'', pp_reg?fmt(pp_reg.total):'',
@@ -353,7 +353,7 @@ async function renderPageMainNew(d) {
     colHeaders.forEach(function(h,i){weekStr += '<th class="sort" data-col="'+i+'">'+h.l+'</th>';});
     weekStr += '</tr></thead><tbody>';
     // ИТОГО первой строкой
-    weekStr += '<tr class="total-row" style="background:#eef1f8;font-weight:700;border-top:2px solid #1f2a44;border-bottom:2px solid #1f2a44"><td><b>\uD83D\uDCCA ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
+    weekStr += '<tr class="total-row"><td><b>ИТОГО</b></td><td>'+tL+'</td><td>'+tM+'</td><td>'+tS+'</td><td>'+tInv+'</td><td>'+tO+'</td><td>'+fmt(tP0)+'</td><td>'+fmt(tAvgChk)+'</td><td>'+(tAvgDur||0).toFixed(1)+'</td><td>'+tCl.toFixed(1)+'%</td><td>'+tCs.toFixed(1)+'%</td><td>'+tSi.toFixed(1)+'%</td><td>'+tIo.toFixed(1)+'%</td><td>'+tLo.toFixed(1)+'%</td></tr>';
     // Недели
     for(var wi=tblBuckets.length-1; wi>=0; wi--){
       var w = tblBuckets[wi];
@@ -420,7 +420,7 @@ async function renderPageMainNew(d) {
     }, 100);
 
   } catch(e) {
-    areaNew.innerHTML = '<div class="alert alert-danger" style="cursor:pointer" onclick="this.style.display=\'none\'\">\u274c <b>Ошибка вкладки «Новая логика»</b><br>'+escapeHtml(e.message)+'<br><br><small style="color:#999">(нажмите чтобы закрыть, время: ' + new Date().toLocaleTimeString('ru-RU') + ')</small></div>';
+    areaNew.innerHTML = '<div class="alert alert-danger" style="cursor:pointer" onclick="this.style.display=\'none\'\"><b>Ошибка вкладки «Новая логика»</b><br>'+escapeHtml(e.message)+'<br><br><small style="color:#999">(нажмите чтобы закрыть, время: ' + new Date().toLocaleTimeString('ru-RU') + ')</small></div>';
     console.error('renderPageMainNew error:', e);
   }
 }

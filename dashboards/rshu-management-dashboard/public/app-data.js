@@ -35,7 +35,7 @@ async function loadAll() {
     renderFilteredData();
   } catch (e) {
     console.error('loadAll error:', e);
-    if (areaNew) areaNew.innerHTML = '<div class="alert alert-danger">❌ Ошибка загрузки: '+escapeHtml(e.message)+'</div>';
+    if (areaNew) areaNew.innerHTML = '<div class="alert alert-danger">Ошибка загрузки: '+escapeHtml(e.message)+'</div>';
   }
 }
 

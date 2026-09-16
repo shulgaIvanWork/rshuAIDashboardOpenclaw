@@ -25,6 +25,11 @@
   --bs-border-radius-sm: var(--radius-s);
   --bs-border-radius-lg: var(--radius-m);
   --bs-focus-ring-color: rgba(12, 140, 255, .25);
+  /* text-success / text-danger (дельты KPI) - цвета роста и падения платформы */
+  --bs-success: #16803c;
+  --bs-success-rgb: 22, 128, 60;
+  --bs-danger: #d62839;
+  --bs-danger-rgb: 214, 40, 57;
 }
 
 /* ── База ──────────────────────────────────────────────────────────── */
