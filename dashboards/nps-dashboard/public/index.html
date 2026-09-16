@@ -3,26 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NPS — Обратная связь</title>
+  <title>NPS: обратная связь</title>
   <link rel="stylesheet" href="/vendor/bootstrap/bootstrap.min.css">
   <link rel="stylesheet" href="/shared.css">
+  <link rel="stylesheet" href="/ui-kit/ds.css">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-<div class="">
+<body class="app-chrome">
+<nav class="ds-topbar">
+  <a href="/dashboards" aria-label="Все дашборды"><img class="ds-topbar__logo" src="/ui-kit/logo-white.svg" alt="Российская школа управления"></a>
+  <div class="ds-topbar__nav" style="margin-left:auto">
+    <a href="/dashboards" class="ds-topbar__link" title="Все дашборды">
+      <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-dashboard"></use></svg><span class="ds-topbar__label">Все дашборды</span>
+    </a>
+  </div>
+</nav>
+<main class="ds-page nps-page">
 
   <!-- Хедер -->
-  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-    <h1 class="h3 mb-0">😊 NPS — Обратная связь
-      <span id="refreshInfo" class="page-title-meta">загрузка…</span>
-    </h1>
-    <div class="d-flex gap-2">
-      <button id="exportExcelBtn" type="button" class="btn-excel">📥 Скачать Excel</button>
-      <a href="guide.pdf" download class="btn-guide">📄 Инструкция</a>
+  <div class="ds-page-head">
+    <div>
+      <h1 class="ds-title">NPS: обратная связь</h1>
+      <p class="ds-subtitle" id="refreshInfo">загрузка…</p>
+    </div>
+    <div class="ds-row">
+      <a href="guide.pdf" download class="btn-guide">
+        <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-file"></use></svg>Инструкция
+      </a>
+      <button id="exportExcelBtn" type="button" class="btn-excel">
+        <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-download"></use></svg>Скачать Excel
+      </button>
     </div>
   </div>
 
-  <!-- KPI-карточки (компонент .kpi из shared.css) -->
+  <!-- KPI-карточки (компонент .kpi из shared.css и ds.css) -->
   <div class="kpis kpis-4">
     <div class="kpi kpi-total" id="kpiNps">
       <div class="lbl">NPS (последний месяц)</div>
@@ -43,15 +57,15 @@
   </div>
 
   <!-- Помесячная таблица -->
-  <div class="card">
+  <div class="card nps-card">
     <div class="table-responsive">
       <table class="table table-sm table-hover align-middle text-center sortable" id="npsTable">
         <thead>
           <tr>
             <th class="sort" data-col="0" rowspan="2">Месяц</th>
-            <th colspan="5">Статистика опросов</th>
-            <th colspan="5">NPS</th>
-            <th colspan="3">Динамика</th>
+            <th colspan="5" class="group">Статистика опросов</th>
+            <th colspan="5" class="group">NPS</th>
+            <th colspan="3" class="group">Динамика</th>
           </tr>
           <tr>
             <th class="sort" data-col="1">Отправлено</th>
@@ -74,13 +88,13 @@
     </div>
   </div>
 
-  <!-- Текстовые выводы — под таблицей статистики опросов -->
-  <div id="insightsBlock" class="mb-3" style="display:none;"></div>
+  <!-- Текстовые выводы - под таблицей статистики опросов -->
+  <div id="insightsBlock" class="nps-insights" style="display:none;"></div>
 
   <!-- Срезы: три отдельные карточки -->
   <div id="slicesCard" style="display:none;">
-    <div class="card">
-      <h2 class="h5 mb-3">NPS по направлениям</h2>
+    <div class="card nps-card">
+      <h2>NPS по направлениям</h2>
       <div class="table-responsive">
         <table class="table table-sm table-hover align-middle text-center sortable" id="directionsTable">
           <thead><tr>
@@ -99,8 +113,8 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2 class="h5 mb-3">NPS по формату обучения</h2>
+    <div class="card nps-card">
+      <h2>NPS по формату обучения</h2>
       <div class="table-responsive">
         <table class="table table-sm table-hover align-middle text-center sortable" id="formatTable">
           <thead><tr>
@@ -119,8 +133,8 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2 class="h5 mb-3">NPS по типу клиента</h2>
+    <div class="card nps-card">
+      <h2>NPS по типу клиента</h2>
       <div class="table-responsive">
         <table class="table table-sm table-hover align-middle text-center sortable" id="b2bTable">
           <thead><tr>
@@ -140,7 +154,7 @@
     </div>
   </div>
 
-</div>
+</main>
 
 <script src="/shared.js"></script>
 <script src="app.js"></script>

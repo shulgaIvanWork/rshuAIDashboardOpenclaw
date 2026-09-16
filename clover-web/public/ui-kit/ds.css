@@ -114,6 +114,7 @@ a:hover { color: var(--color-primary-hover); }
 .btn { --bs-btn-font-family: var(--font-family); --bs-btn-font-weight: 600; --bs-btn-font-size: 14px; --bs-btn-padding-y: 7px; --bs-btn-padding-x: 16px; --bs-btn-border-radius: var(--ds-control-radius); --bs-btn-focus-box-shadow: 0 0 0 3px rgba(12, 140, 255, .25); }
 .btn-sm { --bs-btn-font-size: 13px; --bs-btn-padding-y: 4px; --bs-btn-padding-x: 12px; --bs-btn-border-radius: 10px; }
 .btn-primary { --bs-btn-bg: #093eb4; --bs-btn-border-color: #093eb4; --bs-btn-hover-bg: #2259d4; --bs-btn-hover-border-color: #2259d4; --bs-btn-active-bg: #0a34aa; --bs-btn-active-border-color: #0a34aa; --bs-btn-disabled-bg: #d0d5e3; --bs-btn-disabled-border-color: #d0d5e3; }
+.btn-outline-primary { --bs-btn-color: #093eb4; --bs-btn-border-color: #093eb4; --bs-btn-hover-color: #fff; --bs-btn-hover-bg: #093eb4; --bs-btn-hover-border-color: #093eb4; --bs-btn-active-color: #fff; --bs-btn-active-bg: #0a34aa; --bs-btn-active-border-color: #0a34aa; }
 .btn-outline-secondary { --bs-btn-color: var(--color-text-primary); --bs-btn-border-color: var(--ds-line-strong); --bs-btn-hover-color: #093eb4; --bs-btn-hover-bg: var(--color-bg-accent); --bs-btn-hover-border-color: var(--color-bg-accent); --bs-btn-active-color: #093eb4; --bs-btn-active-bg: var(--ds-accent-hover); --bs-btn-active-border-color: var(--ds-accent-hover); }
 
 /* ── Поля, выбор периода, селект, чекбокс (кит: input-text S, select, checkbox) ─ */
@@ -218,6 +219,8 @@ th.sort.asc::after, th.sort.desc::after { color: var(--color-primary); opacity: 
 .alert { --bs-alert-border-radius: 12px; border: 0; font-size: 13px; }
 .alert-danger { --bs-alert-bg: var(--ds-danger-bg); --bs-alert-color: var(--ds-danger-text); }
 .alert-warning { --bs-alert-bg: var(--ds-warning-bg); --bs-alert-color: var(--ds-warning-text); }
+.alert-success { --bs-alert-bg: var(--ds-success-bg); --bs-alert-color: var(--ds-success-text); }
+.alert-info { --bs-alert-bg: var(--ds-info-bg); --bs-alert-color: var(--ds-info-text); }
 
 .loading-state { color: var(--color-text-muted); }
 .loading-state .spinner { border-color: var(--ds-line); border-top-color: var(--color-primary); }

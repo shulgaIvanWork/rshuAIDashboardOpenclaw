@@ -127,10 +127,11 @@ function render() {
   const insights = $('insightsBlock');
   if (data.insights && data.insights.length) {
     const alertClass = { good: 'alert-success', bad: 'alert-danger', mid: 'alert-warning', neutral: 'alert-info' };
-    const emoji = { good: '🟢', bad: '🔴', mid: '🟡', neutral: '💡' };
+    const icon = { good: 'i-check', bad: 'i-warning', mid: 'i-info', neutral: 'i-info' };
     insights.innerHTML = data.insights.map(i =>
       '<div class="alert ' + (alertClass[i.type] || 'alert-info') + ' py-2 mb-2">' +
-        (emoji[i.type] || '💡') + ' ' + escapeHtml(i.text) +
+        '<svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#' + (icon[i.type] || 'i-info') + '"></use></svg>' +
+        '<span>' + escapeHtml(i.text) + '</span>' +
       '</div>'
     ).join('');
     insights.style.display = 'block';
