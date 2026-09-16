@@ -3,7 +3,7 @@
  *
  * Из недельных weeks[].by_prod / by_src / by_mba / by_company собирает срез:
  * top_products, all_products, src_rating, mba_rating, top_companies, src_funnel + YTD/cur/prev.
- * ⚠ Любые фильтры (исключить КОМ, конструктор ILP и т.п.) должны дублироваться в analyze.js —
+ * Любые фильтры (исключить КОМ, конструктор ILP и т.п.) должны дублироваться в analyze.js —
  *   здесь мы лишь суммируем то, что уже отфильтровано в недельной агрегации (см. README).
  * Вызывается из renderFilteredData() (app-core.js).
  */
@@ -135,7 +135,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   var restMqlSum = rest.reduce(function(s,p){return s+(p.mql_sum||0);},0);
   var restInvSum = rest.reduce(function(s,p){return s+(p.inv_sum||0);},0);
   if (rest.length) {
-    top20.push({name:'📦 Остальные ('+rest.length+' продуктов)', deals:restDeals, mql:restMql, mql_sum:restMqlSum, inv_sum:restInvSum, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:restCycle,
+    top20.push({name:'Остальные ('+rest.length+' продуктов)', deals:restDeals, mql:restMql, mql_sum:restMqlSum, inv_sum:restInvSum, sum:restSum, avg_check:restDeals?Math.round(restSum/restDeals):0, avg_won_days:restCycle,
       share:Math.round(restSum/totalSum*100*10)/10,
       fmt_ochn_cnt:rest.reduce(function(s,p){return s+p.fmt_ochn_cnt;},0),
       fmt_ochn_sum:rest.reduce(function(s,p){return s+p.fmt_ochn_sum;},0),
@@ -193,7 +193,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
       out.dir_products[dn] = {
         rows: Object.entries(rows).map(function(e){ return finishRow(e[0], e[1], dirSum); })
           .sort(function(a,b){ return b.sum-a.sum || b.mql-a.mql || a.name.localeCompare(b.name); }),
-        forms: forms ? finishRow('📨 Лиды с форм без программы', forms, dirSum) : null
+        forms: forms ? finishRow('Лиды с форм без программы', forms, dirSum) : null
       };
     });
   }
@@ -218,7 +218,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   var srcTotDeals = srcList.reduce(function(s,x){return s+x.deals;},0);
   var srcTotSum = srcList.reduce(function(s,x){return s+x.postupleniya;},0);
   var srcAllDurs = bucketWeeks.flatMap(function(w){return Object.values(w.by_src||{}).flatMap(function(v){return v.durs||[];});});
-  var srcTotal = {name:'📊 ИТОГО',
+  var srcTotal = {name:'ИТОГО',
     postupleniya:srcTotSum, deals:srcTotDeals, mql:srcTotMql, sql:srcTotSql, leads:0,
     avg_check:srcTotDeals?Math.round(srcTotSum/srcTotDeals):0,
     avg_won_days:Math.round(avg(srcAllDurs)*10)/10,
@@ -234,7 +234,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
     var rSql = srcRest.reduce(function(s,x){return s+x.sql;},0);
     var rCycleNum = srcRest.reduce(function(s,x){return s+((x.avg_won_days||0)*(x.deals||0));},0);
     var rCycle = rDeals > 0 ? rCycleNum/rDeals : 0;
-    srcRestRow = {name:'📦 Остальные ('+srcRest.length+' источников)',
+    srcRestRow = {name:'Остальные ('+srcRest.length+' источников)',
       postupleniya:rSum, deals:rDeals, mql:rMql, sql:rSql, leads:0,
       avg_check:rDeals?Math.round(rSum/rDeals):0, avg_won_days:rCycle,
       conv_mql_sql:rMql?Math.round(rSql/rMql*100*10)/10:0,
@@ -284,7 +284,7 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
     var cROmSum = compRest.reduce(function(s,x){return s+(x.om_sum||0);},0);
     var cRKomCnt = compRest.reduce(function(s,x){return s+(x.kom_cnt||0);},0);
     var cRKomSum = compRest.reduce(function(s,x){return s+(x.kom_sum||0);},0);
-    compTop = compTop.concat([{id:'_rest', name:'📦 Остальные ('+compRest.length+' компаний)',
+    compTop = compTop.concat([{id:'_rest', name:'Остальные ('+compRest.length+' компаний)',
       sum:cRSum, cnt:cRCnt,
       om_cnt:cROmCnt, om_sum:cROmSum, kom_cnt:cRKomCnt, kom_sum:cRKomSum,
       last_date:'—', avg_check:cRCnt?Math.round(cRSum/cRCnt):0}]);
@@ -317,12 +317,12 @@ function buildFilteredData(orig, filteredWeeks, rangeBucket) {
   var sfTop=sfList.slice(0,20), sfRestList=sfList.slice(20);
   var sfAggFn=function(arr){var r={leads:0,mql:0,mql_sum:0,sql:0,invoice_cnt:0,deals:0,postupleniya:0};arr.forEach(function(x){r.leads+=x.leads;r.mql+=x.mql;r.mql_sum+=(x.mql_sum||0);r.sql+=x.sql;r.invoice_cnt+=x.invoice_cnt;r.deals+=x.deals;r.postupleniya+=x.postupleniya;});r.avg_check=r.deals?Math.round(r.postupleniya/r.deals):0;var c=arr.reduce(function(s,x){return s+(x.avg_dur||0)*(x.deals||0);},0);var dc=arr.reduce(function(s,x){return s+(x.deals||0);},0);r.avg_dur=dc?c/dc:0;return r;};
   function mkSfRow(name, data, extra){ var r=Object.assign({name:name, type:''},data); if(extra) Object.assign(r,extra); return r; }
-  var sfTopTotal=mkSfRow('📊 ИТОГО (топ-20)', sfAggFn(sfTop));
-  var sfAllTotal=mkSfRow('📊 ИТОГО (все без КОМ)', sfAggFn(sfList));
+  var sfTopTotal=mkSfRow('ИТОГО (топ-20)', sfAggFn(sfTop));
+  var sfAllTotal=mkSfRow('ИТОГО (все без КОМ)', sfAggFn(sfList));
   var sfRestRow=null;
   if(sfRestList.length){
     var rr=sfAggFn(sfRestList); rr.avg_dur=0;
-    sfRestRow=mkSfRow('📦 Остальные ('+sfRestList.length+' источников)', rr);
+    sfRestRow=mkSfRow('Остальные ('+sfRestList.length+' источников)', rr);
   }
   out.src_funnel=[sfTopTotal, ...sfTop, sfRestRow, sfAllTotal].filter(Boolean);
 

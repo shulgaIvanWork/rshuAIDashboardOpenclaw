@@ -83,7 +83,7 @@ async function loadAll() {
 
   } catch (e) {
     console.error('loadAll error:', e);
-    if (areaNew) areaNew.innerHTML = '<div class="error-state">❌ Ошибка загрузки: '+escapeHtml(e.message)+'<br>Нажмите «🔄 Обновить данные»</div>';
+    if (areaNew) areaNew.innerHTML = '<div class="error-state">Ошибка загрузки: '+escapeHtml(e.message)+'<br>Нажмите «Обновить данные»</div>';
   }
 }
 

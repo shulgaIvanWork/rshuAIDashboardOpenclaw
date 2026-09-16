@@ -9,28 +9,46 @@
   <title>Рейтинги 2026</title>
   <link rel="stylesheet" href="/shared.css">
   <link rel="stylesheet" href="/vendor/range-calendar/range-calendar.css">
+  <link rel="stylesheet" href="/ui-kit/ds.css">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
-<body>
-<div class="wrap">
-  <div style="display:flex;align-items:center;justify-content:space-between">
-    <h1>Рейтинги 2026 <span id="updateDate" class="page-title-meta"></span></h1>
-    <a href="guide.pdf" download class="btn-guide">📄 Инструкция</a>
+<body class="app-chrome">
+<nav class="ds-topbar">
+  <a href="/dashboards" aria-label="Все дашборды"><img class="ds-topbar__logo" src="/ui-kit/logo-white.svg" alt="Российская школа управления"></a>
+  <div class="ds-topbar__nav" style="margin-left:auto">
+    <a href="/dashboards" class="ds-topbar__link" title="Все дашборды">
+      <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-dashboard"></use></svg><span class="ds-topbar__label">Все дашборды</span>
+    </a>
   </div>
-  <div id="dateFilterBar" class="date-filter-bar">
-    <label>📅 Период:</label>
+</nav>
+<main class="ds-page rt-page">
+  <div class="ds-page-head">
+    <div>
+      <h1 class="ds-title">Рейтинги 2026</h1>
+      <p class="ds-subtitle" id="updateDate"></p>
+    </div>
+    <div class="ds-row">
+      <a href="guide.pdf" download class="btn-guide">
+        <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-file"></use></svg>Инструкция
+      </a>
+      <button id="exportExcelBtn" type="button" class="btn-excel">
+        <svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-download"></use></svg>Скачать Excel
+      </button>
+    </div>
+  </div>
+  <div id="dateFilterBar" class="ds-card date-filter-bar rt-filters">
+    <label for="periodDisplay"><svg class="ds-icon" aria-hidden="true"><use href="/ui-kit/icons.svg#i-calendar"></use></svg> Период:</label>
     <input type="text" id="periodDisplay" class="rc-input" readonly placeholder="Выберите период">
     <input type="hidden" id="dateFrom">
     <input type="hidden" id="dateTo">
     <span id="filterInfo" class="filter-info"></span>
-    <button id="exportExcelBtn" type="button" class="btn-excel">📥 Скачать Excel</button>
   </div>
   <div id="contentAreaNew">
     <div class="loading-state" id="loadingStateNew"><div class="spinner"></div><div>Загрузка данных…</div></div>
   </div>
-</div>
+</main>
 <script src="/shared.js"></script>
 <script src="/vendor/range-calendar/range-calendar.js"></script>
 <!-- app.js разбит на модули (classic-скрипты, общий global-scope). Порядок важен:

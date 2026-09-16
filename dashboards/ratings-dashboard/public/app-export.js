@@ -97,7 +97,7 @@ async function exportRatingsExcel() {
 // Защищённый запуск: ошибка не должна блокировать UI
 loadAll().catch(function(e) {
   var area = document.getElementById('contentArea');
-  if (area) area.innerHTML = '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '<br>Нажмите «Обновить данные»</div>';
+  if (area) area.innerHTML = '<div class="error-state">Ошибка загрузки: ' + escapeHtml(e.message) + '<br>Нажмите «Обновить данные»</div>';
   var areaNew = document.getElementById('contentAreaNew');
-  if (areaNew) areaNew.innerHTML = areaNew.innerHTML || '<div class="error-state">⚠️ Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
+  if (areaNew) areaNew.innerHTML = areaNew.innerHTML || '<div class="error-state">Ошибка загрузки: ' + escapeHtml(e.message) + '</div>';
 });

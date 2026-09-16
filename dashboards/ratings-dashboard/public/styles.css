@@ -1,2 +1,27 @@
-/* Dashboard-specific: ratings — all common styles in /shared.css */
+/* Dashboard-specific: ratings. Подключается после /ui-kit/ds.css: шрифт, кнопки, поля, карточки и
+   шапки таблиц берутся оттуда, здесь только раскладка и палитра дашборда. */
 
+.rt-page { max-width: 1600px; }
+
+/* Фильтр периода */
+.rt-filters { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 14px 20px; margin-bottom: 4px; }
+.rt-filters label { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.rt-filters .ds-icon { color: var(--color-primary); }
+
+/* Карточки таблиц */
+.rt-page .card { margin-top: 12px; }
+.rt-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.rt-head h2 { margin: 0; }
+.rt-note { font-size: 13px; font-weight: 400; color: var(--color-text-muted); }
+.rt-dir-filter { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-text-muted); }
+.rt-dir-filter .ds-select { height: 32px; font-size: 13px; }
+
+/* Итоговые строки: ИТОГО и строки подвала (Остальные, Без оплат, Лиды с форм, Без направления) */
+tr.rt-total > td { background: var(--color-bg-accent); font-weight: 700; }
+tr.rt-rest > td { background: var(--ds-row-hover); font-weight: 700; }
+
+/* Тип трафика: те же цвета, что у источников в управленческом дашборде */
+.rt-type { color: #fff; font-size: 10px; padding: 2px 8px; }
+.rt-type--internal { background: #1f2a44; }
+.rt-type--marketing { background: #00bcd4; }
+.rt-type-note { font-size: 10px; color: var(--color-text-muted); }
