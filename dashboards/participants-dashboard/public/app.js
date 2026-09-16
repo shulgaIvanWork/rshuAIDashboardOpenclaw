@@ -96,14 +96,14 @@ function buildParticipantsTable(res, tableId) {
   for (let i = 0; i < res.participants.length; i++) {
     const p = res.participants[i];
     const amount = p.amount > 0 ? Number(p.amount).toLocaleString('ru-RU') : '—';
-    const fmtBadge = p.format === 'Онлайн' ? 'text-bg-primary' : 'text-bg-success';
+    const fmtBadge = p.format === 'Онлайн' ? 'ds-badge--info' : 'ds-badge--success';
     const fmtLabel = p.format === 'Онлайн' ? 'Онлайн' : 'Очно';
     const regionLabel = p.region ? escapeHtml(p.region) : '—';
-    let stageBadge = 'text-bg-success';
-    if (p.stage === 'Счёт отправлен') stageBadge = 'text-bg-info';
-    else if (p.stage === 'Постоплата') stageBadge = 'text-bg-primary';
-    else if (p.stage === 'Частично оплачен') stageBadge = 'text-bg-warning';
-    const typeBadge = p.clientType === 'B2B' ? 'text-bg-success-subtle text-success-emphasis' : 'text-bg-primary-subtle text-primary-emphasis';
+    let stageBadge = 'ds-badge--success';
+    if (p.stage === 'Счёт отправлен') stageBadge = 'ds-badge--info';
+    else if (p.stage === 'Постоплата') stageBadge = 'ds-badge--primary';
+    else if (p.stage === 'Частично оплачен') stageBadge = 'ds-badge--warning';
+    const typeBadge = p.clientType === 'B2B' ? 'ds-badge--success' : 'ds-badge--primary';
     const invStatusColors = {
       'Черновик': 'text-secondary',
       'Отправлен клиенту': 'text-info',
@@ -119,15 +119,15 @@ function buildParticipantsTable(res, tableId) {
     html += '<tr>' +
       '<td><strong>' + escapeHtml(p.direction || '—') + '</strong></td>' +          /* 0 Направление */
       '<td>' + escapeHtml(p.program) + '</td>' +                                     /* 1 Программа */
-      '<td><span class="badge ' + fmtBadge + '">' + fmtLabel + '</span></td>' +    /* 2 Формат */
+      '<td><span class="ds-badge ' + fmtBadge + '">' + fmtLabel + '</span></td>' +    /* 2 Формат */
       '<td>' + escapeHtml(p.participant) + '</td>' +                                 /* 3 ФИО */
       '<td>' + regionLabel + '</td>' +                                               /* 4 Регион */
       '<td>' + escapeHtml(shortCompany(p.company)) + '</td>' +                       /* 5 Компания */
-      '<td><span class="badge ' + typeBadge + '">' + (p.clientType || '—') + '</span></td>' +  /* 6 Тип клиента */
+      '<td><span class="ds-badge ' + typeBadge + '">' + (p.clientType || '—') + '</span></td>' +  /* 6 Тип клиента */
       '<td class="small">' + (p.date || '—') + '<br>—<br>' + (p.dateEnd || '—') + '</td>' +    /* 7 Даты модуля */
       '<td>' + (p.moduleDuration != null ? p.moduleDuration : '—') + '</td>' +       /* 8 Длительность, дней */
-      '<td><span class="badge ' + stageBadge + '">' + p.stage + '</span></td>' +  /* 9 Статус сделки */
-      '<td>' + (p.participantFlag === 'Да' ? '<span class="badge text-bg-success">Да</span>' : p.participantFlag === 'Нет' ? '<span class="badge text-bg-danger">Нет</span>' : '<span class="text-secondary">—</span>') + '</td>' +  /* 10 Участник */
+      '<td><span class="ds-badge ' + stageBadge + '">' + p.stage + '</span></td>' +  /* 9 Статус сделки */
+      '<td>' + (p.participantFlag === 'Да' ? '<span class="ds-badge ds-badge--success">Да</span>' : p.participantFlag === 'Нет' ? '<span class="ds-badge ds-badge--danger">Нет</span>' : '<span class="text-secondary">—</span>') + '</td>' +  /* 10 Участник */
       '<td>' + (p.invoiceStatus ? '<span class="' + invStatusClass + '">' + escapeHtml(p.invoiceStatus) + '</span>' : '<span class="text-secondary">—</span>') + '</td>' +  /* 11 Статус счета */
       '<td>' + amount + '</td>' +                                                    /* 12 Сумма, ₽ */
       '<td>' + (p.invoiceDiscount != null ? Number(p.invoiceDiscount).toLocaleString('ru-RU') + '%' : '—') + '</td>' +  /* 13 Скидка, % */
@@ -177,7 +177,7 @@ async function loadParticipants(week) {
   try {
     const res = await api('/api/participants?week=' + week);
     if (!res.participants) {
-      wrap.innerHTML = '<div class="alert alert-danger">❌ ' + (res.error || 'Нет данных') + '</div>';
+      wrap.innerHTML = '<div class="alert alert-danger">' + (res.error || 'Нет данных') + '</div>';
       return;
     }
     // Если пользователь уже переключился на другую неделю — не перерисовываем
@@ -187,7 +187,7 @@ async function loadParticipants(week) {
     fillDirSelect(res);
     renderTable();
   } catch (e) {
-    wrap.innerHTML = '<div class="alert alert-danger">❌ Ошибка: ' + escapeHtml(e.message) + '</div>';
+    wrap.innerHTML = '<div class="alert alert-danger">Ошибка: ' + escapeHtml(e.message) + '</div>';
   }
 }
 

@@ -1,35 +1,42 @@
-/* Dashboard-specific overrides — базовая вёрстка на Bootstrap 5 (/vendor/bootstrap/) */
+/* Dashboard-specific: participants. Подключается после /ui-kit/ds.css: шрифт, кнопки, поля,
+   бейджи и шапка таблицы берутся оттуда, здесь только раскладка и фиксы таблицы Bootstrap. */
 
-/* Bootstrap reboot.css задаёт table { border-collapse: collapse }, что ломает
-   position:sticky на th по спецификации CSS Tables — переключаем на separate.
-   Побочный эффект: в separate-модели границы <tr> не рисуются (только границы
-   самих ячеек) — поэтому берём разделители строк явно на td/th, без table-bordered.
-   (position:sticky и text-align:center — уже через утилиты .sticky-top/.text-center
-   в разметке, здесь оставлено только то, чего в Bootstrap нет: brand-цвет и фикс.) */
+/* Таблица широкая (17 колонок): страница на всю ширину окна, боковые поля уже обычных */
+.pt-page { max-width: none; padding-left: var(--space-4); padding-right: var(--space-4); }
+
+/* Бейджи в плотной таблице: шрифт кита шире системного, иначе 17 колонок не помещаются в 1440px */
+#participantsTable .ds-badge { padding: 2px 7px; font-size: 11px; line-height: 14px; white-space: normal; }
+#participantsTable td { padding-left: 3px; padding-right: 3px; font-size: 11.5px; }
+
+/* Фильтры недели и направления */
+.pt-filters { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 14px 20px; margin-bottom: 16px; }
+.pt-filters .ds-label { margin: 0; }
+.pt-filters__gap { margin-left: 12px; }
+
+/* Карточка таблицы: без внутренних полей, чтобы 17 колонок помещались по ширине как раньше */
+.pt-table-card { padding: 0; }
+
+/* Bootstrap reboot.css задает table { border-collapse: collapse }, что ломает
+   position:sticky на th по спецификации CSS Tables - переключаем на separate.
+   В separate-модели границы <tr> не рисуются, поэтому разделители строк - на td/th. */
 .table { border-collapse: separate; border-spacing: 0; font-size: 12px; }
-.table > :not(caption) > * > * { border-bottom: 1px solid var(--bs-border-color); }
-.table thead th { background: #093EB4; color: #fff; border-bottom-color: #093EB4; }
+.table > :not(caption) > * > * { border-bottom: 1px solid var(--ds-line); }
 .table-responsive { overflow-y: visible; }
 
-/* align-middle на <table> не действует на th/td (Bootstrap-утилита работает
-   только на самих ячейках) — заголовки в 2 строки иначе прижаты к верху */
+/* align-middle на <table> не действует на th/td - заголовки в 2 строки иначе прижаты к верху */
 .table th, .table td { vertical-align: middle; }
 
-/* Шапка в 2 строки — компактно */
+/* Шапка в 2 строки - компактно */
 #participantsTable thead th {
   white-space: normal;
   vertical-align: middle;
   line-height: 1.15;
-  padding: 6px 4px;
+  padding: 8px 3px;
   font-size: 11px;
 }
 
-/* Сортировка таблиц (initTableSort из shared.js) — визуальные подсказки */
+/* Сортировка таблиц (initTableSort из shared.js) - визуальные подсказки */
 th.sort { cursor: pointer; user-select: none; }
 th.sort::after { content: ' ⇅'; font-size: 10px; opacity: .4; font-weight: 400; }
 th.sort.asc::after { content: ' ▲'; opacity: 1; }
 th.sort.desc::after { content: ' ▼'; opacity: 1; }
-
-/* Кнопка «Инструкция» — единый вид со всеми дашбордами (как в рейтингах) */
-.btn-guide { display:inline-block; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600; line-height:1.2; text-decoration:none; cursor:pointer; background:#eef1f8; color:#093EB4; border:1px solid #093EB4; }
-.btn-guide:hover { background:#093EB4; color:#fff; }

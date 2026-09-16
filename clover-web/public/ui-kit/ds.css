@@ -30,6 +30,11 @@
   --bs-success-rgb: 22, 128, 60;
   --bs-danger: #d62839;
   --bs-danger-rgb: 214, 40, 57;
+  /* text-warning / text-info (статусы в таблицах) - текст бейджей кита, читаемый на белом */
+  --bs-warning: #704d00;
+  --bs-warning-rgb: 112, 77, 0;
+  --bs-info: #284f71;
+  --bs-info-rgb: 40, 79, 113;
 }
 
 /* ── База ──────────────────────────────────────────────────────────── */
@@ -100,7 +105,7 @@ a:hover { color: var(--color-primary-hover); }
 .ds-btn--block { width: 100%; }
 
 /* Кнопки shared.css: Инструкция / Excel и панель действий - один стиль платформы */
-.btn-guide, .btn-excel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--ds-control-h); padding: 0 var(--space-4); border: 0; border-radius: var(--ds-control-radius); font-size: 14px; font-weight: 600; }
+.btn-guide, .btn-excel { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--ds-control-h); padding: 0 var(--space-4); border: 0; border-radius: var(--ds-control-radius); font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; }
 .toolbar button { height: var(--ds-control-h); padding: 0 var(--space-4); border-radius: var(--ds-control-radius); background: var(--color-primary); font-family: var(--font-family); font-weight: 600; }
 .toolbar button:hover { background: var(--color-primary-hover); }
 .toolbar button:disabled { background: var(--ds-line-strong); }
