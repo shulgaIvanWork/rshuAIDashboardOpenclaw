@@ -6,6 +6,7 @@
  *
  * Категории NPS берутся из поля UF_CRM_5DF2528C641D4 (Статус участника обучения):
  *   Промоутер, Пассивный, Детрактор, Нет контактов.
+ * Если статус пуст, категория считается по оценке (см. getNpsCategory).
  *
  * НЕ влияет на другие дашборды — работает с отдельным файлом post-sale-deals.json.
  */
@@ -65,13 +66,30 @@ export function getLearnerStatus(d) {
   return null;
 }
 
+/**
+ * Категория NPS сделки: статус участника обучения, а если он пуст - по оценке
+ * (9-10 промоутер, 7-8 пассивный, 0-6 детрактор, стандартная шкала NPS).
+ * Статус бывает пуст у сделок, переведенных на стадию «Заполнил NPS» вручную:
+ * в августе 2026 так было у 46 из 94 заполненных анкет, и они выпадали из отчета.
+ * Возвращает: 'promoter' | 'passive' | 'detractor' | 'no_contact' | null
+ */
+export function getNpsCategory(d) {
+  const status = getLearnerStatus(d);
+  if (status !== null) return status;
+  const score = getNpsScore(d);
+  if (score === null) return null;
+  if (score >= 9) return 'promoter';
+  if (score >= 7) return 'passive';
+  return 'detractor';
+}
+
 // ── Агрегация ─────────────────────────────────────────────────────────────────
 
 /**
  * Агрегирует NPS-данные по месяцам за указанный год.
  *
- * Категории (Промоутер/Пассивный/Детрактор) берутся из статуса участника обучения,
- * а не рассчитываются из оценки.
+ * Категории (Промоутер/Пассивный/Детрактор) берутся из статуса участника обучения;
+ * по оценке считаются, только если статус пуст (getNpsCategory).
  *
  * Возвращает массив объектов:
  * {
@@ -108,9 +126,9 @@ export function aggregateByMonth(deals, year) {
     const mData = months[m];
     mData.sent++;
 
-    // Заполнили — стадия «заполнено» И есть статус (не Нет контактов)
+    // Заполнили - стадия «заполнено» И есть категория (статус или оценка; не Нет контактов)
     if (isPostSaleFilled(d)) {
-      const status = getLearnerStatus(d);
+      const status = getNpsCategory(d);
       if (status !== null && status !== 'no_contact') {
         mData.filled++;
         if (status === 'promoter')  mData.promoters++;
@@ -303,7 +321,7 @@ export function aggregateBySlice(deals, year, fieldCode, labelMap = DICT) {
     g.sent++;
 
     if (isPostSaleFilled(d)) {
-      const status = getLearnerStatus(d);
+      const status = getNpsCategory(d);
       if (status !== null && status !== 'no_contact') {
         g.filled++;
         if (status === 'promoter')  g.promoters++;
