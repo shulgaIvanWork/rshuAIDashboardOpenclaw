@@ -21,7 +21,16 @@ function parseDt(s) {
 }
 
 /** Обогащение сырых сделок минимальным набором полей для KPI */
-export function enrichForKpi(dealsRaw) {
+export function enrichForKpi(dealsRaw, paymentMovements = []) {
+  const paymentsByDeal = new Map();
+  for (const payment of paymentMovements) {
+    const dealId = String(payment.dealId || '');
+    const dt = parseDt(payment.date);
+    const amount = Number(payment.amount || 0);
+    if (!dealId || !dt || !(amount > 0)) continue;
+    if (!paymentsByDeal.has(dealId)) paymentsByDeal.set(dealId, []);
+    paymentsByDeal.get(dealId).push({ date: dt, amount });
+  }
   return dealsRaw.map(x => {
     const catId = parseInt(x.CATEGORY_ID || 0);
     const isKom = isKomDeal(x);
@@ -43,11 +52,18 @@ export function enrichForKpi(dealsRaw) {
       BTYPE: detectB2b(x),
       IS_INTERNAL_SRC: isInternalSource(x.SOURCE_ID || ''),
       MGR_ID: String(x.ASSIGNED_BY_ID || ''),
+      // Если есть реестр оплат, полная сумма сделки больше не является
+      // поступлением. Сделки без реестра продолжают считаться по старой схеме.
+      PAYMENT_EVENTS: paymentsByDeal.get(String(x.ID)) || [],
     };
   });
 }
 
 function isPaid(r)    { return r.OPP >= MIN_OPP && r.PAY_DT !== null; }
+function paymentEvents(r) {
+  if (r.PAYMENT_EVENTS?.length) return r.PAYMENT_EVENTS;
+  return isPaid(r) ? [{ date: r.PAY_DT, amount: r.OPP }] : [];
+}
 // Те же правила, что в analyze.js (isAllLead / isQualLead)
 function isAllLead(r) {
   if (!VALID_CATS.has(r.CAT_ID)) return false;
@@ -67,10 +83,13 @@ function blockMetrics(rows, from, to, filterFn) {
   let createdInPeriod = 0, paidSameAsCreated = 0, paidSameAsCreatedSum = 0;
   for (const r of rows) {
     if (filterFn && !filterFn(r)) continue;
-    if (isPaid(r) && r.PAY_DT >= from && r.PAY_DT <= to) {
-      sum += r.OPP; cnt++;
+    const periodPayments = paymentEvents(r).filter(x => x.date >= from && x.date <= to);
+    if (periodPayments.length) {
+      const dealSum = periodPayments.reduce((s, x) => s + x.amount, 0);
+      const firstPaymentDate = periodPayments.reduce((min, x) => x.date < min ? x.date : min, periodPayments[0].date);
+      sum += dealSum; cnt++;
       if (r.DC) {
-        const dd = Math.round((r.PAY_DT - r.DC) / 86400000);
+        const dd = Math.round((firstPaymentDate - r.DC) / 86400000);
         if (dd >= 0) { durSum += dd; durCnt++; }
       }
     }
@@ -80,7 +99,7 @@ function blockMetrics(rows, from, to, filterFn) {
       // Созданные в периоде сделки, которые тоже оплачены (по 1С) в этом же периоде
       if (VALID_CATS.has(r.CAT_ID)) {
         createdInPeriod++;
-        if (isPaid(r) && r.PAY_DT >= from && r.PAY_DT <= to) { paidSameAsCreated++; paidSameAsCreatedSum += r.OPP; }
+        if (periodPayments.length) { paidSameAsCreated++; paidSameAsCreatedSum += periodPayments.reduce((s, x) => s + x.amount, 0); }
       }
     }
   }
@@ -106,14 +125,16 @@ function splits(rows, from, to) {
   const fmt = {}, edu = {}, btype = { B2B: { cnt: 0, sum: 0 }, B2C: { cnt: 0, sum: 0 } };
   const src = { internal: { cnt: 0, sum: 0 }, marketing: { cnt: 0, sum: 0 } };
   for (const r of rows) {
-    if (!isPaid(r) || r.PAY_DT < from || r.PAY_DT > to) continue;
+    const periodPayments = paymentEvents(r).filter(x => x.date >= from && x.date <= to);
+    if (!periodPayments.length) continue;
+    const amount = periodPayments.reduce((s, x) => s + x.amount, 0);
     if (!fmt[r.FORMAT]) fmt[r.FORMAT] = { cnt: 0, sum: 0 };
-    fmt[r.FORMAT].cnt++; fmt[r.FORMAT].sum += r.OPP;
+    fmt[r.FORMAT].cnt++; fmt[r.FORMAT].sum += amount;
     const e = EDU_TYPE_MAP[r.EDU_TYPE];
-    if (e) { if (!edu[e]) edu[e] = { cnt: 0, sum: 0 }; edu[e].cnt++; edu[e].sum += r.OPP; }
-    if (btype[r.BTYPE]) { btype[r.BTYPE].cnt++; btype[r.BTYPE].sum += r.OPP; }
+    if (e) { if (!edu[e]) edu[e] = { cnt: 0, sum: 0 }; edu[e].cnt++; edu[e].sum += amount; }
+    if (btype[r.BTYPE]) { btype[r.BTYPE].cnt++; btype[r.BTYPE].sum += amount; }
     const k = r.IS_INTERNAL_SRC ? 'internal' : 'marketing';
-    src[k].cnt++; src[k].sum += r.OPP;
+    src[k].cnt++; src[k].sum += amount;
   }
   return { fmt, edu, btype, src };
 }

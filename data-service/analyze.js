@@ -119,6 +119,43 @@ function getPayYear(r) { return (isPaid(r) && r.PAY_DT) ? r.PAY_DT.getFullYear()
 function getPayDate(r) { return (isPaid(r) && r.PAY_DT) ? dateOnly(r.PAY_DT) : null; }
 function payYtd(r) { return getPayYear(r) === YEAR; }
 
+function changeReceiptBucket(bucket, r, amount, countDelta) {
+  bucket.postupleniya += amount;
+  bucket.oplata += countDelta;
+  if (r.IS_KOM) {
+    bucket.kom_postupleniya += amount;
+    bucket.kom_won_cnt += countDelta;
+  } else {
+    bucket.oom_postupleniya += amount;
+    bucket.oom_won_cnt += countDelta;
+    bucket.won_cnt += countDelta;
+    if (r.BLOCK === 'sdo') {
+      bucket.sdo_postupleniya += amount;
+      bucket.sdo_won_cnt += countDelta;
+    } else {
+      bucket.open_postupleniya += amount;
+      bucket.open_won_cnt += countDelta;
+    }
+  }
+}
+
+function adjustReceiptBuckets(buckets, rows, bucketKey) {
+  for (const r of rows) {
+    if (!r.PAYMENT_EVENTS?.length || !VALID_CATS.has(r.CAT_ID)) continue;
+    if (isPaid(r)) {
+      const oldKey = bucketKey(getPayDate(r));
+      if (oldKey !== null && oldKey in buckets) changeReceiptBucket(buckets[oldKey], r, -r.OPP, -1);
+    }
+    const grouped = new Map();
+    for (const p of r.PAYMENT_EVENTS) {
+      const key = bucketKey(p.date);
+      if (key === null || !(key in buckets)) continue;
+      grouped.set(key, (grouped.get(key) || 0) + p.amount);
+    }
+    for (const [key, amount] of grouped) changeReceiptBucket(buckets[key], r, amount, 1);
+  }
+}
+
 // ── Метрики ───────────────────────────────────────────────────────────────────
 
 function metrics(subset, { isKomBlock=false, isOomBlock=false }={}) {
@@ -557,6 +594,19 @@ export async function loadRatingsContext() {
   const sourcesMap = dicts.sources || {};
   const directions = dicts.directions || {};
 
+  const paymentsByDeal = new Map();
+  try {
+    const registry = JSON.parse(await readFile(path.join(DATA_SERVICE_CACHE, 'payment-movements.json'), 'utf-8'));
+    for (const p of registry.payments || []) {
+      const dealId = String(p.dealId || '');
+      const date = parseDt(p.date);
+      const amount = Number(p.amount || 0);
+      if (!dealId || !date || !(amount > 0)) continue;
+      if (!paymentsByDeal.has(dealId)) paymentsByDeal.set(dealId, []);
+      paymentsByDeal.get(dealId).push({ date, amount });
+    }
+  } catch { /* до первой выгрузки работает прежний fallback */ }
+
   // Обогащение сделок
   const rows = dealsRaw.map(x => {
     const catId = parseInt(x.CATEGORY_ID||0);
@@ -601,6 +651,7 @@ export async function loadRatingsContext() {
       UF_CRM_1498466811: Array.isArray(dir)?dir:(dir?[dir]:[]),
       CREATED_DIR: x.UF_CRM_1744273716729 || '',
       DIR_C: canonDirName(x.UF_CRM_1498466811, x.UF_CRM_1744273716729, directions),
+      PAYMENT_EVENTS: paymentsByDeal.get(String(x.ID)) || [],
     };
   });
   assignProductDirections(rows, directions);
@@ -999,6 +1050,11 @@ export async function analyze(onProgress, opts) {
     }
   }
 
+  adjustReceiptBuckets(weekly, rows, (d) => {
+    if (!d || d.getFullYear() !== YEAR) return null;
+    return isoCalendar(d)[1];
+  });
+
   // Финализация недель
   const med = (arr) => { const s=[...arr].sort((a,b)=>a-b); return s.length?s[Math.floor(s.length/2)]:0; };
   for (const wd of Object.values(weekly)) {
@@ -1184,6 +1240,11 @@ export async function analyze(onProgress, opts) {
       }
     }
   }
+  adjustReceiptBuckets(monthly, rows, (d) => {
+    const m = d ? monthOf(d) : -1;
+    return m >= 0 ? m : null;
+  });
+
   // стек-2 по месяцам
   for (const m of Object.keys(monthly).map(Number)) {
     const md=monthly[m];

@@ -30,6 +30,17 @@ import { enrichForKpi, calcPeriodKpi } from '@rshu/data-service/lib/period-kpi.j
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const DEALS_PATH = path.join(__dirname, '..', '..', 'data-service', 'cache', 'deals.json');
+const PAYMENTS_PATH = path.join(__dirname, '..', '..', 'data-service', 'cache', 'payment-movements.json');
+
+async function loadPayments() {
+  try {
+    const cache = JSON.parse(await fs.readFile(PAYMENTS_PATH, 'utf-8'));
+    return Array.isArray(cache.payments) ? cache.payments : [];
+  } catch (e) {
+    if (e.code !== 'ENOENT') console.warn('payment-movements cache:', e.message);
+    return [];
+  }
+}
 
 // --- Express ---
 const app = express();
@@ -62,7 +73,11 @@ app.get('/api/kpi', async (req, res) => {
       return res.status(400).json({ error: 'некорректный диапазон дат' });
     }
 
-    const rows = enrichForKpi(JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8')));
+    const [deals, payments] = await Promise.all([
+      fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
+      loadPayments(),
+    ]);
+    const rows = enrichForKpi(deals, payments);
 
     const lenMs = dtTo - dtFrom + 86400000;
     let ppFrom, ppTo;

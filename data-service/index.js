@@ -41,6 +41,7 @@ import { fetchModules } from './lib/fetch-modules.js';
 import { fetchInvoices } from './lib/fetch-invoices.js';
 import { fetchPostSaleDeals } from './lib/bitrix-rest.js';
 import { saveDailySnapshot } from './lib/snapshot.js';
+import { fetchPaymentMovements } from './lib/fetch-payment-movements.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_DIR = path.join(__dirname, 'cache');
@@ -186,6 +187,22 @@ try {
   console.error(`  Ошибка выгрузки PostSale: ${e.message}`);
 }
 progress({ type: 'step_done', idx: 6 });
+
+// --- Фактические поступления: отдельные оплаты по банковской дате ---
+console.log('\n== Поступления: смарт-процессы 1044/1048 ==');
+try {
+  const paymentMovements = await fetchPaymentMovements();
+  await writeFileAtomic(
+    path.join(CACHE_DIR, 'payment-movements.json'),
+    JSON.stringify(paymentMovements, null, 2),
+    'utf-8'
+  );
+  console.log(`  Сохранено: cache/payment-movements.json — ${paymentMovements.payments.length} оплат, ${paymentMovements.rejected.length} отклонено (${elapsed()})`);
+} catch (e) {
+  // Старый проверенный кэш сохраняется: временная ошибка Bitrix24 не должна
+  // возвращать дашборд к полной сумме сделки и создавать двойной учёт.
+  console.error(`  Ошибка выгрузки поступлений (старый кэш сохранён): ${e.message}`);
+}
 
 // --- Шаг 8: Ежедневный снапшот портфеля (для разбивки «Остатка на конец» по этапам
 // на прошлые даты — см. portfolio-flow.js). Дата = дата fetched_at (срез кэша). ---
