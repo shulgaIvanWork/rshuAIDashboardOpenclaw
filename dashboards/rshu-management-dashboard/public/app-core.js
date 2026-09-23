@@ -21,7 +21,7 @@ function loadArtifacts() {
     var el = document.getElementById('newArtifactsBlock');
     if (!el || !d) return;
     var s = d.summary || {};
-    var hasAny = s.returns?.cnt || s.inProgressPaid?.cnt || s.wonNoPay?.cnt || s.negativeDuration?.cnt ||
+    var hasAny = s.inProgressPaid?.cnt || s.wonNoPay?.cnt || s.negativeDuration?.cnt ||
       s.otherCatPaid?.cnt || s.nextYear?.cnt || s.formatRule2?.cnt || s.oldActive?.cnt ||
       s.mmbaDeals?.cnt || s.noTypeEdu?.cnt || s.autopayDeals?.cnt;
     if (!hasAny) {
@@ -30,7 +30,6 @@ function loadArtifacts() {
     }
     var h = '<div class="mg-artifacts">';
     h += '<b>Аномалии данных</b><table style="width:100%;margin-top:8px;font-size:12px">';
-    if (s.returns?.cnt)        h += '<tr><td>Возвраты (LOSE+PAY)</td><td style="text-align:right">'+s.returns.cnt+' шт.</td><td style="text-align:right;color:#C62828">'+fmt(s.returns.sum)+' ₽</td></tr>';
     if (s.inProgressPaid?.cnt) h += '<tr><td>В работе + оплата</td><td style="text-align:right">'+s.inProgressPaid.cnt+' шт.</td><td style="text-align:right;color:#E65100">'+fmt(s.inProgressPaid.sum)+' ₽</td></tr>';
     if (s.wonNoPay?.cnt)       h += '<tr><td>WON без даты оплаты</td><td style="text-align:right">'+s.wonNoPay.cnt+' шт.</td><td style="text-align:right;color:#1565C0">'+fmt(s.wonNoPay.sum)+' ₽</td></tr>';
     if (s.negativeDuration?.cnt) h += '<tr><td>Оплата раньше создания</td><td style="text-align:right">'+s.negativeDuration.cnt+' шт.</td><td style="text-align:right;color:#6A1B9A">'+fmt(s.negativeDuration.sum)+' ₽</td></tr>';
