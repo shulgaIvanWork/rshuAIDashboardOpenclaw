@@ -37,6 +37,21 @@ import { calcManagers } from '@rshu/data-service/lib/managers-kpi.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const DEALS_PATH = path.join(__dirname, '..', '..', 'data-service', 'cache', 'deals.json');
+const PAYMENT_MOVEMENTS_PATH = path.join(__dirname, '..', '..', 'data-service', 'cache', 'payment-movements.json');
+
+async function loadPaymentMovements() {
+  try {
+    const data = JSON.parse(await fs.readFile(PAYMENT_MOVEMENTS_PATH, 'utf-8'));
+    return Array.isArray(data.payments) ? data.payments : [];
+  } catch {
+    return [];
+  }
+}
+
+function receiptEvents(r) {
+  if (r.PAYMENT_EVENTS?.length) return r.PAYMENT_EVENTS;
+  return r.OPP >= MIN_OPP && r.PAY_DT ? [{ date: r.PAY_DT, amount: r.OPP }] : [];
+}
 
 // --- Express ---
 const app = express();
@@ -79,12 +94,13 @@ function buildCheckDist(rows, from, to) {
   const b = BUCKETS.map(function (x) { return { key: x.key, label: x.label, cnt: 0, sum: 0 }; });
   let totalCnt = 0, totalSum = 0;
   for (const r of rows) {
-    if (r.OPP < MIN_OPP || !r.PAY_DT) continue;
-    if (r.PAY_DT < from || r.PAY_DT > to) continue;
-    const idx = BUCKETS.findIndex(function (x) { return r.OPP >= x.min && r.OPP < x.max; });
+    const events = receiptEvents(r).filter(p => p.date >= from && p.date <= to);
+    if (!events.length) continue;
+    const received = events.reduce((s, p) => s + p.amount, 0);
+    const idx = BUCKETS.findIndex(function (x) { return received >= x.min && received < x.max; });
     if (idx < 0) continue;
-    b[idx].cnt++; b[idx].sum += r.OPP;
-    totalCnt++; totalSum += r.OPP;
+    b[idx].cnt++; b[idx].sum += received;
+    totalCnt++; totalSum += received;
   }
   return {
     buckets: b.map(function (x) { return { key: x.key, label: x.label, cnt: x.cnt, sum: Math.round(x.sum) }; }),
@@ -103,8 +119,11 @@ app.get('/api/kpi', async (req, res) => {
     const { dir, traffic } = parseDirTraffic(req.query);
     if (dir && dir.error) return res.status(400).json({ error: dir.error });
     const f = dirTrafficFilter(dir, traffic);
-    const dealsAll = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
-    const rows = enrichForKpi(f ? dealsAll.filter(f) : dealsAll);
+    const [dealsAll, payments] = await Promise.all([
+      fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
+      loadPaymentMovements(),
+    ]);
+    const rows = enrichForKpi(f ? dealsAll.filter(f) : dealsAll, payments);
 
     const lenMs = dtTo - dtFrom + 86400000;
     let ppFrom, ppTo;
@@ -463,7 +482,7 @@ app.get('/api/kpi-month', async (req, res) => {
     const filter = mgrFilter(mgr);
     const f = dirTrafficFilter(dir, traffic);
     const dealsRaw = dealsAll.filter(x => (!filter || filter(x)) && (!f || f(x)));
-    const rows = enrichForKpi(dealsRaw);
+    const rows = enrichForKpi(dealsRaw, await loadPaymentMovements());
 
     const [y, m] = month.split('-').map(Number);
     const prev = (m === 1 ? (y - 1) + '-12' : y + '-' + String(m - 1).padStart(2, '0'));
@@ -565,7 +584,11 @@ function buildWeeks(dealsRaw, rows, range, plan, today) {
     const planSum = (plan > 0 && totalWd > 0) ? Math.round(plan * wd / totalWd) : 0;
     let factSum = 0, factCnt = 0;
     for (const r of rows) {
-      if (r.PAY_DT && r.PAY_DT >= ws && r.PAY_DT <= we) { factSum += r.OPP; factCnt++; }
+      const events = receiptEvents(r).filter(p => p.date >= ws && p.date <= we);
+      if (events.length) {
+        factSum += events.reduce((s, p) => s + p.amount, 0);
+        factCnt++;
+      }
     }
     let expSum = 0, expCnt = 0;
     for (const x of dealsRaw) {
@@ -792,7 +815,7 @@ app.get('/api/kpi-slices', async (req, res) => {
     const filter = mgrFilter(mgr);
     const f = dirTrafficFilter(dir, traffic);
     const deals = dealsAllDedup.filter(x => (!filter || filter(x)) && (!f || f(x)));
-    const rows = enrichForKpi(deals);
+    const rows = enrichForKpi(deals, await loadPaymentMovements());
     const mskToday = todayMsk();
     const range = monthRange(month);
     const plans = await readPlans();
@@ -850,7 +873,7 @@ app.get('/api/managers-sales', async (req, res) => {
     // скидки, конверсия портфеля)
     const f = dirTrafficFilter(dir, traffic);
     const dealsScoped = f ? dealsRaw.filter(f) : dealsRaw;
-    const rows = enrichForKpi(dealsScoped).map(r => ({
+    const rows = enrichForKpi(dealsScoped, await loadPaymentMovements()).map(r => ({
       ...r,
       MGR_NAME: users[r.MGR_ID] || r.MGR_ID || '(без ответственного)',
     }));
@@ -860,7 +883,6 @@ app.get('/api/managers-sales', async (req, res) => {
     const ppTo   = new Date(dtFrom.getTime() - 86400000);
     const ppFrom = new Date(dtFrom.getTime() - lenMs);
 
-    const isPaid = r => r.OPP >= MIN_OPP && r.PAY_DT !== null;
     const isAllLead  = r => VALID_CATS.has(r.CAT_ID) && !(r.SEM === 'S' && r.OPP < MIN_OPP);
     const isQualLead = r => {
       if (!VALID_CATS.has(r.CAT_ID)) return false;
@@ -889,17 +911,21 @@ app.get('/api/managers-sales', async (req, res) => {
     const touch = (map, id, name) => { if (!map[id]) map[id] = emptyMgr(id, name); return map[id]; };
 
     for (const r of rows) {
-      if (isPaid(r) && r.PAY_DT >= dtFrom && r.PAY_DT <= dtTo) {
+      const currentPayments = receiptEvents(r).filter(p => p.date >= dtFrom && p.date <= dtTo);
+      if (currentPayments.length) {
+        const received = currentPayments.reduce((s, p) => s + p.amount, 0);
+        const firstPayment = currentPayments.reduce((min, p) => p.date < min ? p.date : min, currentPayments[0].date);
         const m = touch(curM, r.MGR_ID, r.MGR_NAME);
-        m.postupleniya += r.OPP; m.won_cnt++;
+        m.postupleniya += received; m.won_cnt++;
         if (r.DC) {
-          const dd = Math.round((r.PAY_DT - r.DC) / 86400000);
+          const dd = Math.round((firstPayment - r.DC) / 86400000);
           if (dd >= 0) { m.durs_sum = (m.durs_sum || 0) + dd; m.durs_cnt = (m.durs_cnt || 0) + 1; }
         }
       }
-      if (isPaid(r) && r.PAY_DT >= ppFrom && r.PAY_DT <= ppTo) {
+      const previousPayments = receiptEvents(r).filter(p => p.date >= ppFrom && p.date <= ppTo);
+      if (previousPayments.length) {
         const m = touch(prevM, r.MGR_ID, r.MGR_NAME);
-        m.prev_postupleniya += r.OPP; m.prev_won_cnt++;
+        m.prev_postupleniya += previousPayments.reduce((s, p) => s + p.amount, 0); m.prev_won_cnt++;
       }
       if (r.DC && r.DC >= dtFrom && r.DC <= dtTo) {
         if (isAllLead(r)) {
@@ -1015,9 +1041,10 @@ app.get('/api/managers-report', async (req, res) => {
     const dirParam = String(req.query.dir || 'all');
     const form     = String(req.query.form || (dirParam === 'kom' ? 'kom' : (dirParam === 'oom' ? 'oom' : 'all')));
     const traffic  = String(req.query.traffic || 'all');
-    const [dealsAll, dicts] = await Promise.all([
+    const [dealsAll, dicts, payments] = await Promise.all([
       fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
       fs.readFile(path.join(__dirname, '..', '..', 'data-service', 'cache', 'dicts.json'), 'utf-8').then(JSON.parse),
+      loadPaymentMovements(),
     ]);
     let fromDate = null, toDate = null;
     if (from && to) {
@@ -1035,7 +1062,7 @@ app.get('/api/managers-report', async (req, res) => {
       if (traffic === 'market'   &&  internal) return false;    // маркетинговый трафик
       return true;
     });
-    const all = calcManagers(dealsRaw, dicts, fromDate, toDate);
+    const all = calcManagers(dealsRaw, dicts, fromDate, toDate, payments);
     const g = k => all.filter(m => m.group === k);
     res.json({
       period:   (from && to) ? `${from} — ${to}` : 'YTD',
@@ -1059,9 +1086,10 @@ app.get('/api/manager-weeks', async (req, res) => {
     const filterAll = mgrId === 'all';
     const { dir, traffic } = parseDirTraffic(req.query);
     if (dir && dir.error) return res.status(400).json({ error: dir.error });
-    const [dealsRaw, agg] = await Promise.all([
+    const [dealsRaw, agg, payments] = await Promise.all([
       fs.readFile(DEALS_PATH, 'utf-8').then(JSON.parse),
       getAgg(),
+      loadPaymentMovements(),
     ]);
     const f = dirTrafficFilter(dir, traffic);
     const dealsScoped = f ? dealsRaw.filter(f) : dealsRaw;
@@ -1100,6 +1128,15 @@ app.get('/api/manager-weeks', async (req, res) => {
     const blank = () => ({ leads:0, mql:0, sql:0, invoice_cnt:0, oplata:0, postupleniya:0, won_cnt:0, durSum:0, durN:0 });
     const eW = k => (wk[k] || (wk[k] = blank()));
     const eM = k => (mo[k] || (mo[k] = blank()));
+    const paymentsByDeal = new Map();
+    for (const p of payments) {
+      const id = String(p.dealId || '');
+      const date = parseDt(p.date);
+      const amount = Number(p.amount || 0);
+      if (!id || !date || !(amount > 0)) continue;
+      if (!paymentsByDeal.has(id)) paymentsByDeal.set(id, []);
+      paymentsByDeal.get(id).push({ date, amount });
+    }
 
     for (const x of dealsScoped) {
       if (!filterAll && String(x.ASSIGNED_BY_ID || '') !== mgrId) continue;
@@ -1121,13 +1158,24 @@ app.get('/api/manager-weeks', async (req, res) => {
       if (r.INV_DT && r.INV_DT.getFullYear() === YEAR) {
         eW(isoWeek(r.INV_DT)).invoice_cnt++; eM(r.INV_DT.getMonth()).invoice_cnt++;
       }
-      // оплаты — по дате оплаты
-      if (r.OPP >= MIN_OPP && r.PAY_DT && r.PAY_DT.getFullYear() === YEAR && VALID_CATS.has(r.CAT_ID)) {
-        const w = isoWeek(r.PAY_DT), mm = r.PAY_DT.getMonth();
-        eW(w).oplata++; eW(w).postupleniya += r.OPP;
-        eM(mm).oplata++; eM(mm).postupleniya += r.OPP;
-        if (!r.IS_KOM) { eW(w).won_cnt++; eM(mm).won_cnt++; }
-        if (r.DC) { const dd = daysBetween(r.DC, r.PAY_DT); if (dd >= 0) { eW(w).durSum += dd; eW(w).durN++; eM(mm).durSum += dd; eM(mm).durN++; } }
+      // поступления — по датам банка; транши заменяют полную сумму сделки
+      const registered = paymentsByDeal.get(String(x.ID || '')) || [];
+      const events = registered.length ? registered : (r.OPP >= MIN_OPP && r.PAY_DT ? [{ date: r.PAY_DT, amount: r.OPP }] : []);
+      if (VALID_CATS.has(r.CAT_ID)) {
+        const byWeek = new Map(), byMonth = new Map();
+        for (const p of events) {
+          if (p.date.getFullYear() !== YEAR) continue;
+          const w = isoWeek(p.date), mm = p.date.getMonth();
+          byWeek.set(w, (byWeek.get(w) || 0) + p.amount);
+          byMonth.set(mm, (byMonth.get(mm) || 0) + p.amount);
+        }
+        for (const [w, amount] of byWeek) { eW(w).oplata++; eW(w).postupleniya += amount; if (!r.IS_KOM) eW(w).won_cnt++; }
+        for (const [mm, amount] of byMonth) { eM(mm).oplata++; eM(mm).postupleniya += amount; if (!r.IS_KOM) eM(mm).won_cnt++; }
+        if (r.DC && events.length) {
+          const first = events.reduce((min, p) => p.date < min ? p.date : min, events[0].date);
+          const dd = daysBetween(r.DC, first);
+          if (dd >= 0) { eW(isoWeek(first)).durSum += dd; eW(isoWeek(first)).durN++; eM(first.getMonth()).durSum += dd; eM(first.getMonth()).durN++; }
+        }
       }
     }
 
@@ -1168,6 +1216,7 @@ app.get('/api/day-series', async (req, res) => {
     const dealsRaw = JSON.parse(await fs.readFile(DEALS_PATH, 'utf-8'));
     const f = dirTrafficFilter(dir, traffic);
     const dealsScoped = f ? dealsRaw.filter(f) : dealsRaw;
+    const rows = enrichForKpi(dealsScoped, await loadPaymentMovements());
     const parseDt = s => {
       if (!s) return null;
       let m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1], +m[2]-1, +m[3]);
@@ -1176,14 +1225,13 @@ app.get('/api/day-series', async (req, res) => {
     };
     const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const bucket = {};
-    for (const x of dealsScoped) {
-      const opp = parseFloat(x.OPPORTUNITY || 0);
-      if (opp < MIN_OPP) continue;
-      const pd = parseDt(x.UF_DATE_PAY_1C);
-      if (!pd || pd.getFullYear() !== YEAR) continue;
-      if (!VALID_CATS.has(parseInt(x.CATEGORY_ID || 0))) continue;
-      const b = bucket[key(pd)] || (bucket[key(pd)] = { oom_postupleniya: 0, kom_postupleniya: 0 });
-      if (isKomDeal(x)) b.kom_postupleniya += opp; else b.oom_postupleniya += opp;
+    for (const r of rows) {
+      if (!VALID_CATS.has(r.CAT_ID)) continue;
+      for (const payment of receiptEvents(r)) {
+        if (payment.date.getFullYear() !== YEAR) continue;
+        const b = bucket[key(payment.date)] || (bucket[key(payment.date)] = { oom_postupleniya: 0, kom_postupleniya: 0 });
+        if (r.IS_KOM) b.kom_postupleniya += payment.amount; else b.oom_postupleniya += payment.amount;
+      }
     }
     const today = new Date();
     const end = today.getFullYear() === YEAR ? new Date(YEAR, today.getMonth(), today.getDate()) : new Date(YEAR, 11, 31);

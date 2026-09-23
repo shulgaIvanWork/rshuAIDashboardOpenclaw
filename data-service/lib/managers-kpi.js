@@ -95,10 +95,19 @@ export { getMgrKey };
  *  conv_sql_inv, conv_inv_paid, b2b_sum, b2c_sum, src_int_sum, src_mkt_sum,
  *  fmt_oom_sum, fmt_om_sum, fmt_sdo_sum, edu_pk_sum, edu_pp_sum, edu_kom_sum}
  */
-export function calcManagers(deals, dicts, fromDate, toDate) {
+export function calcManagers(deals, dicts, fromDate, toDate, paymentMovements = []) {
   const users = dicts?.users || {};
   const mgrData = {};
   const isFiltered = fromDate && toDate;
+  const paymentsByDeal = new Map();
+  for (const p of paymentMovements) {
+    const dealId = String(p.dealId || '');
+    const date = parseDT(p.date);
+    const amount = Number(p.amount || 0);
+    if (!dealId || !date || !(amount > 0)) continue;
+    if (!paymentsByDeal.has(dealId)) paymentsByDeal.set(dealId, []);
+    paymentsByDeal.get(dealId).push({ date, amount });
+  }
 
   function getMgr(name) {
     if (!mgrData[name]) {
@@ -131,6 +140,10 @@ export function calcManagers(deals, dicts, fromDate, toDate) {
     const isAutoOrOzk = group === 'autopay' || group === 'ozk';
     const dc = parseDT(d.DATE_CREATE);
     const pay = parseDT(d.UF_DATE_PAY_1C);
+    const registeredPayments = paymentsByDeal.get(String(d.ID || '')) || [];
+    const receiptEvents = registeredPayments.length
+      ? registeredPayments
+      : (isPaid(d, opp) ? [{ date: pay, amount: opp }] : []);
     const cl = parseDT(d.CLOSEDATE);
     const loseDt = parseDT(d.UF_CRM_1753341391806) || cl;
     const sem = d.STAGE_SEMANTIC_ID || '';
@@ -141,10 +154,10 @@ export function calcManagers(deals, dicts, fromDate, toDate) {
     let inPeriod = true;
     if (isFiltered) {
       const dcOk = dc && dc >= fromDate && dc <= toDate;
-      const payOk = pay && pay >= fromDate && pay <= toDate;
+      const payOk = receiptEvents.some(p => p.date >= fromDate && p.date <= toDate);
       const lostOk = isLost && loseDt && loseDt >= fromDate && loseDt <= toDate;
       const wasInWork = dc && dc < fromDate && (cat === 0 || cat === 19) && !isAutoOrOzk;
-      const isCarryOver = wasInWork && (!pay || pay >= fromDate) && (!isLost || !loseDt || loseDt >= fromDate);
+      const isCarryOver = wasInWork && !receiptEvents.some(p => p.date < fromDate) && (!isLost || !loseDt || loseDt >= fromDate);
       inPeriod = dcOk || payOk || lostOk || isCarryOver;
       if (!inPeriod) continue;
     }
@@ -154,7 +167,7 @@ export function calcManagers(deals, dicts, fromDate, toDate) {
 
     const periodStart = isFiltered ? fromDate : YEAR_START;
     if (dc && dc <= periodStart && (cat === 0 || cat === 19) && !isAutoOrOzk) {
-      const wasPaid = pay && pay <= periodStart;
+      const wasPaid = receiptEvents.some(p => p.date <= periodStart);
       const wasLost = isLost && (loseDt ? loseDt <= periodStart : true);
       if (!wasPaid && !wasLost) m.in_work_start++;
     }
@@ -179,30 +192,30 @@ export function calcManagers(deals, dicts, fromDate, toDate) {
 
     if (isAllLead(d, opp, cat)) m.leads++;
 
-    const isP = isPaid(d, opp);
-    if (isP && pay.getFullYear() === YEAR) {
-      if (!isFiltered || (pay >= fromDate && pay <= toDate)) {
+    const paidEvents = receiptEvents.filter(p => p.date.getFullYear() === YEAR && (!isFiltered || (p.date >= fromDate && p.date <= toDate)));
+    if (paidEvents.length) {
+      const paidSum = paidEvents.reduce((s, p) => s + p.amount, 0);
+      const firstPay = paidEvents.reduce((min, p) => p.date < min ? p.date : min, paidEvents[0].date);
         m.paid++;
-        m.paid_sum += opp;
-        if (dc && pay) {
-          const dur = Math.round((pay - dc) / (1000*60*60*24));
+        m.paid_sum += paidSum;
+        if (dc) {
+          const dur = Math.round((firstPay - dc) / (1000*60*60*24));
           if (dur >= 0) { m.durs_sum += dur; m.durs_cnt++; }
         }
         const companyId = String(d.COMPANY_ID || d['UF_CRM_1455718982'] || '0');
-        if (companyId !== '0' && companyId !== 'null') m.b2b_sum += opp;
-        else m.b2c_sum += opp;
+        if (companyId !== '0' && companyId !== 'null') m.b2b_sum += paidSum;
+        else m.b2c_sum += paidSum;
         const srcId = String(d.SOURCE_ID || '');
-        if (INTERNAL_SRC.includes(srcId)) m.src_int_sum += opp;
-        else m.src_mkt_sum += opp;
+        if (INTERNAL_SRC.includes(srcId)) m.src_int_sum += paidSum;
+        else m.src_mkt_sum += paidSum;
         const fmt = String(d.UF_FORMAT || '');
-        if (fmt === '19042467') m.fmt_oom_sum += opp;
-        else if (fmt === '19042468') m.fmt_om_sum += opp;
-        else if (fmt === '19042469') m.fmt_sdo_sum += opp;
+        if (fmt === '19042467') m.fmt_oom_sum += paidSum;
+        else if (fmt === '19042468') m.fmt_om_sum += paidSum;
+        else if (fmt === '19042469') m.fmt_sdo_sum += paidSum;
         const edu = String(d.UF_CRM_1765896709800 || '');
-        if (edu === '34699') m.edu_pk_sum += opp;
-        else if (edu === '34700') m.edu_pp_sum += opp;
-        else if (edu === '34765') m.edu_kom_sum += opp;
-      }
+        if (edu === '34699') m.edu_pk_sum += paidSum;
+        else if (edu === '34700') m.edu_pp_sum += paidSum;
+        else if (edu === '34765') m.edu_kom_sum += paidSum;
     }
 
     if (isLost) {
